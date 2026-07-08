@@ -20,7 +20,7 @@
 
 #include "../lib/epanet_wrapper.h"
 
-#include "../lib/_enums_structs.h"
+#include "../lib/model/simulation_request.h"
 
 
 // QHttpServer is move only.

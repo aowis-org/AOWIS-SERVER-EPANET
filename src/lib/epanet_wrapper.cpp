@@ -8,6 +8,8 @@ EpanetWrapper::EpanetWrapper(QObject *parent)
 
 void EpanetWrapper::run(SimulationRequest request)
 {
+    this->simulation_request = request;
+    
     this->epanet_report.clear();
     
     EN_createproject(&this->epanet_project);

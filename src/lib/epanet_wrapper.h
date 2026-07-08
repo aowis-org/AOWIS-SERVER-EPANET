@@ -15,7 +15,7 @@
 #error "Could not find EPANET header."
 #endif
 
-#include "_enums_structs.h"
+#include "model/simulation_request.h"
 
 class EpanetWrapper : public QObject
 {
@@ -31,6 +31,8 @@ public:
 private:
     EN_Project epanet_project = nullptr;
     QStringList epanet_report;
+    
+    SimulationRequest simulation_request;
     
     static void epanetReportCallback(
         void *user_data,

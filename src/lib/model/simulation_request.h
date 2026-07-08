@@ -1,7 +1,7 @@
-#ifndef _ENUMS_STRUCTS_H
-#define _ENUMS_STRUCTS_H
+#ifndef SIMULATION_REQUEST_H
+#define SIMULATION_REQUEST_H
 
-#include "QString"
+#include <QString>
 #include <QList>
 
 struct Reservoir
@@ -36,4 +36,4 @@ struct SimulationRequest
     QList<Pipe> pipes;
 };
 
-#endif // _ENUMS_STRUCTS_H
+#endif // SIMULATION_REQUEST_H

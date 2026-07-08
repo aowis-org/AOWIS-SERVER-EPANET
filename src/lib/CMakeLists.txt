@@ -2,7 +2,7 @@
 add_library(aowis-server-epanet-core STATIC
     epanet_wrapper.h
     epanet_wrapper.cpp
-    _enums_structs.h
+    model/simulation_request.h
     
     
     
