@@ -2,7 +2,7 @@
 #define _ENUMS_STRUCTS_H
 
 #include "QString"
-#include <QVector>
+#include <QList>
 
 struct Reservoir
 {
@@ -31,9 +31,9 @@ struct Pipe
 
 struct SimulationRequest
 {
-    QVector<Reservoir> reservoirs;
-    QVector<Junction> junctions;
-    QVector<Pipe> pipes;
+    QList<Reservoir> reservoirs;
+    QList<Junction> junctions;
+    QList<Pipe> pipes;
 };
 
 #endif // _ENUMS_STRUCTS_H
