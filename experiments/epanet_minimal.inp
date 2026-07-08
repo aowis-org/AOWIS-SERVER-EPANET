@@ -1,0 +1,32 @@
+[TITLE]
+Minimal EPANET metric hello world: reservoir to junction
+
+[REPORT]
+STATUS              YES
+SUMMARY             YES
+NODES               ALL
+LINKS               ALL
+
+[OPTIONS]
+UNITS              LPS
+HEADLOSS           H-W
+
+[JUNCTIONS]
+;ID        Elevation_m   Demand_LPS
+ J1        0             1.0
+
+[RESERVOIRS]
+;ID        Head_m
+ R1        30
+
+[PIPES]
+;ID        Node1   Node2   Length_m   Diameter_mm   Roughness   MinorLoss   Status
+ P1        R1      J1      100        150           130         0           Open
+
+[COORDINATES]
+;Node      X       Y
+ R1        0       0
+ J1        100     0
+
+[END]
+
