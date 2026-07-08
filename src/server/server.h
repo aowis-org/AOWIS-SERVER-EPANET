@@ -18,6 +18,7 @@
 
 #include <variant>
 
+#include "../lib/epanet_wrapper.h"
 
 
 // QHttpServer is move only.

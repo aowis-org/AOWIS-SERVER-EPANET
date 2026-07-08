@@ -21,6 +21,9 @@ void Server::setupRoutes()
 {
     qDebug() << "Starting Server";
     
+    EpanetWrapper *epanet = new EpanetWrapper(this);
+    epanet->run();
+    
     /*
     this->maptiles = new MapTiles(this);
     connect(this->maptiles, &MapTiles::tileReady, this, &Server::onTileReady);
