@@ -3,6 +3,7 @@ add_library(aowis-server-epanet-core STATIC
     epanet_wrapper.h
     epanet_wrapper.cpp
     model/simulation_request.h
+    model/simulation_result.h
     
     
     

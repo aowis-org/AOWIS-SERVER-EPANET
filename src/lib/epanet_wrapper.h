@@ -16,6 +16,7 @@
 #endif
 
 #include "model/simulation_request.h"
+#include "model/simulation_result.h"
 
 class EpanetWrapper : public QObject
 {
@@ -25,6 +26,9 @@ public:
     explicit EpanetWrapper(QObject *parent = nullptr);
     
     void run(SimulationRequest request);
+    void runHydraulics();
+    SimulationResult readResults();
+    
     QStringList reportTextList() const;
     QString reportText() const;
     
@@ -44,8 +48,8 @@ private:
     void addJunction(Junction junction);
     void addPipe(Pipe Pipe);
     
-    void runHydraulics();
-    void readResults();
+    SimulationResult readResultsJunctions(SimulationResult result);
+    SimulationResult readResultsPipes(SimulationResult result);
     
 signals:
         
