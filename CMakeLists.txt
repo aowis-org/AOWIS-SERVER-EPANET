@@ -12,7 +12,11 @@ set(CMAKE_AUTORCC ON)
 option(AOWIS_SERVER_EPANET_BUILD_SERVER "Build AOWIS EPANET REST server executable" ON)
 option(AOWIS_SERVER_EPANET_BUILD_SHARED_EPANET "Build EPANET as shared library" ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Network HttpServer)
+find_package(Qt6 REQUIRED COMPONENTS Core Network)
+
+if(AOWIS_SERVER_EPANET_BUILD_SERVER)
+    find_package(Qt6 REQUIRED COMPONENTS HttpServer)
+endif()
 
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/epanet/CMakeLists.txt")
     message(FATAL_ERROR
