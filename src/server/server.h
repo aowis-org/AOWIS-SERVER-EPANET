@@ -20,6 +20,8 @@
 
 #include "../lib/epanet_wrapper.h"
 
+#include "../lib/_enums_structs.h"
+
 
 // QHttpServer is move only.
 // Storing it in QList, QVector ... will always result in those things trying to copy during reallocation, which will break

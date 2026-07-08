@@ -5,6 +5,7 @@
 #include <QDebug>
 
 #include <QString>
+#include <QStringList>
 
 #if __has_include(<epanet2_2.h>)
 #include <epanet2_2.h>
@@ -23,11 +24,19 @@ class EpanetWrapper : public QObject
 public:
     explicit EpanetWrapper(QObject *parent = nullptr);
     
-    void run();
-    
+    void run(SimulationRequest request);
+    QStringList reportTextList();
+    QString reportText();
     
 private:
-    EN_Project project = nullptr;
+    EN_Project epanet_project = nullptr;
+    QStringList epanet_report;
+    
+    static void epanetReportCallback(
+        void *user_data,
+        void *project_handle,
+        const char *line
+    );
     
     void addReservoir(Reservoir reservoir);
     void addJunction(Junction junction);

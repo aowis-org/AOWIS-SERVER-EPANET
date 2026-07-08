@@ -1,6 +1,9 @@
 #ifndef _ENUMS_STRUCTS_H
 #define _ENUMS_STRUCTS_H
 
+#include "QString"
+#include <QVector>
+
 struct Reservoir
 {
     QString id;
@@ -24,6 +27,13 @@ struct Pipe
     double roughness_hw;
     double minor_loss;
     bool open;
+};
+
+struct SimulationRequest
+{
+    QVector<Reservoir> reservoirs;
+    QVector<Junction> junctions;
+    QVector<Pipe> pipes;
 };
 
 #endif // _ENUMS_STRUCTS_H
