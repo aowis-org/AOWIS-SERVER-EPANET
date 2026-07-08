@@ -11,10 +11,16 @@ void EpanetWrapper::run(SimulationRequest request)
     this->epanet_report.clear();
     
     EN_createproject(&this->epanet_project);
+    
     EN_setreportcallbackuserdata(this->epanet_project, this);
     EN_setreportcallback(this->epanet_project, &EpanetWrapper::epanetReportCallback);
     
     EN_init(this->epanet_project, "", "", EN_LPS, EN_HW);
+    
+    // Important: EN_init can reset report-related project state.
+    // Register the callback again after EN_init.
+    EN_setreportcallbackuserdata(this->epanet_project, this);
+    EN_setreportcallback(this->epanet_project, &EpanetWrapper::epanetReportCallback);
     
     // Reservoirs
     for (int i=0; i < request.reservoirs.length(); i++)
@@ -39,6 +45,18 @@ void EpanetWrapper::run(SimulationRequest request)
     
     runHydraulics();
     readResults();
+    
+    int error = EN_saveH(this->epanet_project);
+    if (error != 0)
+    {
+        qWarning() << "EN_saveH failed:" << error;
+    }
+    
+    error = EN_report(this->epanet_project);
+    if (error != 0)
+    {
+        qWarning() << "EN_report failed:" << error;
+    }
     
     EN_deleteproject(this->epanet_project);
     this->epanet_project = nullptr;
@@ -155,6 +173,11 @@ void EpanetWrapper::addPipe(Pipe pipe)
 
 void EpanetWrapper::runHydraulics()
 {
+    EN_setreport(this->epanet_project, "STATUS YES");
+    EN_setreport(this->epanet_project, "SUMMARY YES");
+    EN_setreport(this->epanet_project, "NODES ALL");
+    EN_setreport(this->epanet_project, "LINKS ALL");
+    
     int error = EN_openH(this->epanet_project);
     if (error != 0)
     {
@@ -162,7 +185,7 @@ void EpanetWrapper::runHydraulics()
         return;
     }
     
-    error = EN_initH(this->epanet_project, EN_NOSAVE | EN_INITFLOW);
+    error = EN_initH(this->epanet_project, EN_SAVE_AND_INIT);
     if (error != 0)
     {
         qWarning() << "EN_initH failed:" << error;
@@ -171,16 +194,36 @@ void EpanetWrapper::runHydraulics()
     }
     
     long current_time_s = 0;
+    long next_step_s = 0;
     
-    error = EN_runH(this->epanet_project, &current_time_s);
+    do
+    {
+        error = EN_runH(this->epanet_project, &current_time_s);
+        if (error != 0)
+        {
+            qWarning() << "EN_runH failed:" << error;
+            EN_closeH(this->epanet_project);
+            return;
+        }
+        
+        qDebug() << "hydraulics calculated at time =" << current_time_s << "s";
+        
+        error = EN_nextH(this->epanet_project, &next_step_s);
+        if (error != 0)
+        {
+            qWarning() << "EN_nextH failed:" << error;
+            EN_closeH(this->epanet_project);
+            return;
+        }
+        
+    } while (next_step_s > 0);
+    
+    error = EN_closeH(this->epanet_project);
     if (error != 0)
     {
-        qWarning() << "EN_runH failed:" << error;
-        EN_closeH(this->epanet_project);
+        qWarning() << "EN_closeH failed:" << error;
         return;
     }
-    
-    qDebug() << "hydraulics calculated at time =" << current_time_s << "s";    
 }
 
 void EpanetWrapper::readResults()
@@ -279,19 +322,21 @@ void EpanetWrapper::readResults()
         return;
     }
     
+    /*
     qDebug() << "EPANET results:";
     qDebug() << "  J1 head =" << junction_head_m << "m";
     qDebug() << "  J1 pressure =" << junction_pressure_m << "m";
     qDebug() << "  P1 flow =" << pipe_flow_lps << "L/s";
     qDebug() << "  P1 velocity =" << pipe_velocity_mps << "m/s";
     qDebug() << "  P1 headloss =" << pipe_headloss;
+    */
 }
 
-QStringList EpanetWrapper::reportTextList()
+QStringList EpanetWrapper::reportTextList() const
 {
     return this->epanet_report;
 }
-QString EpanetWrapper::reportText()
+QString EpanetWrapper::reportText() const
 {
     return this->epanet_report.join('\n');
 }

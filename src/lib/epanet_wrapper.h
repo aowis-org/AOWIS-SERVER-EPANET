@@ -25,8 +25,8 @@ public:
     explicit EpanetWrapper(QObject *parent = nullptr);
     
     void run(SimulationRequest request);
-    QStringList reportTextList();
-    QString reportText();
+    QStringList reportTextList() const;
+    QString reportText() const;
     
 private:
     EN_Project epanet_project = nullptr;
