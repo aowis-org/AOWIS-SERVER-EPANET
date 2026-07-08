@@ -3,4 +3,4 @@
 cmake -S . -B build-linux
 cmake --build build-linux
 
-./build-linux/AOWIS-SERVER-EPANET/aowis-server-epanet
+./build-linux/src/server/aowis-server-epanet
