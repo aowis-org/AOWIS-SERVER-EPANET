@@ -83,6 +83,6 @@ EpanetStatus EpanetWrapper::runHydraulics()
     } while (next_step_s > 0);
     
     EpanetStatus status;
-    status.success = false;
+    status.success = true;
     return status;
 }
