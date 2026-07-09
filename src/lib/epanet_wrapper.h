@@ -17,6 +17,7 @@
 
 #include "model/simulation_request.h"
 #include "model/simulation_result.h"
+#include "model/epanet_status.h"
 
 class EpanetWrapper : public QObject
 {
