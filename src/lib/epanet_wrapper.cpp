@@ -34,8 +34,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
     error = EN_init(this->epanet_project, "", "", EN_LPS, EN_HW);
     if (error != 0)
     {
-        EN_deleteproject(this->epanet_project);
-        this->epanet_project = nullptr;
+        cleanupProject();
         
         emit signalSimulationFailed("EN_init failed");
         return;
@@ -53,8 +52,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
         if (!addReservoir(reservoir))
         {
             emit signalSimulationFailed("Failed to add reservoir");
-            EN_deleteproject(this->epanet_project);
-            this->epanet_project = nullptr;
+            cleanupProject();
             return;
         }
     }
@@ -66,8 +64,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
         if (!addJunction(junction))
         {
             emit signalSimulationFailed("Failed to add junction");
-            EN_deleteproject(this->epanet_project);
-            this->epanet_project = nullptr;
+            cleanupProject();
             return;
         }
     }
@@ -79,8 +76,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
         if (!addPipe(pipe))
         {
             emit signalSimulationFailed("Failed to add pipe");
-            EN_deleteproject(this->epanet_project);
-            this->epanet_project = nullptr;
+            cleanupProject();
             return;
         }
     }
@@ -89,8 +85,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
     
     if (!runHydraulics())
     {
-        EN_deleteproject(this->epanet_project);
-        this->epanet_project = nullptr;
+        cleanupProject();
         
         emit signalSimulationFailed("Hydraulic simulation failed");
         return;
@@ -99,8 +94,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
     if (!readResults())
     {
         EN_closeH(this->epanet_project);
-        EN_deleteproject(this->epanet_project);
-        this->epanet_project = nullptr;
+        cleanupProject();
         
         emit signalSimulationFailed("Failed to read simulation results");
         return;
@@ -126,8 +120,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
         qWarning() << "EN_report failed:" << error;
     }
     
-    EN_deleteproject(this->epanet_project);
-    this->epanet_project = nullptr;
+    cleanupProject();
     
     emit signalSimulationFinished(this->simulation_result);
 }
