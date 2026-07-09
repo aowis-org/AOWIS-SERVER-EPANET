@@ -160,3 +160,22 @@ void EpanetWrapper::cleanupProject()
         this->epanet_project = nullptr;
     }
 }
+
+QString EpanetWrapper::getEpanetErrorMessage(int error_code) const
+{
+    if (error_code == 0)
+        return QString();
+    
+    char message[256] = "";
+    
+    int result = EN_geterror(
+        error_code,
+        message,
+        sizeof(message)
+        );
+    
+    if (result != 0)
+        return QString("Unknown EPANET error code %1").arg(error_code);
+    
+    return QString::fromUtf8(message);
+}

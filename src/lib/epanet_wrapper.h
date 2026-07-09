@@ -41,6 +41,7 @@ public:
 private:
     EN_Project epanet_project = nullptr;
     QStringList epanet_report;
+    QString getEpanetErrorMessage(int error_code) const;
     
     SimulationRequest simulation_request;
     SimulationResult simulation_result;

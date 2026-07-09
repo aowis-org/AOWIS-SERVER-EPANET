@@ -17,6 +17,7 @@ EpanetStatus EpanetWrapper::runHydraulics()
         status.operation = EpanetOperation::EN_openH;
         status.entity.type = EpanetEntityType::None;
         status.message = "EN_openH failed";
+        status.message_epanet = getEpanetErrorMessage(error);
         status.details << "Opening EPANET hydraulics analysis system failed";
         
         return status;
@@ -34,6 +35,7 @@ EpanetStatus EpanetWrapper::runHydraulics()
         status.operation = EpanetOperation::EN_initH;
         status.entity.type = EpanetEntityType::None;
         status.message = "EN_initH failed";
+        status.message_epanet = getEpanetErrorMessage(error);
         status.details << "Initializing EPANET hydraulics analysis system failed";
         
         return status;
@@ -56,6 +58,7 @@ EpanetStatus EpanetWrapper::runHydraulics()
             status.operation = EpanetOperation::EN_runH;
             status.entity.type = EpanetEntityType::None;
             status.message = "EN_runH failed";
+            status.message_epanet = getEpanetErrorMessage(error);
             status.details << "Running EPANET hydraulics analysis system failed";
             
             return status;
@@ -75,6 +78,7 @@ EpanetStatus EpanetWrapper::runHydraulics()
             status.operation = EpanetOperation::EN_nextH;
             status.entity.type = EpanetEntityType::None;
             status.message = "EN_nextH failed";
+            status.message_epanet = getEpanetErrorMessage(error);
             status.details << "EPANET hydraulics analysis system failed";
             
             return status;

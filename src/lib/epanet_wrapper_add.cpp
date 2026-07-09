@@ -61,6 +61,7 @@ EpanetStatus EpanetWrapper::addReservoir(const Reservoir &reservoir)
         status.entity.type = EpanetEntityType::Reservoir;
         status.entity.id = reservoir.id;
         status.message = "Failed to add Reservoir";
+        status.message_epanet = getEpanetErrorMessage(error);
         status.details << "Node: " + reservoir.id;
         return status;
     }
@@ -80,6 +81,7 @@ EpanetStatus EpanetWrapper::addReservoir(const Reservoir &reservoir)
         status.entity.type = EpanetEntityType::Reservoir;
         status.entity.id = reservoir.id;
         status.message = "Failed to add Reservoir Head";
+        status.message_epanet = getEpanetErrorMessage(error);
         status.details << "Node: " + reservoir.id;
         return status;
     }
@@ -110,6 +112,7 @@ EpanetStatus EpanetWrapper::addJunction(const Junction &junction)
         status.entity.type = EpanetEntityType::Junction;
         status.entity.id = junction.id;
         status.message = "Failed to add Junction";
+        status.message_epanet = getEpanetErrorMessage(error);
         status.details << "Node: " + junction.id;
         return status;
     }
@@ -131,6 +134,7 @@ EpanetStatus EpanetWrapper::addJunction(const Junction &junction)
         status.entity.type = EpanetEntityType::Junction;
         status.entity.id = junction.id;
         status.message = "Failed to add Junction Data";
+        status.message_epanet = getEpanetErrorMessage(error);
         status.details << "Node: " + junction.id;
         return status;
     }
@@ -166,6 +170,7 @@ EpanetStatus EpanetWrapper::addPipe(const Pipe &pipe)
         status.entity.type = EpanetEntityType::Pipe;
         status.entity.id = pipe.id;
         status.message = "Failed to add pipe";
+        status.message_epanet = getEpanetErrorMessage(error);
         status.details << "From node: " + pipe.node_id_from;
         status.details << "To node: " + pipe.node_id_to;
         return status;
@@ -189,6 +194,7 @@ EpanetStatus EpanetWrapper::addPipe(const Pipe &pipe)
         status.entity.type = EpanetEntityType::Pipe;
         status.entity.id = pipe.id;
         status.message = "Failed to add pipe data";
+        status.message_epanet = getEpanetErrorMessage(error);
         status.details << "From node: " + pipe.node_id_from;
         status.details << "To node: " + pipe.node_id_to;
         return status;
@@ -210,6 +216,7 @@ EpanetStatus EpanetWrapper::addPipe(const Pipe &pipe)
         status.entity.type = EpanetEntityType::Pipe;
         status.entity.id = pipe.id;
         status.message = "Failed to add pipe status";
+        status.message_epanet = getEpanetErrorMessage(error);
         status.details << "From node: " + pipe.node_id_from;
         status.details << "To node: " + pipe.node_id_to;
         return status;

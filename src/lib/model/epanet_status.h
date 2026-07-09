@@ -128,7 +128,7 @@ struct EpanetStatus
     EpanetEntity entity;
     
     QString message;        // AOWIS/user-facing message
-    QString epanet_message; // decoded EPANET message if available
+    QString message_epanet; // decoded EPANET message if available
     QStringList details;    // optional extra context
 };
 
