@@ -1,5 +1,45 @@
 #include "epanet_wrapper.h"
 
+EpanetStatus EpanetWrapper::addEntities(const SimulationRequest &request)
+{
+    // Reservoirs
+    for (int i=0; i < request.reservoirs.length(); i++)
+    {
+        Reservoir reservoir = request.reservoirs.at(i);
+        EpanetStatus status = addReservoir(reservoir);
+        if (!status.success)
+        {
+            return status;
+        }
+    }
+    
+    // Junctions
+    for (int i=0; i < request.junctions.length(); i++)
+    {
+        Junction junction = request.junctions.at(i);
+        EpanetStatus status = addJunction(junction);
+        if (!status.success)
+        {
+            return status;
+        }
+    }
+    
+    // Pipes
+    for (int i=0; i < request.pipes.length(); i++)
+    {
+        Pipe pipe = request.pipes.at(i);
+        EpanetStatus status = addPipe(pipe);
+        if (!status.success)
+        {
+            return status;
+        }
+    }
+    
+    EpanetStatus status;
+    status.success = true;
+    return status;
+}
+
 EpanetStatus EpanetWrapper::addReservoir(const Reservoir &reservoir)
 {
     QByteArray reservoir_id = reservoir.id.toUtf8();

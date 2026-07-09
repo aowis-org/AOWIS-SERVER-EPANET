@@ -46,6 +46,7 @@ private:
         const char *line
     );
     
+    EpanetStatus addEntities(const SimulationRequest &request);
     EpanetStatus addReservoir(const Reservoir &reservoir);
     EpanetStatus addJunction(const Junction &junction);
     EpanetStatus addPipe(const Pipe &pipe);

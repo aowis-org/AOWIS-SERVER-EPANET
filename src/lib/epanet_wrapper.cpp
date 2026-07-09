@@ -1,6 +1,5 @@
 #include "epanet_wrapper.h"
 
-#include <utility>
 
 EpanetWrapper::EpanetWrapper(QObject *parent)
     : QObject(parent)
@@ -40,50 +39,17 @@ void EpanetWrapper::run(const SimulationRequest &request)
         return;
     }
     
-    // Important: EN_init can reset report-related project state.
-    // Register the callback again after EN_init.
     EN_setreportcallbackuserdata(this->epanet_project, this);
     EN_setreportcallback(this->epanet_project, &EpanetWrapper::epanetReportCallback);
     
-    // Reservoirs
-    for (int i=0; i < request.reservoirs.length(); i++)
-    {
-        Reservoir reservoir = request.reservoirs.at(i);
-        EpanetStatus status = addReservoir(reservoir);
-        if (!status.success)
-        {
-            emit signalSimulationFailed(status);
-            cleanupProject();
-            return;
-        }
-    }
     
-    // Junctions
-    for (int i=0; i < request.junctions.length(); i++)
+    EpanetStatus status = addEntities(request);
+    if (!status.success)
     {
-        Junction junction = request.junctions.at(i);
-        EpanetStatus status = addJunction(junction);
-        if (!status.success)
-        {
-            emit signalSimulationFailed(status);
-            cleanupProject();
-            return;
-        }
+        emit signalSimulationFailed(status);
+        cleanupProject();
+        return;
     }
-    
-    // Pipes
-    for (int i=0; i < request.pipes.length(); i++)
-    {
-        Pipe pipe = request.pipes.at(i);
-        EpanetStatus status = addPipe(pipe);
-        if (!status.success)
-        {
-            emit signalSimulationFailed(status);
-            cleanupProject();
-            return;
-        }
-    }
-    
     
     
     if (!runHydraulics())
