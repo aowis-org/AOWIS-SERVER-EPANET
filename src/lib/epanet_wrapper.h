@@ -27,7 +27,7 @@ public:
     explicit EpanetWrapper(QObject *parent = nullptr);
     
     void run(const SimulationRequest &request);
-    bool runHydraulics();
+    EpanetStatus runHydraulics();
     bool readResults();
     
     QStringList reportTextList() const;

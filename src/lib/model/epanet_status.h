@@ -10,8 +10,8 @@ enum class EpanetStage
     
     CreateProject,
     InitializeProject,
-    BuildNetwork,
     
+    BuildNetwork,
     AddReservoir,
     AddJunction,
     AddPipe,

@@ -33,6 +33,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
     {
         EpanetStatus status;
         status.success = false;
+        status.epanet_error_code = error;
         status.stage = EpanetStage::CreateProject;
         status.operation = EpanetOperation::EN_createproject;
         status.entity.type = EpanetEntityType::None;
@@ -53,6 +54,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
         
         EpanetStatus status;
         status.success = false;
+        status.epanet_error_code = error;
         status.stage = EpanetStage::InitializeProject;
         status.operation = EpanetOperation::EN_init;
         status.entity.type = EpanetEntityType::None;
@@ -76,11 +78,11 @@ void EpanetWrapper::run(const SimulationRequest &request)
     }
     
     
-    if (!runHydraulics())
+    status = runHydraulics();
+    if (!status.success)
     {
+        emit signalSimulationFailed(status);
         cleanupProject();
-        
-        //emit signalSimulationFailed("Hydraulic simulation failed");
         return;
     }
     
