@@ -107,7 +107,7 @@ EpanetStatus EpanetWrapper::addJunction(const Junction &junction)
         status.epanet_error_code = error;
         status.stage = EpanetStage::AddJunction;
         status.operation = EpanetOperation::EN_addnode;
-        status.entity.type = EpanetEntityType::Pipe;
+        status.entity.type = EpanetEntityType::Junction;
         status.entity.id = junction.id;
         status.message = "Failed to add Junction";
         status.details << "Node: " + junction.id;
@@ -128,7 +128,7 @@ EpanetStatus EpanetWrapper::addJunction(const Junction &junction)
         status.epanet_error_code = error;
         status.stage = EpanetStage::AddJunction;
         status.operation = EpanetOperation::EN_setjuncdata;
-        status.entity.type = EpanetEntityType::Pipe;
+        status.entity.type = EpanetEntityType::Junction;
         status.entity.id = junction.id;
         status.message = "Failed to add Junction Data";
         status.details << "Node: " + junction.id;
