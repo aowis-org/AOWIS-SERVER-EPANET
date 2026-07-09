@@ -50,7 +50,7 @@ EpanetStatus EpanetWrapper::addReservoir(const Reservoir &reservoir)
         reservoir_id.constData(),
         EN_RESERVOIR,
         &reservoir_index
-        );
+    );
     if (error != 0)
     {
         EpanetStatus status;
@@ -66,10 +66,10 @@ EpanetStatus EpanetWrapper::addReservoir(const Reservoir &reservoir)
     }
     
     error = EN_setnodevalue(this->epanet_project,
-                            reservoir_index,
-                            EN_ELEVATION,
-                            reservoir.head_m
-                            );
+        reservoir_index,
+        EN_ELEVATION,
+        reservoir.head_m
+    );
     if (error != 0)
     {
         EpanetStatus status;
@@ -99,7 +99,7 @@ EpanetStatus EpanetWrapper::addJunction(const Junction &junction)
         junction_id.constData(),
         EN_JUNCTION,
         &junction_index
-        );
+    );
     if (error != 0)
     {
         EpanetStatus status;
@@ -120,7 +120,7 @@ EpanetStatus EpanetWrapper::addJunction(const Junction &junction)
         junction.elevation_m,
         junction.demand_lps,
         ""
-        );
+    );
     if (error != 0)
     {
         EpanetStatus status;
@@ -155,7 +155,7 @@ EpanetStatus EpanetWrapper::addPipe(const Pipe &pipe)
         node_id_from.constData(),
         node_id_to.constData(),
         &pipe_index
-        );
+    );
     if (error != 0)
     {
         EpanetStatus status;
@@ -178,7 +178,7 @@ EpanetStatus EpanetWrapper::addPipe(const Pipe &pipe)
         pipe.diameter_mm,
         pipe.roughness_hw,
         pipe.minor_loss
-        );
+    );
     if (error != 0)
     {
         EpanetStatus status;
@@ -199,7 +199,7 @@ EpanetStatus EpanetWrapper::addPipe(const Pipe &pipe)
         pipe_index,
         EN_INITSTATUS,
         pipe.open ? EN_OPEN : EN_CLOSED
-        );
+    );
     if (error != 0)
     {
         EpanetStatus status;
