@@ -28,7 +28,7 @@ public:
     
     void run(const SimulationRequest &request);
     EpanetStatus runHydraulics();
-    bool readResults();
+    EpanetStatus readResults();
     
     QStringList reportTextList() const;
     QString reportText() const;
@@ -51,8 +51,8 @@ private:
     EpanetStatus addJunction(const Junction &junction);
     EpanetStatus addPipe(const Pipe &pipe);
     
-    bool readResultsJunctions();
-    bool readResultsPipes();
+    EpanetStatus readResultsJunctions();
+    EpanetStatus readResultsPipes();
     
     void cleanupProject();
     

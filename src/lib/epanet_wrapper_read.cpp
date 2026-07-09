@@ -1,16 +1,20 @@
 #include "epanet_wrapper.h"
 
-bool EpanetWrapper::readResults()
+EpanetStatus EpanetWrapper::readResults()
 {
-    if (!readResultsJunctions())
-        return false;
+    EpanetStatus status_junctions = readResultsJunctions();
+    if (!status_junctions.success)
+        return status_junctions;
     
-    if (!readResultsPipes())
-        return false;
+    EpanetStatus status_pipes = readResultsPipes();
+    if (!status_pipes.success)
+        return status_pipes;
     
-    return true;
+    EpanetStatus status;
+    status.success = true;
+    return status;
 }
-bool EpanetWrapper::readResultsJunctions()
+EpanetStatus EpanetWrapper::readResultsJunctions()
 {
     for (const Junction &junction : std::as_const(this->simulation_request.junctions))
     {
@@ -24,10 +28,17 @@ bool EpanetWrapper::readResultsJunctions()
         );
         if (error != 0)
         {
-            qWarning() << "EN_getnodeindex failed for junction"
-                       << junction.id
-                       << "error =" << error;
-            return false;
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::ReadJunctionResults;
+            status.operation = EpanetOperation::EN_getnodeindex;
+            status.entity.type = EpanetEntityType::Junction;
+            status.entity.id = junction.id;
+            status.message = "Failed to get Junction Index";
+            status.details << "EN_getnodeindex failed for : " + junction.id;
+            
+            return status;
         }
         
         double junction_head_m = 0.0;
@@ -41,10 +52,17 @@ bool EpanetWrapper::readResultsJunctions()
         );
         if (error != 0)
         {
-            qWarning() << "EN_getnodevalue head failed for junction"
-                       << junction.id
-                       << "error =" << error;
-            return false;
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::ReadJunctionResults;
+            status.operation = EpanetOperation::EN_getnodevalue;
+            status.entity.type = EpanetEntityType::Junction;
+            status.entity.id = junction.id;
+            status.message = "Failed to get Head for Junction";
+            status.details << "EN_getnodevalue EN_HEAD failed for : " + junction.id;
+            
+            return status;
         }
         
         error = EN_getnodevalue(
@@ -55,10 +73,17 @@ bool EpanetWrapper::readResultsJunctions()
         );
         if (error != 0)
         {
-            qWarning() << "EN_getnodevalue pressure failed for junction"
-                       << junction.id
-                       << "error =" << error;
-            return false;
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::ReadJunctionResults;
+            status.operation = EpanetOperation::EN_getnodevalue;
+            status.entity.type = EpanetEntityType::Junction;
+            status.entity.id = junction.id;
+            status.message = "Failed to get Pressure for Junction";
+            status.details << "EN_getnodevalue EN_PRESSURE failed for : " + junction.id;
+            
+            return status;
         }
         
         JunctionResult junction_result;
@@ -69,9 +94,11 @@ bool EpanetWrapper::readResultsJunctions()
         this->simulation_result.junctions.append(junction_result);
     }
     
-    return true;
+    EpanetStatus status;
+    status.success = true;
+    return status;
 }
-bool EpanetWrapper::readResultsPipes()
+EpanetStatus EpanetWrapper::readResultsPipes()
 {
     for (const Pipe &pipe : std::as_const(this->simulation_request.pipes))
     {
@@ -88,7 +115,17 @@ bool EpanetWrapper::readResultsPipes()
             qWarning() << "EN_getlinkindex failed for pipe"
                        << pipe.id
                        << "error =" << error;
-            return false;
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::ReadPipeResults;
+            status.operation = EpanetOperation::EN_getlinkindex;
+            status.entity.type = EpanetEntityType::Pipe;
+            status.entity.id = pipe.id;
+            status.message = "Failed to get Link Index for Pipe";
+            status.details << "EN_getlinkindex failed for Pipe: " + pipe.id;
+            
+            return status;
         }
         
         double pipe_flow_lps = 0.0;
@@ -103,10 +140,17 @@ bool EpanetWrapper::readResultsPipes()
         );
         if (error != 0)
         {
-            qWarning() << "EN_getlinkvalue flow failed for pipe"
-                       << pipe.id
-                       << "error =" << error;
-            return false;
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::ReadPipeResults;
+            status.operation = EpanetOperation::EN_getlinkvalue;
+            status.entity.type = EpanetEntityType::Pipe;
+            status.entity.id = pipe.id;
+            status.message = "Failed to get Flow for Pipe";
+            status.details << "EN_getlinkvalue EN_FLOW failed for Pipe: " + pipe.id;
+            
+            return status;
         }
         
         error = EN_getlinkvalue(
@@ -117,10 +161,17 @@ bool EpanetWrapper::readResultsPipes()
         );
         if (error != 0)
         {
-            qWarning() << "EN_getlinkvalue velocity failed for pipe"
-                       << pipe.id
-                       << "error =" << error;
-            return false;
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::ReadPipeResults;
+            status.operation = EpanetOperation::EN_getlinkvalue;
+            status.entity.type = EpanetEntityType::Pipe;
+            status.entity.id = pipe.id;
+            status.message = "Failed to get Velocity for Pipe";
+            status.details << "EN_getlinkvalue EN_VELOCITY failed for Pipe: " + pipe.id;
+            
+            return status;
         }
         
         error = EN_getlinkvalue(
@@ -131,10 +182,17 @@ bool EpanetWrapper::readResultsPipes()
         );
         if (error != 0)
         {
-            qWarning() << "EN_getlinkvalue headloss failed for pipe"
-                       << pipe.id
-                       << "error =" << error;
-            return false;
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::ReadPipeResults;
+            status.operation = EpanetOperation::EN_getlinkvalue;
+            status.entity.type = EpanetEntityType::Pipe;
+            status.entity.id = pipe.id;
+            status.message = "Failed to get Headloss for Pipe";
+            status.details << "EN_getlinkvalue EN_HEADLOSS failed for Pipe: " + pipe.id;
+            
+            return status;
         }
         
         PipeResult pipe_result;
@@ -146,5 +204,7 @@ bool EpanetWrapper::readResultsPipes()
         this->simulation_result.pipes.append(pipe_result);
     }
     
-    return true;
+    EpanetStatus status;
+    status.success = true;
+    return status;
 }

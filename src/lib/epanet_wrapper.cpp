@@ -60,8 +60,8 @@ void EpanetWrapper::run(const SimulationRequest &request)
         status.entity.type = EpanetEntityType::None;
         status.message = "EPANET project initialization failed";
         status.details << "";
-        emit signalSimulationFailed(status);
         
+        emit signalSimulationFailed(status);
         return;
     }
     
@@ -72,8 +72,9 @@ void EpanetWrapper::run(const SimulationRequest &request)
     EpanetStatus status = addEntities(request);
     if (!status.success)
     {
-        emit signalSimulationFailed(status);
         cleanupProject();
+        
+        emit signalSimulationFailed(status);
         return;
     }
     
@@ -81,17 +82,19 @@ void EpanetWrapper::run(const SimulationRequest &request)
     status = runHydraulics();
     if (!status.success)
     {
-        emit signalSimulationFailed(status);
         cleanupProject();
+        
+        emit signalSimulationFailed(status);
         return;
     }
     
-    if (!readResults())
+    status = readResults();
+    if (!status.success)
     {
         EN_closeH(this->epanet_project);
         cleanupProject();
         
-        //emit signalSimulationFailed("Failed to read simulation results");
+        emit signalSimulationFailed(status);
         return;
     }
     
