@@ -7,6 +7,8 @@
 #include <QString>
 #include <QStringList>
 
+#include <QMetaType>
+
 #if __has_include(<epanet2_2.h>)
 #include <epanet2_2.h>
 #elif __has_include(<epanet2.h>)
@@ -18,6 +20,9 @@
 #include "model/simulation_request.h"
 #include "model/simulation_result.h"
 #include "model/epanet_status.h"
+
+Q_DECLARE_METATYPE(SimulationResult)
+Q_DECLARE_METATYPE(EpanetStatus)
 
 class EpanetWrapper : public QObject
 {

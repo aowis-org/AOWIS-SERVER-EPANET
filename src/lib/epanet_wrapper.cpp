@@ -4,7 +4,8 @@
 EpanetWrapper::EpanetWrapper(QObject *parent)
     : QObject(parent)
 {
-    
+    qRegisterMetaType<SimulationResult>("SimulationResult");
+    qRegisterMetaType<EpanetStatus>("EpanetStatus");
 }
 
 void EpanetWrapper::run(const SimulationRequest &request)
