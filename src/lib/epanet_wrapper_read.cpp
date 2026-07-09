@@ -21,8 +21,7 @@ bool EpanetWrapper::readResultsJunctions()
             this->epanet_project,
             junction_id.constData(),
             &junction_index
-            );
-        
+        );
         if (error != 0)
         {
             qWarning() << "EN_getnodeindex failed for junction"
@@ -39,8 +38,7 @@ bool EpanetWrapper::readResultsJunctions()
             junction_index,
             EN_HEAD,
             &junction_head_m
-            );
-        
+        );
         if (error != 0)
         {
             qWarning() << "EN_getnodevalue head failed for junction"
@@ -54,8 +52,7 @@ bool EpanetWrapper::readResultsJunctions()
             junction_index,
             EN_PRESSURE,
             &junction_pressure_m
-            );
-        
+        );
         if (error != 0)
         {
             qWarning() << "EN_getnodevalue pressure failed for junction"
@@ -85,8 +82,7 @@ bool EpanetWrapper::readResultsPipes()
             this->epanet_project,
             pipe_id.constData(),
             &pipe_index
-            );
-        
+        );
         if (error != 0)
         {
             qWarning() << "EN_getlinkindex failed for pipe"
@@ -104,8 +100,7 @@ bool EpanetWrapper::readResultsPipes()
             pipe_index,
             EN_FLOW,
             &pipe_flow_lps
-            );
-        
+        );
         if (error != 0)
         {
             qWarning() << "EN_getlinkvalue flow failed for pipe"
@@ -119,8 +114,7 @@ bool EpanetWrapper::readResultsPipes()
             pipe_index,
             EN_VELOCITY,
             &pipe_velocity_mps
-            );
-        
+        );
         if (error != 0)
         {
             qWarning() << "EN_getlinkvalue velocity failed for pipe"
@@ -134,8 +128,7 @@ bool EpanetWrapper::readResultsPipes()
             pipe_index,
             EN_HEADLOSS,
             &pipe_headloss
-            );
-        
+        );
         if (error != 0)
         {
             qWarning() << "EN_getlinkvalue headloss failed for pipe"
