@@ -12,7 +12,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
 {
     if (this->epanet_project != nullptr)
     {
-        emit signalSimulationFailed("EPANET project is already running");
+        //emit signalSimulationFailed("EPANET project is already running");
         return;
     }
     
@@ -24,7 +24,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
     int error = EN_createproject(&this->epanet_project);
     if (error != 0)
     {
-        emit signalSimulationFailed("EN_createproject failed");
+        //emit signalSimulationFailed("EN_createproject failed");
         return;
     }
     
@@ -36,7 +36,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
     {
         cleanupProject();
         
-        emit signalSimulationFailed("EN_init failed");
+        //emit signalSimulationFailed("EN_init failed");
         return;
     }
     
@@ -49,9 +49,10 @@ void EpanetWrapper::run(const SimulationRequest &request)
     for (int i=0; i < request.reservoirs.length(); i++)
     {
         Reservoir reservoir = request.reservoirs.at(i);
-        if (!addReservoir(reservoir))
+        EpanetStatus status = addReservoir(reservoir);
+        if (!status.success)
         {
-            emit signalSimulationFailed("Failed to add reservoir");
+            emit signalSimulationFailed(status);
             cleanupProject();
             return;
         }
@@ -61,9 +62,10 @@ void EpanetWrapper::run(const SimulationRequest &request)
     for (int i=0; i < request.junctions.length(); i++)
     {
         Junction junction = request.junctions.at(i);
-        if (!addJunction(junction))
+        EpanetStatus status = addJunction(junction);
+        if (!status.success)
         {
-            emit signalSimulationFailed("Failed to add junction");
+            emit signalSimulationFailed(status);
             cleanupProject();
             return;
         }
@@ -73,9 +75,10 @@ void EpanetWrapper::run(const SimulationRequest &request)
     for (int i=0; i < request.pipes.length(); i++)
     {
         Pipe pipe = request.pipes.at(i);
-        if (!addPipe(pipe))
+        EpanetStatus status = addPipe(pipe);
+        if (!status.success)
         {
-            emit signalSimulationFailed("Failed to add pipe");
+            emit signalSimulationFailed(status);
             cleanupProject();
             return;
         }
@@ -87,7 +90,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
     {
         cleanupProject();
         
-        emit signalSimulationFailed("Hydraulic simulation failed");
+        //emit signalSimulationFailed("Hydraulic simulation failed");
         return;
     }
     
@@ -96,7 +99,7 @@ void EpanetWrapper::run(const SimulationRequest &request)
         EN_closeH(this->epanet_project);
         cleanupProject();
         
-        emit signalSimulationFailed("Failed to read simulation results");
+        //emit signalSimulationFailed("Failed to read simulation results");
         return;
     }
     

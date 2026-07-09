@@ -46,9 +46,9 @@ private:
         const char *line
     );
     
-    bool addReservoir(const Reservoir &reservoir);
-    bool addJunction(const Junction &junction);
-    bool addPipe(const Pipe &pipe);
+    EpanetStatus addReservoir(const Reservoir &reservoir);
+    EpanetStatus addJunction(const Junction &junction);
+    EpanetStatus addPipe(const Pipe &pipe);
     
     bool readResultsJunctions();
     bool readResultsPipes();
@@ -57,7 +57,7 @@ private:
     
 signals:
     void signalSimulationFinished(SimulationResult result);
-    void signalSimulationFailed(QString message);
+    void signalSimulationFailed(EpanetStatus status);
         
 };
 
