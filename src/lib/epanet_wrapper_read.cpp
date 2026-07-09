@@ -57,6 +57,7 @@ EpanetStatus EpanetWrapper::readResultsJunctions()
             status.epanet_error_code = error;
             status.stage = EpanetStage::ReadJunctionResults;
             status.operation = EpanetOperation::EN_getnodevalue;
+            status.property = EpanetProperty::Headloss;
             status.entity.type = EpanetEntityType::Junction;
             status.entity.id = junction.id;
             status.message = "Failed to get Head for Junction";
@@ -78,6 +79,7 @@ EpanetStatus EpanetWrapper::readResultsJunctions()
             status.epanet_error_code = error;
             status.stage = EpanetStage::ReadJunctionResults;
             status.operation = EpanetOperation::EN_getnodevalue;
+            status.property = EpanetProperty::Pressure;
             status.entity.type = EpanetEntityType::Junction;
             status.entity.id = junction.id;
             status.message = "Failed to get Pressure for Junction";
@@ -112,9 +114,6 @@ EpanetStatus EpanetWrapper::readResultsPipes()
         );
         if (error != 0)
         {
-            qWarning() << "EN_getlinkindex failed for pipe"
-                       << pipe.id
-                       << "error =" << error;
             EpanetStatus status;
             status.success = false;
             status.epanet_error_code = error;
@@ -145,6 +144,7 @@ EpanetStatus EpanetWrapper::readResultsPipes()
             status.epanet_error_code = error;
             status.stage = EpanetStage::ReadPipeResults;
             status.operation = EpanetOperation::EN_getlinkvalue;
+            status.property = EpanetProperty::Flow;
             status.entity.type = EpanetEntityType::Pipe;
             status.entity.id = pipe.id;
             status.message = "Failed to get Flow for Pipe";
@@ -166,6 +166,7 @@ EpanetStatus EpanetWrapper::readResultsPipes()
             status.epanet_error_code = error;
             status.stage = EpanetStage::ReadPipeResults;
             status.operation = EpanetOperation::EN_getlinkvalue;
+            status.property = EpanetProperty::Velocity;
             status.entity.type = EpanetEntityType::Pipe;
             status.entity.id = pipe.id;
             status.message = "Failed to get Velocity for Pipe";
@@ -187,6 +188,7 @@ EpanetStatus EpanetWrapper::readResultsPipes()
             status.epanet_error_code = error;
             status.stage = EpanetStage::ReadPipeResults;
             status.operation = EpanetOperation::EN_getlinkvalue;
+            status.property = EpanetProperty::Headloss;
             status.entity.type = EpanetEntityType::Pipe;
             status.entity.id = pipe.id;
             status.message = "Failed to get Headloss for Pipe";

@@ -65,6 +65,21 @@ enum class EpanetOperation
     EN_geterror
 };
 
+enum class EpanetProperty
+{
+    None,
+    
+    Elevation,
+    Head,
+    Pressure,
+    
+    Flow,
+    Velocity,
+    Headloss,
+    
+    InitialStatus
+};
+
 enum class EpanetEntityType
 {
     None,
@@ -108,6 +123,7 @@ struct EpanetStatus
     
     EpanetStage stage = EpanetStage::None;
     EpanetOperation operation = EpanetOperation::None;
+    EpanetProperty property = EpanetProperty::None;
     
     EpanetEntity entity;
     
