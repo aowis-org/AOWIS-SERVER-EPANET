@@ -25,9 +25,9 @@ class EpanetWrapper : public QObject
 public:
     explicit EpanetWrapper(QObject *parent = nullptr);
     
-    void run(SimulationRequest request);
-    void runHydraulics();
-    SimulationResult readResults();
+    void run(const SimulationRequest &request);
+    bool runHydraulics();
+    bool readResults();
     
     QStringList reportTextList() const;
     QString reportText() const;
@@ -37,6 +37,7 @@ private:
     QStringList epanet_report;
     
     SimulationRequest simulation_request;
+    SimulationResult simulation_result;
     
     static void epanetReportCallback(
         void *user_data,
@@ -44,14 +45,18 @@ private:
         const char *line
     );
     
-    void addReservoir(Reservoir reservoir);
-    void addJunction(Junction junction);
-    void addPipe(Pipe Pipe);
+    bool addReservoir(const Reservoir &reservoir);
+    bool addJunction(const Junction &junction);
+    bool addPipe(const Pipe &pipe);
     
-    SimulationResult readResultsJunctions(SimulationResult result);
-    SimulationResult readResultsPipes(SimulationResult result);
+    bool readResultsJunctions();
+    bool readResultsPipes();
+    
+    void cleanupProject();
     
 signals:
+    void signalSimulationFinished(SimulationResult result);
+    void signalSimulationFailed(QString message);
         
 };
 

@@ -1,23 +1,45 @@
 #include "epanet_wrapper.h"
 
+#include <utility>
+
 EpanetWrapper::EpanetWrapper(QObject *parent)
     : QObject(parent)
 {
     
 }
 
-void EpanetWrapper::run(SimulationRequest request)
+void EpanetWrapper::run(const SimulationRequest &request)
 {
+    if (this->epanet_project != nullptr)
+    {
+        emit signalSimulationFailed("EPANET project is already running");
+        return;
+    }
+    
     this->simulation_request = request;
     
+    this->simulation_result = SimulationResult();
     this->epanet_report.clear();
     
-    EN_createproject(&this->epanet_project);
+    int error = EN_createproject(&this->epanet_project);
+    if (error != 0)
+    {
+        emit signalSimulationFailed("EN_createproject failed");
+        return;
+    }
     
     EN_setreportcallbackuserdata(this->epanet_project, this);
     EN_setreportcallback(this->epanet_project, &EpanetWrapper::epanetReportCallback);
     
-    EN_init(this->epanet_project, "", "", EN_LPS, EN_HW);
+    error = EN_init(this->epanet_project, "", "", EN_LPS, EN_HW);
+    if (error != 0)
+    {
+        EN_deleteproject(this->epanet_project);
+        this->epanet_project = nullptr;
+        
+        emit signalSimulationFailed("EN_init failed");
+        return;
+    }
     
     // Important: EN_init can reset report-related project state.
     // Register the callback again after EN_init.
@@ -28,27 +50,71 @@ void EpanetWrapper::run(SimulationRequest request)
     for (int i=0; i < request.reservoirs.length(); i++)
     {
         Reservoir reservoir = request.reservoirs.at(i);
-        addReservoir(reservoir);
+        if (!addReservoir(reservoir))
+        {
+            emit signalSimulationFailed("Failed to add reservoir");
+            EN_deleteproject(this->epanet_project);
+            this->epanet_project = nullptr;
+            return;
+        }
     }
     
     // Junctions
     for (int i=0; i < request.junctions.length(); i++)
     {
         Junction junction = request.junctions.at(i);
-        addJunction(junction);
+        if (!addJunction(junction))
+        {
+            emit signalSimulationFailed("Failed to add junction");
+            EN_deleteproject(this->epanet_project);
+            this->epanet_project = nullptr;
+            return;
+        }
     }
     
     // Pipes
     for (int i=0; i < request.pipes.length(); i++)
     {
         Pipe pipe = request.pipes.at(i);
-        addPipe(pipe);
+        if (!addPipe(pipe))
+        {
+            emit signalSimulationFailed("Failed to add pipe");
+            EN_deleteproject(this->epanet_project);
+            this->epanet_project = nullptr;
+            return;
+        }
     }
     
-    runHydraulics();
-    readResults();
     
-    int error = EN_saveH(this->epanet_project);
+    
+    if (!runHydraulics())
+    {
+        EN_deleteproject(this->epanet_project);
+        this->epanet_project = nullptr;
+        
+        emit signalSimulationFailed("Hydraulic simulation failed");
+        return;
+    }
+    
+    if (!readResults())
+    {
+        EN_closeH(this->epanet_project);
+        EN_deleteproject(this->epanet_project);
+        this->epanet_project = nullptr;
+        
+        emit signalSimulationFailed("Failed to read simulation results");
+        return;
+    }
+    
+    
+    
+    error = EN_closeH(this->epanet_project);
+    if (error != 0)
+    {
+        qWarning() << "EN_closeH failed:" << error;
+    }
+    
+    error = EN_saveH(this->epanet_project);
     if (error != 0)
     {
         qWarning() << "EN_saveH failed:" << error;
@@ -62,9 +128,11 @@ void EpanetWrapper::run(SimulationRequest request)
     
     EN_deleteproject(this->epanet_project);
     this->epanet_project = nullptr;
+    
+    emit signalSimulationFinished(this->simulation_result);
 }
 
-void EpanetWrapper::addReservoir(Reservoir reservoir)
+bool EpanetWrapper::addReservoir(const Reservoir &reservoir)
 {
     QByteArray reservoir_id = reservoir.id.toUtf8();
     int reservoir_index = 0;
@@ -78,7 +146,7 @@ void EpanetWrapper::addReservoir(Reservoir reservoir)
     if (error != 0)
     {
         qWarning() << "EN_addnode reservoir failed:" << error;
-        return;
+        return false;
     }
     
     error = EN_setnodevalue(this->epanet_project,
@@ -89,11 +157,13 @@ void EpanetWrapper::addReservoir(Reservoir reservoir)
     if (error != 0)
     {
         qWarning() << "EN_setnodevalue reservoir head failed:" << error;
-        return;
+        return false;
     }
+    
+    return true;
 }
 
-void EpanetWrapper::addJunction(Junction junction)
+bool EpanetWrapper::addJunction(const Junction &junction)
 {
     QByteArray junction_id = junction.id.toUtf8();
     int junction_index = 0;
@@ -107,7 +177,7 @@ void EpanetWrapper::addJunction(Junction junction)
     if (error != 0)
     {
         qWarning() << "EN_addnode junction failed:" << error;
-        return;
+        return false;
     }
     
     error = EN_setjuncdata(
@@ -120,11 +190,13 @@ void EpanetWrapper::addJunction(Junction junction)
     if (error != 0)
     {
         qWarning() << "EN_setjuncdata junction failed:" << error;
-        return;
+        return false;
     }
+    
+    return true;
 }
 
-void EpanetWrapper::addPipe(Pipe pipe)
+bool EpanetWrapper::addPipe(const Pipe &pipe)
 {
     QByteArray pipe_id = pipe.id.toUtf8();
     QByteArray node_id_from = pipe.node_id_from.toUtf8();
@@ -143,7 +215,7 @@ void EpanetWrapper::addPipe(Pipe pipe)
     if (error != 0)
     {
         qWarning() << "EN_addlink pipe failed:" << error;
-        return;
+        return false;
     }
     
     error = EN_setpipedata(
@@ -157,7 +229,7 @@ void EpanetWrapper::addPipe(Pipe pipe)
     if (error != 0)
     {
         qWarning() << "EN_setpipedata pipe failed:" << error;
-        return;
+        return false;
     }
     
     error = EN_setlinkvalue(
@@ -169,11 +241,13 @@ void EpanetWrapper::addPipe(Pipe pipe)
     if (error != 0)
     {
         qWarning() << "EN_setlinkvalue pipe status failed:" << error;
-        return;
+        return false;
     }
+    
+    return true;
 }
 
-void EpanetWrapper::runHydraulics()
+bool EpanetWrapper::runHydraulics()
 {
     EN_setreport(this->epanet_project, "STATUS YES");
     EN_setreport(this->epanet_project, "SUMMARY YES");
@@ -184,7 +258,7 @@ void EpanetWrapper::runHydraulics()
     if (error != 0)
     {
         qWarning() << "EN_openH failed:" << error;
-        return;
+        return false;
     }
     
     error = EN_initH(this->epanet_project, EN_SAVE_AND_INIT);
@@ -192,7 +266,7 @@ void EpanetWrapper::runHydraulics()
     {
         qWarning() << "EN_initH failed:" << error;
         EN_closeH(this->epanet_project);
-        return;
+        return false;
     }
     
     long current_time_s = 0;
@@ -205,7 +279,7 @@ void EpanetWrapper::runHydraulics()
         {
             qWarning() << "EN_runH failed:" << error;
             EN_closeH(this->epanet_project);
-            return;
+            return false;
         }
         
         qDebug() << "hydraulics calculated at time =" << current_time_s << "s";
@@ -215,34 +289,29 @@ void EpanetWrapper::runHydraulics()
         {
             qWarning() << "EN_nextH failed:" << error;
             EN_closeH(this->epanet_project);
-            return;
+            return false;
         }
         
     } while (next_step_s > 0);
     
-    error = EN_closeH(this->epanet_project);
-    if (error != 0)
-    {
-        qWarning() << "EN_closeH failed:" << error;
-        return;
-    }
+    return true;
 }
 
-SimulationResult EpanetWrapper::readResults()
+bool EpanetWrapper::readResults()
 {
-    SimulationResult result;
+    if (!readResultsJunctions())
+        return false;
     
-    result = readResultsJunctions(result);
-    result = readResultsPipes(result);
+    if (!readResultsPipes())
+        return false;
     
-    return result;
+    return true;
 }
-SimulationResult EpanetWrapper::readResultsJunctions(SimulationResult result)
+bool EpanetWrapper::readResultsJunctions()
 {
     for (const Junction &junction : std::as_const(this->simulation_request.junctions))
     {
         int junction_index = 0;
-        
         QByteArray junction_id = junction.id.toUtf8();
         
         int error = EN_getnodeindex(
@@ -256,7 +325,7 @@ SimulationResult EpanetWrapper::readResultsJunctions(SimulationResult result)
             qWarning() << "EN_getnodeindex failed for junction"
                        << junction.id
                        << "error =" << error;
-            return result;
+            return false;
         }
         
         double junction_head_m = 0.0;
@@ -274,7 +343,7 @@ SimulationResult EpanetWrapper::readResultsJunctions(SimulationResult result)
             qWarning() << "EN_getnodevalue head failed for junction"
                        << junction.id
                        << "error =" << error;
-            return result;
+            return false;
         }
         
         error = EN_getnodevalue(
@@ -289,7 +358,7 @@ SimulationResult EpanetWrapper::readResultsJunctions(SimulationResult result)
             qWarning() << "EN_getnodevalue pressure failed for junction"
                        << junction.id
                        << "error =" << error;
-            return result;
+            return false;
         }
         
         JunctionResult junction_result;
@@ -297,17 +366,16 @@ SimulationResult EpanetWrapper::readResultsJunctions(SimulationResult result)
         junction_result.head_m = junction_head_m;
         junction_result.pressure_m = junction_pressure_m;
         
-        result.junctions.append(junction_result);
+        this->simulation_result.junctions.append(junction_result);
     }
     
-    return result;
+    return true;
 }
-SimulationResult EpanetWrapper::readResultsPipes(SimulationResult result)
+bool EpanetWrapper::readResultsPipes()
 {
     for (const Pipe &pipe : std::as_const(this->simulation_request.pipes))
     {
         int pipe_index = 0;
-        
         QByteArray pipe_id = pipe.id.toUtf8();
         
         int error = EN_getlinkindex(
@@ -321,7 +389,7 @@ SimulationResult EpanetWrapper::readResultsPipes(SimulationResult result)
             qWarning() << "EN_getlinkindex failed for pipe"
                        << pipe.id
                        << "error =" << error;
-            return result;
+            return false;
         }
         
         double pipe_flow_lps = 0.0;
@@ -340,7 +408,7 @@ SimulationResult EpanetWrapper::readResultsPipes(SimulationResult result)
             qWarning() << "EN_getlinkvalue flow failed for pipe"
                        << pipe.id
                        << "error =" << error;
-            return result;
+            return false;
         }
         
         error = EN_getlinkvalue(
@@ -355,7 +423,7 @@ SimulationResult EpanetWrapper::readResultsPipes(SimulationResult result)
             qWarning() << "EN_getlinkvalue velocity failed for pipe"
                        << pipe.id
                        << "error =" << error;
-            return result;
+            return false;
         }
         
         error = EN_getlinkvalue(
@@ -370,7 +438,7 @@ SimulationResult EpanetWrapper::readResultsPipes(SimulationResult result)
             qWarning() << "EN_getlinkvalue headloss failed for pipe"
                        << pipe.id
                        << "error =" << error;
-            return result;
+            return false;
         }
         
         PipeResult pipe_result;
@@ -379,10 +447,10 @@ SimulationResult EpanetWrapper::readResultsPipes(SimulationResult result)
         pipe_result.velocity_mps = pipe_velocity_mps;
         pipe_result.headloss = pipe_headloss;
         
-        result.pipes.append(pipe_result);
+        this->simulation_result.pipes.append(pipe_result);
     }
     
-    return result;
+    return true;
 }
 
 QStringList EpanetWrapper::reportTextList() const
@@ -413,3 +481,11 @@ void EpanetWrapper::epanetReportCallback(
     wrapper->epanet_report.append(QString::fromUtf8(line));
 }
 
+void EpanetWrapper::cleanupProject()
+{
+    if (this->epanet_project != nullptr)
+    {
+        EN_deleteproject(this->epanet_project);
+        this->epanet_project = nullptr;
+    }
+}
