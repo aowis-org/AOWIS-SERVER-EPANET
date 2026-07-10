@@ -4,6 +4,59 @@
 #include <QString>
 #include <QList>
 
+enum class TankGeometryInputType
+{
+    Cylindrical,
+    UniformArea,
+    VolumeAtMaximumLevel,
+    VolumeCurve
+};
+
+struct TankVolumeCurvePoint
+{
+    double level_m = 0.0;
+    double volume_m3 = 0.0;
+};
+struct TankVolumeCurve
+{
+    QString id;
+    QList<TankVolumeCurvePoint> points;
+};
+struct Tank
+{
+    QString id;
+    
+    // Elevation of the bottom of the tank.
+    double elevation_m = 0.0;
+    
+    // Water levels measured above elevation_m.
+    double initial_level_m = 0.0;
+    double minimum_level_m = 0.0;
+    double maximum_level_m = 0.0;
+    
+    TankGeometryInputType geometry_input_type = TankGeometryInputType::Cylindrical;
+    
+    // Used for Cylindrical.
+    double diameter_m = 0.0;
+    
+    // Used for UniformArea.
+    double cross_section_area_m2 = 0.0;
+    
+    // Used for VolumeAtMaximumLevel.
+    double volume_at_maximum_level_m3 = 0.0;
+    
+    // EPANET volume stored when the tank is at minimum_level_m.
+    double minimum_volume_m3 = 0.0;
+    
+    // Used for VolumeCurve.
+    QString volume_curve_id;
+    
+    // EPANET 2.2 option.
+    bool can_overflow = false;
+};
+
+
+
 struct Reservoir
 {
     QString id;
@@ -34,6 +87,9 @@ struct SimulationRequest
     QList<Reservoir> reservoirs;
     QList<Junction> junctions;
     QList<Pipe> pipes;
+    
+    QList<Tank> tanks;
+    QList<TankVolumeCurve> tank_volume_curves;
 };
 
 #endif // SIMULATION_REQUEST_H
