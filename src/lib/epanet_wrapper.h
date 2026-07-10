@@ -21,8 +21,8 @@
 #include "model/simulation_result.h"
 #include "model/epanet_status.h"
 
-Q_DECLARE_METATYPE(SimulationResult)
-Q_DECLARE_METATYPE(EpanetStatus)
+//Q_DECLARE_METATYPE(SimulationResult)
+//Q_DECLARE_METATYPE(EpanetStatus)
 
 class EpanetWrapper : public QObject
 {
