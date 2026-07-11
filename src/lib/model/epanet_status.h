@@ -12,8 +12,10 @@ enum class EpanetStage
     InitializeProject,
     
     BuildNetwork,
+    AddTankVolumeCurve,
     AddReservoir,
     AddJunction,
+    AddTank,
     AddPipe,
     
     RunHydraulics,
@@ -36,8 +38,13 @@ enum class EpanetOperation
     
     EN_init,
     
+    EN_addcurve,
+    EN_getcurveindex,
+    EN_setcurve,
+    
     EN_addnode,
     EN_setnodevalue,
+    EN_settankdata,
     EN_setjuncdata,
     
     EN_addlink,

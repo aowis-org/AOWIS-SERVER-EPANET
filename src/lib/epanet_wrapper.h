@@ -21,6 +21,8 @@
 #include "model/simulation_result.h"
 #include "model/epanet_status.h"
 
+#include "epanet_resolvers.h"
+
 //Q_DECLARE_METATYPE(SimulationResult)
 //Q_DECLARE_METATYPE(EpanetStatus)
 
@@ -53,8 +55,12 @@ private:
     );
     
     EpanetStatus addEntities(const SimulationRequest &request);
+    
+    EpanetStatus addTankVolumeCurve(const TankVolumeCurve &curve);
+    
     EpanetStatus addReservoir(const Reservoir &reservoir);
     EpanetStatus addJunction(const Junction &junction);
+    EpanetStatus addTank(const Tank &tank);
     EpanetStatus addPipe(const Pipe &pipe);
     
     EpanetStatus readResultsJunctions();

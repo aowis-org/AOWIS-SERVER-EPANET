@@ -56,9 +56,9 @@ double EpanetResolvers::resolveTankDiameter(const Tank &tank)
     }
         
     case TankGeometryInputType::VolumeCurve:
-        // EPANET requires a positive diameter, but ignores it when
-        // a volume curve is assigned.
-        return 1.0;
+        // for a tank with a volume curve,
+        // EPANET explicitly expects the diameter passed to EN_settankdata() to be 0
+        return 0.0;
     }
     
     return 0.0;
