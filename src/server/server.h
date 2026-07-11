@@ -22,7 +22,9 @@
 
 #include "../lib/model/simulation_request.h"
 
-#include "dummies/dummy_networks.h"
+#include "utility/epanet_status_printer.h"
+
+#include "dummy/dummy_networks.h"
 
 
 // QHttpServer is move only.

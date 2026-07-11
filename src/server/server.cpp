@@ -25,6 +25,10 @@ void Server::setupRoutes()
     SimulationRequest request = DummyNetworks::networkTanks();
     
     EpanetWrapper *epanet = new EpanetWrapper(this);
+    connect(epanet, &EpanetWrapper::signalSimulationFailed, this, [this](EpanetStatus status)
+    {
+        EpanetStatusPrinter::print(status);
+    });
     epanet->run(request);
     qDebug().noquote() << epanet->reportText();
     

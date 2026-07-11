@@ -15,8 +15,11 @@ add_library(aowis-server-epanet-core STATIC
     model/epanet_status.h
     epanet_resolvers.h epanet_resolvers.cpp
     
-    dummies/dummy_networks.h
-    dummies/dummy_networks.cpp
+    utility/epanet_status_printer.h
+    utility/epanet_status_printer.cpp
+    
+    dummy/dummy_networks.h
+    dummy/dummy_networks.cpp
 )
 
 target_include_directories(aowis-server-epanet-core
