@@ -4,6 +4,12 @@
 #include <QString>
 #include <QList>
 
+
+enum class TankElevationInputType
+{
+    BottomElevation,
+    TerrainElevationAndOffset
+};
 enum class TankGeometryInputType
 {
     Cylindrical,
@@ -11,7 +17,6 @@ enum class TankGeometryInputType
     VolumeAtMaximumLevel,
     VolumeCurve
 };
-
 struct TankVolumeCurvePoint
 {
     double level_m = 0.0;
@@ -26,8 +31,11 @@ struct Tank
 {
     QString id;
     
-    // Elevation of the bottom of the tank.
-    double elevation_m = 0.0;
+    TankElevationInputType elevation_input_type = TankElevationInputType::BottomElevation;
+    
+    double bottom_elevation_m = 0.0;
+    double terrain_elevation_m = 0.0;
+    double bottom_offset_m = 0.0;
     
     // Water levels measured above elevation_m.
     double initial_level_m = 0.0;

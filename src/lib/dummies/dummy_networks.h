@@ -1,0 +1,13 @@
+#ifndef DUMMY_NETWORKS_H
+#define DUMMY_NETWORKS_H
+
+#include "model/simulation_request.h"
+
+class DummyNetworks
+{
+public:
+    static SimulationRequest networkSimple();
+    static SimulationRequest networkTanks();
+};
+
+#endif // DUMMY_NETWORKS_H

@@ -13,6 +13,10 @@ add_library(aowis-server-epanet-core STATIC
     model/simulation_request.h
     model/simulation_result.h
     model/epanet_status.h
+    epanet_resolvers.h epanet_resolvers.cpp
+    
+    dummies/dummy_networks.h
+    dummies/dummy_networks.cpp
 )
 
 target_include_directories(aowis-server-epanet-core

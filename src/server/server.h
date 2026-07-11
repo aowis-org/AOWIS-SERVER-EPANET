@@ -22,6 +22,8 @@
 
 #include "../lib/model/simulation_request.h"
 
+#include "dummies/dummy_networks.h"
+
 
 // QHttpServer is move only.
 // Storing it in QList, QVector ... will always result in those things trying to copy during reallocation, which will break
