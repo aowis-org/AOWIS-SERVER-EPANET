@@ -64,6 +64,7 @@ private:
     EpanetStatus addPipe(const Pipe &pipe);
     
     EpanetStatus readResultsJunctions();
+    EpanetStatus readResultsTanks();
     EpanetStatus readResultsPipes();
     
     void cleanupProject();

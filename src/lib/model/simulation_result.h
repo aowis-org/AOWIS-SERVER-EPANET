@@ -19,9 +19,19 @@ struct PipeResult
     double headloss = 0.0;
 };
 
+struct TankResult
+{
+    QString id;
+    
+    double head_m = 0.0;
+    double level_m = 0.0;
+    double volume_m3 = 0.0;
+};
+
 struct SimulationResult
 {
     QList<JunctionResult> junctions;
+    QList<TankResult> tanks;
     QList<PipeResult> pipes;
 };
 

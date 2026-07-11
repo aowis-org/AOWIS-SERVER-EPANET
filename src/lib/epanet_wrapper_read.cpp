@@ -6,6 +6,10 @@ EpanetStatus EpanetWrapper::readResults()
     if (!status_junctions.success)
         return status_junctions;
     
+    EpanetStatus status_tanks = readResultsTanks();
+    if (!status_tanks.success)
+        return status_tanks;
+    
     EpanetStatus status_pipes = readResultsPipes();
     if (!status_pipes.success)
         return status_pipes;
@@ -37,7 +41,7 @@ EpanetStatus EpanetWrapper::readResultsJunctions()
             status.entity.id = junction.id;
             status.message = "Failed to get Junction Index";
             status.message_epanet = getEpanetErrorMessage(error);
-            status.details << "EN_getnodeindex failed for : " + junction.id;
+            status.details << "EN_getnodeindex failed for: " + junction.id;
             
             return status;
         }
@@ -58,12 +62,12 @@ EpanetStatus EpanetWrapper::readResultsJunctions()
             status.epanet_error_code = error;
             status.stage = EpanetStage::ReadJunctionResults;
             status.operation = EpanetOperation::EN_getnodevalue;
-            status.property = EpanetProperty::Headloss;
+            status.property = EpanetProperty::Head;
             status.entity.type = EpanetEntityType::Junction;
             status.entity.id = junction.id;
             status.message = "Failed to get Head for Junction";
             status.message_epanet = getEpanetErrorMessage(error);
-            status.details << "EN_getnodevalue EN_HEAD failed for : " + junction.id;
+            status.details << "EN_getnodevalue EN_HEAD failed for: " + junction.id;
             
             return status;
         }
@@ -86,7 +90,7 @@ EpanetStatus EpanetWrapper::readResultsJunctions()
             status.entity.id = junction.id;
             status.message = "Failed to get Pressure for Junction";
             status.message_epanet = getEpanetErrorMessage(error);
-            status.details << "EN_getnodevalue EN_PRESSURE failed for : " + junction.id;
+            status.details << "EN_getnodevalue EN_PRESSURE failed for: " + junction.id;
             
             return status;
         }
@@ -103,6 +107,137 @@ EpanetStatus EpanetWrapper::readResultsJunctions()
     status.success = true;
     return status;
 }
+
+EpanetStatus EpanetWrapper::readResultsTanks()
+{
+    for (
+        const Tank &tank :
+        std::as_const(this->simulation_request.tanks)
+        )
+    {
+        int tank_index = 0;
+        QByteArray tank_id = tank.id.toUtf8();
+        
+        int error = EN_getnodeindex(
+            this->epanet_project,
+            tank_id.constData(),
+            &tank_index
+            );
+        
+        if (error != 0)
+        {
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::ReadTankResults;
+            status.operation =
+                EpanetOperation::EN_getnodeindex;
+            status.entity.type = EpanetEntityType::Tank;
+            status.entity.id = tank.id;
+            status.message = "Failed to get Tank Index";
+            status.message_epanet = getEpanetErrorMessage(error);
+            status.details << "EN_getnodeindex failed for Tank: "
+                            + tank.id;
+            
+            return status;
+        }
+        
+        double tank_head_m = 0.0;
+        double tank_level_m = 0.0;
+        double tank_volume_m3 = 0.0;
+        
+        error = EN_getnodevalue(
+            this->epanet_project,
+            tank_index,
+            EN_HEAD,
+            &tank_head_m
+        );
+        if (error != 0)
+        {
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::ReadTankResults;
+            status.operation = EpanetOperation::EN_getnodevalue;
+            status.property = EpanetProperty::Head;
+            status.entity.type = EpanetEntityType::Tank;
+            status.entity.id = tank.id;
+            status.entity.index = tank_index;
+            status.message = "Failed to get Head for Tank";
+            status.message_epanet = getEpanetErrorMessage(error);
+            status.details << "EN_getnodevalue EN_HEAD failed for Tank: "
+                            + tank.id;
+            
+            return status;
+        }
+        
+        error = EN_getnodevalue(
+            this->epanet_project,
+            tank_index,
+            EN_TANKLEVEL,
+            &tank_level_m
+        );
+        if (error != 0)
+        {
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::ReadTankResults;
+            status.operation =
+                EpanetOperation::EN_getnodevalue;
+            status.property = EpanetProperty::Level;
+            status.entity.type = EpanetEntityType::Tank;
+            status.entity.id = tank.id;
+            status.entity.index = tank_index;
+            status.message = "Failed to get Water Level for Tank";
+            status.message_epanet = getEpanetErrorMessage(error);
+            status.details << "EN_getnodevalue EN_TANKLEVEL failed "
+                            "for Tank: "
+                            + tank.id;
+            
+            return status;
+        }
+        
+        error = EN_getnodevalue(
+            this->epanet_project,
+            tank_index,
+            EN_TANKVOLUME,
+            &tank_volume_m3
+        );
+        if (error != 0)
+        {
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::ReadTankResults;
+            status.operation = EpanetOperation::EN_getnodevalue;
+            status.property = EpanetProperty::Volume;
+            status.entity.type = EpanetEntityType::Tank;
+            status.entity.id = tank.id;
+            status.entity.index = tank_index;
+            status.message = "Failed to get Volume for Tank";
+            status.message_epanet = getEpanetErrorMessage(error);
+            status.details << "EN_getnodevalue EN_TANKVOLUME failed "
+                            "for Tank: "
+                            + tank.id;
+            
+            return status;
+        }
+        
+        TankResult tank_result;
+        tank_result.id = tank.id;
+        tank_result.head_m = tank_head_m;
+        tank_result.level_m = tank_level_m;
+        tank_result.volume_m3 = tank_volume_m3;
+        
+        this->simulation_result.tanks.append(tank_result);
+    }
+    
+    EpanetStatus status;
+    status.success = true;
+    return status;
+}
+
 EpanetStatus EpanetWrapper::readResultsPipes()
 {
     for (const Pipe &pipe : std::as_const(this->simulation_request.pipes))

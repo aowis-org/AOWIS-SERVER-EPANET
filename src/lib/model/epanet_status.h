@@ -21,6 +21,7 @@ enum class EpanetStage
     RunHydraulics,
     ReadResults,
     ReadJunctionResults,
+    ReadTankResults,
     ReadPipeResults,
     
     CloseHydraulics,
@@ -79,6 +80,8 @@ enum class EpanetProperty
     Elevation,
     Head,
     Pressure,
+    Level,
+    Volume,
     
     Flow,
     Velocity,
