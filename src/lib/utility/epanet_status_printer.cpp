@@ -83,10 +83,14 @@ QString EpanetStatusPrinter::stageToString(EpanetStage stage)
         return "Initialize project";
     case EpanetStage::BuildNetwork:
         return "Build network";
+    case EpanetStage::AddTankVolumeCurve:
+        return "Add Tank Volume Curve";
     case EpanetStage::AddReservoir:
         return "Add reservoir";
     case EpanetStage::AddJunction:
         return "Add junction";
+    case EpanetStage::AddTank:
+        return "Add tank";
     case EpanetStage::AddPipe:
         return "Add pipe";
     case EpanetStage::RunHydraulics:
@@ -122,6 +126,12 @@ QString EpanetStatusPrinter::operationToString(EpanetOperation operation)
         return "EN_deleteproject";
     case EpanetOperation::EN_init:
         return "EN_init";
+    case EpanetOperation::EN_addcurve:
+        return "EN_addcurve";
+    case EpanetOperation::EN_getcurveindex:
+        return "EN_getcurveindex";
+    case EpanetOperation::EN_setcurve:
+        return "EN_setcurve";
     case EpanetOperation::EN_addnode:
         return "EN_addnode";
     case EpanetOperation::EN_setnodevalue:
