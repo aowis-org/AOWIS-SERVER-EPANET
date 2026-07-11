@@ -136,6 +136,8 @@ QString EpanetStatusPrinter::operationToString(EpanetOperation operation)
         return "EN_addnode";
     case EpanetOperation::EN_setnodevalue:
         return "EN_setnodevalue";
+    case EpanetOperation::EN_settankdata:
+        return "EN_settankdata";
     case EpanetOperation::EN_setjuncdata:
         return "EN_setjuncdata";
     case EpanetOperation::EN_addlink:
