@@ -8,57 +8,55 @@
 
 namespace
 {
-
-template<typename EnumType>
-QString enumKey(EnumType value)
-{
-    const QMetaEnum meta_enum =
-        QMetaEnum::fromType<EnumType>();
+    template<typename EnumType>
+    QString enumKey(EnumType value)
+    {
+        const QMetaEnum meta_enum =
+            QMetaEnum::fromType<EnumType>();
+        
+        const char *key =
+            meta_enum.valueToKey(static_cast<int>(value));
+        
+        if (key == nullptr)
+            return QStringLiteral("Unknown");
+        
+        return QString::fromLatin1(key);
+    }
     
-    const char *key =
-        meta_enum.valueToKey(static_cast<int>(value));
-    
-    if (key == nullptr)
-        return QStringLiteral("Unknown");
-    
-    return QString::fromLatin1(key);
-}
-
-template<typename EnumType>
-QString enumLabel(EnumType value)
-{
-    QString text = enumKey(value);
-    
-    if (text == QStringLiteral("Unknown"))
+    template<typename EnumType>
+    QString enumLabel(EnumType value)
+    {
+        QString text = enumKey(value);
+        
+        if (text == QStringLiteral("Unknown"))
+            return text;
+        
+        text.replace(
+            QRegularExpression(
+                QStringLiteral("([A-Z]+)([A-Z][a-z])")
+                ),
+            QStringLiteral("\\1 \\2")
+            );
+        
+        text.replace(
+            QRegularExpression(
+                QStringLiteral("([a-z0-9])([A-Z])")
+                ),
+            QStringLiteral("\\1 \\2")
+            );
+        
+        text = text.toLower();
+        
+        if (!text.isEmpty())
+            text[0] = text[0].toUpper();
+        
         return text;
-    
-    text.replace(
-        QRegularExpression(
-            QStringLiteral("([A-Z]+)([A-Z][a-z])")
-            ),
-        QStringLiteral("\\1 \\2")
-        );
-    
-    text.replace(
-        QRegularExpression(
-            QStringLiteral("([a-z0-9])([A-Z])")
-            ),
-        QStringLiteral("\\1 \\2")
-        );
-    
-    text = text.toLower();
-    
-    if (!text.isEmpty())
-        text[0] = text[0].toUpper();
-    
-    return text;
-}
-
+    }
 }
 
 QString EpanetStatusPrinter::toString(
     const EpanetStatus &status
-    )
+)
 {
     QString output;
     QTextStream stream(&output);
@@ -150,7 +148,7 @@ QString EpanetStatusPrinter::toString(
 
 void EpanetStatusPrinter::print(
     const EpanetStatus &status
-    )
+)
 {
     FILE *output_file =
         status.success ? stdout : stderr;
