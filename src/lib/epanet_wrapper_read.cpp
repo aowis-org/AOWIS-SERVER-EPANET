@@ -1,24 +1,40 @@
 #include "epanet_wrapper.h"
 
-EpanetStatus EpanetWrapper::readResults()
+EpanetStatus EpanetWrapper::readResults(SimulationResult &result)
 {
-    EpanetStatus status_junctions = readResultsJunctions();
-    if (!status_junctions.success)
-        return status_junctions;
+    EpanetStatus status = readResultsJunctions(result);
     
-    EpanetStatus status_tanks = readResultsTanks();
-    if (!status_tanks.success)
-        return status_tanks;
+    if (!status.success)
+    {
+        result.status = status;
+        return status;
+    }
     
-    EpanetStatus status_pipes = readResultsPipes();
-    if (!status_pipes.success)
-        return status_pipes;
+    status = readResultsTanks(result);
     
-    EpanetStatus status;
+    if (!status.success)
+    {
+        result.status = status;
+        return status;
+    }
+    
+    status = readResultsPipes(result);
+    
+    if (!status.success)
+    {
+        result.status = status;
+        return status;
+    }
+    
+    status = EpanetStatus();
     status.success = true;
+    
+    result.status = status;
+    
     return status;
 }
-EpanetStatus EpanetWrapper::readResultsJunctions()
+
+EpanetStatus EpanetWrapper::readResultsJunctions(SimulationResult &result)
 {
     for (const Junction &junction : std::as_const(this->simulation_request.junctions))
     {
@@ -100,7 +116,7 @@ EpanetStatus EpanetWrapper::readResultsJunctions()
         junction_result.head_m = junction_head_m;
         junction_result.pressure_m = junction_pressure_m;
         
-        this->simulation_result.junctions.append(junction_result);
+        result.junctions.append(junction_result);
     }
     
     EpanetStatus status;
@@ -108,7 +124,7 @@ EpanetStatus EpanetWrapper::readResultsJunctions()
     return status;
 }
 
-EpanetStatus EpanetWrapper::readResultsTanks()
+EpanetStatus EpanetWrapper::readResultsTanks(SimulationResult &result)
 {
     for (
         const Tank &tank :
@@ -230,7 +246,7 @@ EpanetStatus EpanetWrapper::readResultsTanks()
         tank_result.level_m = tank_level_m;
         tank_result.volume_m3 = tank_volume_m3;
         
-        this->simulation_result.tanks.append(tank_result);
+        result.tanks.append(tank_result);
     }
     
     EpanetStatus status;
@@ -238,7 +254,7 @@ EpanetStatus EpanetWrapper::readResultsTanks()
     return status;
 }
 
-EpanetStatus EpanetWrapper::readResultsPipes()
+EpanetStatus EpanetWrapper::readResultsPipes(SimulationResult &result)
 {
     for (const Pipe &pipe : std::as_const(this->simulation_request.pipes))
     {
@@ -345,7 +361,7 @@ EpanetStatus EpanetWrapper::readResultsPipes()
         pipe_result.velocity_mps = pipe_velocity_mps;
         pipe_result.headloss = pipe_headloss;
         
-        this->simulation_result.pipes.append(pipe_result);
+        result.pipes.append(pipe_result);
     }
     
     EpanetStatus status;

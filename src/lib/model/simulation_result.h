@@ -5,6 +5,8 @@
 #include <QList>
 #include <QDateTime>
 
+#include <QMetaType>
+
 #include "epanet_status.h"
 
 struct JunctionResult
@@ -33,6 +35,8 @@ struct TankResult
 
 struct SimulationResult
 {
+    long elapsed_time_s = 0;
+    
     EpanetStatus status;
     
     QList<JunctionResult> junctions;
@@ -46,5 +50,7 @@ struct SimulationResultTimeline
     QDateTime simulation_start_utc;
     QList<SimulationResult> results;
 };
+
+Q_DECLARE_METATYPE(SimulationResultTimeline)
 
 #endif // SIMULATION_RESULT_H

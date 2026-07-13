@@ -22,6 +22,9 @@ SimulationRequest DummyNetworks::networkSimple()
     pipe.open = true;
     
     SimulationRequest request;
+    request.duration_s = 24 * 60 * 60;
+    request.hydraulic_timestep_s = 60 * 60;
+    
     request.reservoirs.append(reservoir);
     request.junctions.append(junction);
     request.pipes.append(pipe);

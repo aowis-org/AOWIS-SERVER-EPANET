@@ -4,13 +4,15 @@
 EpanetWrapper::EpanetWrapper(QObject *parent)
     : QObject(parent)
 {
-    qRegisterMetaType<SimulationResult>("SimulationResult");
+    qRegisterMetaType<SimulationResultTimeline>(
+        "SimulationResultTimeline"
+    );
     qRegisterMetaType<EpanetStatus>("EpanetStatus");
 }
 
-SimulationResult EpanetWrapper::run(
+SimulationResultTimeline EpanetWrapper::run(
     const SimulationRequest &request
-    )
+)
 {
     if (this->epanet_project != nullptr)
     {
@@ -24,33 +26,36 @@ SimulationResult EpanetWrapper::run(
         
         emit signalSimulationFailed(status);
         
-        SimulationResult result;
-        result.status = status;
-        return result;
+        SimulationResultTimeline timeline;
+        timeline.status = status;
+        return timeline;
     }
     
     this->simulation_request = request;
-    this->simulation_result = SimulationResult();
+    this->simulation_result_timeline = SimulationResultTimeline();
+    this->simulation_result_timeline.simulation_start_utc =
+        QDateTime::currentDateTimeUtc();
+    
     this->epanet_report.clear();
     
     const auto returnFailure =
         [this](
             const EpanetStatus &status,
             bool cleanup_project
-            ) -> SimulationResult
+            ) -> SimulationResultTimeline
     {
-        this->simulation_result.status = status;
+        this->simulation_result_timeline.status = status;
         
         if (cleanup_project)
             cleanupProject();
         
         emit signalSimulationFailed(status);
         
-        return this->simulation_result;
+        return this->simulation_result_timeline;
     };
     
-    int error =
-        EN_createproject(&this->epanet_project);
+    int error = EN_createproject(&this->epanet_project);
+    
     if (error != 0)
     {
         EpanetStatus status;
@@ -66,10 +71,8 @@ SimulationResult EpanetWrapper::run(
     }
     
     /*
-     * Register the report callback before EN_init().
-     *
-     * EPANET writes its header while initializing the project,
-     * so the callback must already be available at this point.
+     * Register the callback before EN_init() so the EPANET
+     * report header is captured.
      */
     error = EN_setreportcallbackuserdata(
         this->epanet_project,
@@ -130,7 +133,7 @@ SimulationResult EpanetWrapper::run(
     
     /*
      * EN_init() resets the report callback internally.
-     * Register the callback again for the remainder of the run.
+     * Restore it for the remainder of the simulation.
      */
     error = EN_setreportcallbackuserdata(
         this->epanet_project,
@@ -168,40 +171,56 @@ SimulationResult EpanetWrapper::run(
         return returnFailure(status, true);
     }
     
-    EpanetStatus status = addEntities(request);
-    if (!status.success)
-        return returnFailure(status, true);
-    
-    status = runHydraulics();
-    if (!status.success)
-        return returnFailure(status, true);
-    
-    status = readResults();
-    this->simulation_result.status = status;
-    if (!status.success)
+    error = EN_settimeparam(
+        this->epanet_project,
+        EN_DURATION,
+        request.duration_s
+    );
+    if (error != 0)
     {
-        const int close_error =
-            EN_closeH(this->epanet_project);
-        
-        if (close_error != 0)
-        {
-            status.details
-                << QString(
-                    "Additionally, EN_closeH failed "
-                    "with error code %1: %2"
-                    )
-                    .arg(close_error)
-                    .arg(
-                        getEpanetErrorMessage(
-                            close_error
-                    )
-                );
-        }
+        EpanetStatus status;
+        status.success = false;
+        status.epanet_error_code = error;
+        status.stage = EpanetStage::InitializeProject;
+        status.operation = EpanetOperation::EN_settimeparam;
+        status.entity.type = EpanetEntityType::Project;
+        status.message = "Failed to set simulation duration";
+        status.message_epanet = getEpanetErrorMessage(error);
         
         return returnFailure(status, true);
     }
     
+    error = EN_settimeparam(
+        this->epanet_project,
+        EN_HYDSTEP,
+        request.hydraulic_timestep_s
+    );
+    if (error != 0)
+    {
+        EpanetStatus status;
+        status.success = false;
+        status.epanet_error_code = error;
+        status.stage = EpanetStage::InitializeProject;
+        status.operation = EpanetOperation::EN_settimeparam;
+        status.entity.type = EpanetEntityType::Project;
+        status.message = "Failed to set hydraulic timestep";
+        status.message_epanet = getEpanetErrorMessage(error);
+        
+        return returnFailure(status, true);
+    }
+    
+    EpanetStatus status = addEntities(request);
+    
+    if (!status.success)
+        return returnFailure(status, true);
+    
+    status = runHydraulics();
+    
+    if (!status.success)
+        return returnFailure(status, true);
+    
     error = EN_closeH(this->epanet_project);
+    
     if (error != 0)
     {
         status = EpanetStatus();
@@ -217,6 +236,7 @@ SimulationResult EpanetWrapper::run(
     }
     
     error = EN_saveH(this->epanet_project);
+    
     if (error != 0)
     {
         status = EpanetStatus();
@@ -232,6 +252,7 @@ SimulationResult EpanetWrapper::run(
     }
     
     error = EN_report(this->epanet_project);
+    
     if (error != 0)
     {
         status = EpanetStatus();
@@ -240,10 +261,8 @@ SimulationResult EpanetWrapper::run(
         status.stage = EpanetStage::GenerateReport;
         status.operation = EpanetOperation::EN_report;
         status.entity.type = EpanetEntityType::Report;
-        status.message =
-            "Failed to generate EPANET report";
-        status.message_epanet =
-            getEpanetErrorMessage(error);
+        status.message = "Failed to generate EPANET report";
+        status.message_epanet = getEpanetErrorMessage(error);
         
         return returnFailure(status, true);
     }
@@ -253,13 +272,11 @@ SimulationResult EpanetWrapper::run(
     status = EpanetStatus();
     status.success = true;
     
-    this->simulation_result.status = status;
+    this->simulation_result_timeline.status = status;
     
-    emit signalSimulationFinished(
-        this->simulation_result
-    );
+    emit signalSimulationFinished(this->simulation_result_timeline);
     
-    return this->simulation_result;
+    return this->simulation_result_timeline;
 }
 
 QStringList EpanetWrapper::reportTextList() const

@@ -7,8 +7,6 @@
 #include <QString>
 #include <QStringList>
 
-#include <QMetaType>
-
 #if __has_include(<epanet2_2.h>)
 #include <epanet2_2.h>
 #elif __has_include(<epanet2.h>)
@@ -23,9 +21,6 @@
 
 #include "epanet_resolvers.h"
 
-//Q_DECLARE_METATYPE(SimulationResult)
-//Q_DECLARE_METATYPE(EpanetStatus)
-
 class EpanetWrapper : public QObject
 {
     Q_OBJECT
@@ -33,9 +28,9 @@ class EpanetWrapper : public QObject
 public:
     explicit EpanetWrapper(QObject *parent = nullptr);
     
-    SimulationResult run(const SimulationRequest &request);
+    SimulationResultTimeline run(const SimulationRequest &request);
+    
     EpanetStatus runHydraulics();
-    EpanetStatus readResults();
     
     QStringList reportTextList() const;
     QString reportText() const;
@@ -46,7 +41,7 @@ private:
     QString getEpanetErrorMessage(int error_code) const;
     
     SimulationRequest simulation_request;
-    SimulationResult simulation_result;
+    SimulationResultTimeline simulation_result_timeline;
     
     static void epanetReportCallback(
         void *user_data,
@@ -63,14 +58,16 @@ private:
     EpanetStatus addTank(const Tank &tank);
     EpanetStatus addPipe(const Pipe &pipe);
     
-    EpanetStatus readResultsJunctions();
-    EpanetStatus readResultsTanks();
-    EpanetStatus readResultsPipes();
+    EpanetStatus readResults(SimulationResult &result);
+    
+    EpanetStatus readResultsJunctions(SimulationResult &result);
+    EpanetStatus readResultsTanks(SimulationResult &result);
+    EpanetStatus readResultsPipes(SimulationResult &result);
     
     void cleanupProject();
     
 signals:
-    void signalSimulationFinished(SimulationResult result);
+    void signalSimulationFinished(SimulationResultTimeline result);
     void signalSimulationFailed(EpanetStatus status);
         
 };

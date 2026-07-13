@@ -30,7 +30,7 @@ signals:
     
     void signalSimulationFinished(
         QUuid simulation_id,
-        SimulationResult result,
+        SimulationResultTimeline timeline,
         QStringList report
         );
     

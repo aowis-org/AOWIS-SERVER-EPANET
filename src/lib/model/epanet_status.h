@@ -5,6 +5,8 @@
 #include <QString>
 #include <QStringList>
 
+#include <QMetaType>
+
 class EpanetEnums
 {
     Q_GADGET
@@ -45,6 +47,7 @@ public:
         EN_deleteproject,
         
         EN_init,
+        EN_settimeparam,
         
         EN_addcurve,
         EN_getcurveindex,
@@ -157,5 +160,7 @@ struct EpanetStatus
     QString message_epanet;
     QStringList details;
 };
+
+Q_DECLARE_METATYPE(EpanetStatus)
 
 #endif // EPANET_STATUS_H

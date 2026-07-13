@@ -92,6 +92,9 @@ struct Pipe
 
 struct SimulationRequest
 {
+    long duration_s = 0;
+    long hydraulic_timestep_s = 3600;
+    
     QList<Reservoir> reservoirs;
     QList<Junction> junctions;
     QList<Pipe> pipes;

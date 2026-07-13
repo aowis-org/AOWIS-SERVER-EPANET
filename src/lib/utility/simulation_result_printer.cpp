@@ -2,92 +2,61 @@
 
 #include <QTextStream>
 
-
-namespace
-{
-    QString formatNumber(double value)
-    {
-        return QString::number(value, 'f', 3);
-    }
-}
+#include <cstdio>
 
 QString SimulationResultPrinter::toString(
     const SimulationResult &result
-)
+    )
 {
     QString output;
     QTextStream stream(&output);
     
     stream << "--------------------------------------------------\n";
-    stream << "EPANET SIMULATION RESULT\n";
+    stream << "SIMULATION RESULT\n";
+    stream << "Time: "
+           << result.elapsed_time_s
+           << " s\n";
     
-    stream << "Junctions:     "
-           << result.junctions.size()
-           << '\n';
+    stream << "Junctions:\n";
     
     for (const JunctionResult &junction : result.junctions)
     {
-        stream << "\n";
-        stream << "Junction:      "
+        stream << "  "
                << junction.id
-               << '\n';
-        
-        stream << "  Head:        "
-               << formatNumber(junction.head_m)
-               << " m\n";
-        
-        stream << "  Pressure:    "
-               << formatNumber(junction.pressure_m)
+               << ": head="
+               << junction.head_m
+               << " m, pressure="
+               << junction.pressure_m
                << " m\n";
     }
     
-    stream << "\n";
-    stream << "Tanks:         "
-           << result.tanks.size()
-           << '\n';
+    stream << "Tanks:\n";
     
     for (const TankResult &tank : result.tanks)
     {
-        stream << "\n";
-        stream << "Tank:          "
+        stream << "  "
                << tank.id
-               << '\n';
-        
-        stream << "  Head:        "
-               << formatNumber(tank.head_m)
-               << " m\n";
-        
-        stream << "  Level:       "
-               << formatNumber(tank.level_m)
-               << " m\n";
-        
-        stream << "  Volume:      "
-               << formatNumber(tank.volume_m3)
-               << " m³\n";
+               << ": head="
+               << tank.head_m
+               << " m, level="
+               << tank.level_m
+               << " m, volume="
+               << tank.volume_m3
+               << " m3\n";
     }
     
-    stream << "\n";
-    stream << "Pipes:         "
-           << result.pipes.size()
-           << '\n';
+    stream << "Pipes:\n";
     
     for (const PipeResult &pipe : result.pipes)
     {
-        stream << "\n";
-        stream << "Pipe:          "
+        stream << "  "
                << pipe.id
-               << '\n';
-        
-        stream << "  Flow:        "
-               << formatNumber(pipe.flow_lps)
-               << " L/s\n";
-        
-        stream << "  Velocity:    "
-               << formatNumber(pipe.velocity_mps)
-               << " m/s\n";
-        
-        stream << "  Headloss:    "
-               << formatNumber(pipe.headloss)
+               << ": flow="
+               << pipe.flow_lps
+               << " L/s, velocity="
+               << pipe.velocity_mps
+               << " m/s, headloss="
+               << pipe.headloss
                << '\n';
     }
     
@@ -96,12 +65,62 @@ QString SimulationResultPrinter::toString(
     return output;
 }
 
+QString SimulationResultPrinter::toString(
+    const SimulationResultTimeline &timeline
+    )
+{
+    QString output;
+    QTextStream stream(&output);
+    
+    stream << "==================================================\n";
+    stream << "SIMULATION RESULT TIMELINE\n";
+    
+    if (timeline.simulation_start_utc.isValid())
+    {
+        stream << "Start UTC: "
+               << timeline.simulation_start_utc.toString(
+                      Qt::ISODate
+                      )
+               << '\n';
+    }
+    
+    stream << "Results: "
+           << timeline.results.size()
+           << '\n';
+    
+    stream << "==================================================\n";
+    
+    for (const SimulationResult &result : timeline.results)
+    {
+        if (timeline.simulation_start_utc.isValid())
+        {
+            stream << "Timestamp UTC: "
+                   << timeline.simulation_start_utc
+                          .addSecs(result.elapsed_time_s)
+                          .toString(Qt::ISODate)
+                   << '\n';
+        }
+        
+        stream << toString(result);
+    }
+    
+    return output;
+}
+
 void SimulationResultPrinter::print(
     const SimulationResult &result
-)
+    )
 {
     QTextStream stream(stdout);
-    
     stream << toString(result);
+    stream.flush();
+}
+
+void SimulationResultPrinter::print(
+    const SimulationResultTimeline &timeline
+    )
+{
+    QTextStream stream(stdout);
+    stream << toString(timeline);
     stream.flush();
 }

@@ -21,8 +21,8 @@ void Server::setupRoutes()
 {
     qDebug() << "Starting Server";
     
-    //SimulationRequest request = DummyNetworks::networkSimple();
-    SimulationRequest request = DummyNetworks::networkTanks();
+    SimulationRequest request = DummyNetworks::networkSimple();
+    //SimulationRequest request = DummyNetworks::networkTanks();
     
     EpanetWrapper *epanet = new EpanetWrapper(this);
     connect(epanet, &EpanetWrapper::signalSimulationFailed, this, [this](EpanetStatus status)
@@ -30,7 +30,7 @@ void Server::setupRoutes()
         SimulationStatusPrinter::print(status);
     });
     
-    SimulationResult result = epanet->run(request);
+    SimulationResultTimeline result = epanet->run(request);
     SimulationResultPrinter::print(result);
     
     qDebug().noquote() << epanet->reportText();
