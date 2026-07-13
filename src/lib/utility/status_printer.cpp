@@ -1,4 +1,4 @@
-#include "epanet_status_printer.h"
+#include "status_printer.h"
 
 #include <QMetaEnum>
 #include <QRegularExpression>
@@ -58,7 +58,7 @@ namespace
     }
 }
 
-QString EpanetStatusPrinter::toString(
+QString StatusPrinter::toString(
     const EpanetStatus &status
 )
 {
@@ -150,7 +150,7 @@ QString EpanetStatusPrinter::toString(
     return output;
 }
 
-void EpanetStatusPrinter::print(
+void StatusPrinter::print(
     const EpanetStatus &status
 )
 {

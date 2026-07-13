@@ -1,15 +1,15 @@
-#ifndef EPANET_STATUS_PRINTER_H
-#define EPANET_STATUS_PRINTER_H
+#ifndef STATUS_PRINTER_H
+#define STATUS_PRINTER_H
 
 #include <QString>
 
 #include "model/epanet_status.h"
 
-class EpanetStatusPrinter
+class StatusPrinter
 {
 public:
     static QString toString(const EpanetStatus &status);
     static void print(const EpanetStatus &status);
 };
 
-#endif // EPANET_STATUS_PRINTER_H
+#endif // STATUS_PRINTER_H
