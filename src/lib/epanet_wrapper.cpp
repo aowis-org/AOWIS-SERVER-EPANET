@@ -8,7 +8,7 @@ EpanetWrapper::EpanetWrapper(QObject *parent)
     qRegisterMetaType<EpanetStatus>("EpanetStatus");
 }
 
-void EpanetWrapper::run(const SimulationRequest &request)
+SimulationResult EpanetWrapper::run(const SimulationRequest &request)
 {
     if (this->epanet_project != nullptr)
     {
@@ -21,7 +21,9 @@ void EpanetWrapper::run(const SimulationRequest &request)
         status.details << "Variable this->epanet_project != nullptr";
         emit signalSimulationFailed(status);
         
-        return;
+        SimulationResult result;
+        result.status = status;
+        return result;
     }
     
     this->simulation_request = request;
@@ -42,7 +44,9 @@ void EpanetWrapper::run(const SimulationRequest &request)
         status.details << "";
         emit signalSimulationFailed(status);
         
-        return;
+        SimulationResult result;
+        result.status = status;
+        return result;
     }
     
     EN_setreportcallbackuserdata(this->epanet_project, this);
@@ -63,7 +67,10 @@ void EpanetWrapper::run(const SimulationRequest &request)
         status.details << "";
         
         emit signalSimulationFailed(status);
-        return;
+        
+        SimulationResult result;
+        result.status = status;
+        return result;
     }
     
     EN_setreportcallbackuserdata(this->epanet_project, this);
@@ -76,7 +83,10 @@ void EpanetWrapper::run(const SimulationRequest &request)
         cleanupProject();
         
         emit signalSimulationFailed(status);
-        return;
+        
+        SimulationResult result;
+        result.status = status;
+        return result;
     }
     
     
@@ -86,7 +96,10 @@ void EpanetWrapper::run(const SimulationRequest &request)
         cleanupProject();
         
         emit signalSimulationFailed(status);
-        return;
+        
+        SimulationResult result;
+        result.status = status;
+        return result;
     }
     
     status = readResults();
@@ -96,7 +109,10 @@ void EpanetWrapper::run(const SimulationRequest &request)
         cleanupProject();
         
         emit signalSimulationFailed(status);
-        return;
+        
+        SimulationResult result;
+        result.status = status;
+        return result;
     }
     
     
@@ -122,6 +138,8 @@ void EpanetWrapper::run(const SimulationRequest &request)
     cleanupProject();
     
     emit signalSimulationFinished(this->simulation_result);
+    
+    return this->simulation_result;
 }
 
 QStringList EpanetWrapper::reportTextList() const

@@ -29,7 +29,10 @@ void Server::setupRoutes()
     {
         StatusPrinter::print(status);
     });
-    epanet->run(request);
+    
+    SimulationResult result = epanet->run(request);
+    SimulationResultPrinter::print(result);
+    
     qDebug().noquote() << epanet->reportText();
     
     /*

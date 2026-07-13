@@ -4,6 +4,8 @@
 #include <QString>
 #include <QList>
 
+#include "epanet_status.h"
+
 struct JunctionResult
 {
     QString id;
@@ -30,6 +32,8 @@ struct TankResult
 
 struct SimulationResult
 {
+    EpanetStatus status;
+    
     QList<JunctionResult> junctions;
     QList<TankResult> tanks;
     QList<PipeResult> pipes;

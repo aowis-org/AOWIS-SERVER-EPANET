@@ -33,7 +33,7 @@ class EpanetWrapper : public QObject
 public:
     explicit EpanetWrapper(QObject *parent = nullptr);
     
-    void run(const SimulationRequest &request);
+    SimulationResult run(const SimulationRequest &request);
     EpanetStatus runHydraulics();
     EpanetStatus readResults();
     
