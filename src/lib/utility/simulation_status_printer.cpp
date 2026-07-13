@@ -1,4 +1,4 @@
-#include "status_printer.h"
+#include "simulation_status_printer.h"
 
 #include <QMetaEnum>
 #include <QRegularExpression>
@@ -58,7 +58,7 @@ namespace
     }
 }
 
-QString StatusPrinter::toString(
+QString SimulationStatusPrinter::toString(
     const EpanetStatus &status
 )
 {
@@ -150,7 +150,7 @@ QString StatusPrinter::toString(
     return output;
 }
 
-void StatusPrinter::print(
+void SimulationStatusPrinter::print(
     const EpanetStatus &status
 )
 {

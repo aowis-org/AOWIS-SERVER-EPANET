@@ -22,7 +22,7 @@
 
 #include "../lib/model/simulation_request.h"
 
-#include "utility/status_printer.h"
+#include "utility/simulation_status_printer.h"
 #include "utility/simulation_result_printer.h"
 
 #include "dummy/dummy_networks.h"

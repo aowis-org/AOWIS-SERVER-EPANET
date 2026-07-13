@@ -27,7 +27,7 @@ void Server::setupRoutes()
     EpanetWrapper *epanet = new EpanetWrapper(this);
     connect(epanet, &EpanetWrapper::signalSimulationFailed, this, [this](EpanetStatus status)
     {
-        StatusPrinter::print(status);
+        SimulationStatusPrinter::print(status);
     });
     
     SimulationResult result = epanet->run(request);
