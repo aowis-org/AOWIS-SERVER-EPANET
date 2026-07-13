@@ -22,9 +22,6 @@ SimulationRequest DummyNetworks::networkSimple()
     pipe.open = true;
     
     SimulationRequest request;
-    request.duration_s = 24 * 60 * 60;
-    request.hydraulic_timestep_s = 60 * 60;
-    
     request.reservoirs.append(reservoir);
     request.junctions.append(junction);
     request.pipes.append(pipe);
@@ -389,5 +386,20 @@ SimulationRequest DummyNetworks::networkTanks()
     request.pipes.append(tank_pipe_3);
     request.pipes.append(tank_pipe_4);
     
+    return request;
+}
+
+SimulationRequest DummyNetworks::networkSimpleTimeline()
+{
+    SimulationRequest request = networkSimpleTimeline();
+    request.duration_s = 24 * 60 * 60;
+    request.hydraulic_timestep_s = 60 * 60;
+    return request;
+}
+SimulationRequest DummyNetworks::networkTanksTimeline()
+{
+    SimulationRequest request = networkTanksTimeline();
+    request.duration_s = 24 * 60 * 60;
+    request.hydraulic_timestep_s = 60 * 60;
     return request;
 }
