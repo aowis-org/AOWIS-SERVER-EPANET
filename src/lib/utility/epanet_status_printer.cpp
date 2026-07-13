@@ -31,17 +31,21 @@ namespace
         if (text == QStringLiteral("Unknown"))
             return text;
         
+        static const QRegularExpression acronym_boundary(
+            QStringLiteral("([A-Z]+)([A-Z][a-z])")
+            );
+        
+        static const QRegularExpression camel_case_boundary(
+            QStringLiteral("([a-z0-9])([A-Z])")
+            );
+        
         text.replace(
-            QRegularExpression(
-                QStringLiteral("([A-Z]+)([A-Z][a-z])")
-                ),
+            acronym_boundary,
             QStringLiteral("\\1 \\2")
             );
         
         text.replace(
-            QRegularExpression(
-                QStringLiteral("([a-z0-9])([A-Z])")
-                ),
+            camel_case_boundary,
             QStringLiteral("\\1 \\2")
             );
         
