@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <QList>
+#include <QDateTime>
 
 #include "epanet_status.h"
 
@@ -37,6 +38,13 @@ struct SimulationResult
     QList<JunctionResult> junctions;
     QList<TankResult> tanks;
     QList<PipeResult> pipes;
+};
+
+struct SimulationResultTimeline
+{
+    EpanetStatus status;
+    QDateTime simulation_start_utc;
+    QList<SimulationResult> results;
 };
 
 #endif // SIMULATION_RESULT_H
