@@ -391,14 +391,14 @@ SimulationRequest DummyNetworks::networkTanks()
 
 SimulationRequest DummyNetworks::networkSimpleTimeline()
 {
-    SimulationRequest request = networkSimpleTimeline();
+    SimulationRequest request = networkSimple();
     request.duration_s = 24 * 60 * 60;
     request.hydraulic_timestep_s = 60 * 60;
     return request;
 }
 SimulationRequest DummyNetworks::networkTanksTimeline()
 {
-    SimulationRequest request = networkTanksTimeline();
+    SimulationRequest request = networkTanks();
     request.duration_s = 24 * 60 * 60;
     request.hydraulic_timestep_s = 60 * 60;
     return request;
