@@ -8,7 +8,9 @@ EpanetWrapper::EpanetWrapper(QObject *parent)
     qRegisterMetaType<EpanetStatus>("EpanetStatus");
 }
 
-SimulationResult EpanetWrapper::run(const SimulationRequest &request)
+SimulationResult EpanetWrapper::run(
+    const SimulationRequest &request
+    )
 {
     if (this->epanet_project != nullptr)
     {
@@ -19,6 +21,7 @@ SimulationResult EpanetWrapper::run(const SimulationRequest &request)
         status.entity.type = EpanetEntityType::None;
         status.message = "EPANET project is already running";
         status.details << "Variable this->epanet_project != nullptr";
+        
         emit signalSimulationFailed(status);
         
         SimulationResult result;
@@ -27,36 +30,52 @@ SimulationResult EpanetWrapper::run(const SimulationRequest &request)
     }
     
     this->simulation_request = request;
-    
     this->simulation_result = SimulationResult();
     this->epanet_report.clear();
     
-    int error = EN_createproject(&this->epanet_project);
+    const auto returnFailure =
+        [this](
+            const EpanetStatus &status,
+            bool cleanup_project
+        ) -> SimulationResult
+    {
+        this->simulation_result.status = status;
+        
+        if (cleanup_project)
+            cleanupProject();
+        
+        emit signalSimulationFailed(status);
+        
+        return this->simulation_result;
+    };
+    
+    int error =
+        EN_createproject(&this->epanet_project);
+    
     if (error != 0)
     {
         EpanetStatus status;
         status.success = false;
         status.epanet_error_code = error;
         status.stage = EpanetStage::CreateProject;
-        status.operation = EpanetOperation::EN_createproject;
+        status.operation =
+            EpanetOperation::EN_createproject;
         status.entity.type = EpanetEntityType::None;
         status.message = "EPANET project creation failed";
-        status.details << "";
-        emit signalSimulationFailed(status);
+        status.message_epanet = getEpanetErrorMessage(error);
         
-        SimulationResult result;
-        result.status = status;
-        return result;
+        return returnFailure(status, false);
     }
     
-    EN_setreportcallbackuserdata(this->epanet_project, this);
-    EN_setreportcallback(this->epanet_project, &EpanetWrapper::epanetReportCallback);
-    
-    error = EN_init(this->epanet_project, "", "", EN_LPS, EN_HW);
+    error = EN_init(
+        this->epanet_project,
+        "",
+        "",
+        EN_LPS,
+        EN_HW
+    );
     if (error != 0)
     {
-        cleanupProject();
-        
         EpanetStatus status;
         status.success = false;
         status.epanet_error_code = error;
@@ -64,80 +83,139 @@ SimulationResult EpanetWrapper::run(const SimulationRequest &request)
         status.operation = EpanetOperation::EN_init;
         status.entity.type = EpanetEntityType::None;
         status.message = "EPANET project initialization failed";
-        status.details << "";
+        status.message_epanet = getEpanetErrorMessage(error);
         
-        emit signalSimulationFailed(status);
-        
-        SimulationResult result;
-        result.status = status;
-        return result;
+        return returnFailure(status, true);
     }
     
-    EN_setreportcallbackuserdata(this->epanet_project, this);
-    EN_setreportcallback(this->epanet_project, &EpanetWrapper::epanetReportCallback);
-    
-    
-    EpanetStatus status = addEntities(request);
-    if (!status.success)
-    {
-        cleanupProject();
-        
-        emit signalSimulationFailed(status);
-        
-        SimulationResult result;
-        result.status = status;
-        return result;
-    }
-    
-    
-    status = runHydraulics();
-    if (!status.success)
-    {
-        cleanupProject();
-        
-        emit signalSimulationFailed(status);
-        
-        SimulationResult result;
-        result.status = status;
-        return result;
-    }
-    
-    status = readResults();
-    if (!status.success)
-    {
-        EN_closeH(this->epanet_project);
-        cleanupProject();
-        
-        emit signalSimulationFailed(status);
-        
-        SimulationResult result;
-        result.status = status;
-        return result;
-    }
-    
-    
-    
-    error = EN_closeH(this->epanet_project);
+    error = EN_setreportcallbackuserdata(
+        this->epanet_project,
+        this
+    );
     if (error != 0)
     {
-        qWarning() << "EN_closeH failed:" << error;
+        EpanetStatus status;
+        status.success = false;
+        status.epanet_error_code = error;
+        status.stage = EpanetStage::InitializeProject;
+        status.operation = EpanetOperation::EN_setreportcallbackuserdata;
+        status.entity.type = EpanetEntityType::Report;
+        status.message = "Failed to set EPANET report callback data";
+        status.message_epanet = getEpanetErrorMessage(error);
+        
+        return returnFailure(status, true);
+    }
+    
+    error = EN_setreportcallback(
+        this->epanet_project,
+        &EpanetWrapper::epanetReportCallback
+    );
+    if (error != 0)
+    {
+        EpanetStatus status;
+        status.success = false;
+        status.epanet_error_code = error;
+        status.stage = EpanetStage::InitializeProject;
+        status.operation = EpanetOperation::EN_setreportcallback;
+        status.entity.type = EpanetEntityType::Report;
+        status.message = "Failed to set EPANET report callback";
+        status.message_epanet = getEpanetErrorMessage(error);
+        
+        return returnFailure(status, true);
+    }
+    
+    EpanetStatus status = addEntities(request);
+    
+    if (!status.success)
+        return returnFailure(status, true);
+    
+    status = runHydraulics();
+    
+    if (!status.success)
+        return returnFailure(status, true);
+    
+    status = readResults();
+    this->simulation_result.status = status;
+    
+    if (!status.success)
+    {
+        const int close_error =
+            EN_closeH(this->epanet_project);
+        
+        if (close_error != 0)
+        {
+            status.details
+                << QString(
+                       "Additionally, EN_closeH failed "
+                       "with error code %1: %2"
+                )
+                .arg(close_error)
+                .arg(
+                    getEpanetErrorMessage(
+                        close_error
+                    )
+                );
+        }
+        
+        return returnFailure(status, true);
+    }
+    
+    error = EN_closeH(this->epanet_project);
+    
+    if (error != 0)
+    {
+        status = EpanetStatus();
+        status.success = false;
+        status.epanet_error_code = error;
+        status.stage = EpanetStage::CloseHydraulics;
+        status.operation = EpanetOperation::EN_closeH;
+        status.entity.type = EpanetEntityType::HydraulicSolver;
+        status.message = "Failed to close EPANET hydraulics";
+        status.message_epanet = getEpanetErrorMessage(error);
+        
+        return returnFailure(status, true);
     }
     
     error = EN_saveH(this->epanet_project);
     if (error != 0)
     {
-        qWarning() << "EN_saveH failed:" << error;
+        status = EpanetStatus();
+        status.success = false;
+        status.epanet_error_code = error;
+        status.stage = EpanetStage::SaveHydraulics;
+        status.operation = EpanetOperation::EN_saveH;
+        status.entity.type = EpanetEntityType::HydraulicSolver;
+        status.message = "Failed to save EPANET hydraulic results";
+        status.message_epanet = getEpanetErrorMessage(error);
+        
+        return returnFailure(status, true);
     }
     
     error = EN_report(this->epanet_project);
     if (error != 0)
     {
-        qWarning() << "EN_report failed:" << error;
+        status = EpanetStatus();
+        status.success = false;
+        status.epanet_error_code = error;
+        status.stage = EpanetStage::GenerateReport;
+        status.operation = EpanetOperation::EN_report;
+        status.entity.type = EpanetEntityType::Report;
+        status.message = "Failed to generate EPANET report";
+        status.message_epanet = getEpanetErrorMessage(error);
+        
+        return returnFailure(status, true);
     }
     
     cleanupProject();
     
-    emit signalSimulationFinished(this->simulation_result);
+    status = EpanetStatus();
+    status.success = true;
+    
+    this->simulation_result.status = status;
+    
+    emit signalSimulationFinished(
+        this->simulation_result
+    );
     
     return this->simulation_result;
 }
