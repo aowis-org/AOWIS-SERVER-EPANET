@@ -37,7 +37,7 @@ SimulationResult EpanetWrapper::run(
         [this](
             const EpanetStatus &status,
             bool cleanup_project
-        ) -> SimulationResult
+            ) -> SimulationResult
     {
         this->simulation_result.status = status;
         
@@ -51,20 +51,60 @@ SimulationResult EpanetWrapper::run(
     
     int error =
         EN_createproject(&this->epanet_project);
-    
     if (error != 0)
     {
         EpanetStatus status;
         status.success = false;
         status.epanet_error_code = error;
         status.stage = EpanetStage::CreateProject;
-        status.operation =
-            EpanetOperation::EN_createproject;
+        status.operation = EpanetOperation::EN_createproject;
         status.entity.type = EpanetEntityType::None;
         status.message = "EPANET project creation failed";
         status.message_epanet = getEpanetErrorMessage(error);
         
         return returnFailure(status, false);
+    }
+    
+    /*
+     * Register the report callback before EN_init().
+     *
+     * EPANET writes its header while initializing the project,
+     * so the callback must already be available at this point.
+     */
+    error = EN_setreportcallbackuserdata(
+        this->epanet_project,
+        this
+    );
+    if (error != 0)
+    {
+        EpanetStatus status;
+        status.success = false;
+        status.epanet_error_code = error;
+        status.stage = EpanetStage::InitializeProject;
+        status.operation = EpanetOperation::EN_setreportcallbackuserdata;
+        status.entity.type = EpanetEntityType::Report;
+        status.message = "Failed to set EPANET report callback data before initialization";
+        status.message_epanet = getEpanetErrorMessage(error);
+        
+        return returnFailure(status, true);
+    }
+    
+    error = EN_setreportcallback(
+        this->epanet_project,
+        &EpanetWrapper::epanetReportCallback
+    );
+    if (error != 0)
+    {
+        EpanetStatus status;
+        status.success = false;
+        status.epanet_error_code = error;
+        status.stage = EpanetStage::InitializeProject;
+        status.operation = EpanetOperation::EN_setreportcallback;
+        status.entity.type = EpanetEntityType::Report;
+        status.message = "Failed to set EPANET report callback before initialization";
+        status.message_epanet = getEpanetErrorMessage(error);
+        
+        return returnFailure(status, true);
     }
     
     error = EN_init(
@@ -88,6 +128,10 @@ SimulationResult EpanetWrapper::run(
         return returnFailure(status, true);
     }
     
+    /*
+     * EN_init() resets the report callback internally.
+     * Register the callback again for the remainder of the run.
+     */
     error = EN_setreportcallbackuserdata(
         this->epanet_project,
         this
@@ -100,7 +144,7 @@ SimulationResult EpanetWrapper::run(
         status.stage = EpanetStage::InitializeProject;
         status.operation = EpanetOperation::EN_setreportcallbackuserdata;
         status.entity.type = EpanetEntityType::Report;
-        status.message = "Failed to set EPANET report callback data";
+        status.message = "Failed to restore EPANET report callback data after initialization";
         status.message_epanet = getEpanetErrorMessage(error);
         
         return returnFailure(status, true);
@@ -118,25 +162,22 @@ SimulationResult EpanetWrapper::run(
         status.stage = EpanetStage::InitializeProject;
         status.operation = EpanetOperation::EN_setreportcallback;
         status.entity.type = EpanetEntityType::Report;
-        status.message = "Failed to set EPANET report callback";
+        status.message = "Failed to restore EPANET report callback after initialization";
         status.message_epanet = getEpanetErrorMessage(error);
         
         return returnFailure(status, true);
     }
     
     EpanetStatus status = addEntities(request);
-    
     if (!status.success)
         return returnFailure(status, true);
     
     status = runHydraulics();
-    
     if (!status.success)
         return returnFailure(status, true);
     
     status = readResults();
     this->simulation_result.status = status;
-    
     if (!status.success)
     {
         const int close_error =
@@ -146,13 +187,13 @@ SimulationResult EpanetWrapper::run(
         {
             status.details
                 << QString(
-                       "Additionally, EN_closeH failed "
-                       "with error code %1: %2"
-                )
-                .arg(close_error)
-                .arg(
-                    getEpanetErrorMessage(
-                        close_error
+                    "Additionally, EN_closeH failed "
+                    "with error code %1: %2"
+                    )
+                    .arg(close_error)
+                    .arg(
+                        getEpanetErrorMessage(
+                            close_error
                     )
                 );
         }
@@ -161,7 +202,6 @@ SimulationResult EpanetWrapper::run(
     }
     
     error = EN_closeH(this->epanet_project);
-    
     if (error != 0)
     {
         status = EpanetStatus();
@@ -200,8 +240,10 @@ SimulationResult EpanetWrapper::run(
         status.stage = EpanetStage::GenerateReport;
         status.operation = EpanetOperation::EN_report;
         status.entity.type = EpanetEntityType::Report;
-        status.message = "Failed to generate EPANET report";
-        status.message_epanet = getEpanetErrorMessage(error);
+        status.message =
+            "Failed to generate EPANET report";
+        status.message_epanet =
+            getEpanetErrorMessage(error);
         
         return returnFailure(status, true);
     }
