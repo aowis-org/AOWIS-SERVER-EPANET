@@ -38,6 +38,13 @@ set(BUILD_SHARED_LIBS
 
 add_subdirectory(external/epanet EXCLUDE_FROM_ALL)
 
+if(WIN32 AND NOT AOWIS_SERVER_EPANET_BUILD_SHARED_EPANET)
+    target_compile_definitions(epanet2
+        PUBLIC
+        "DLLEXPORT=__stdcall"
+    )
+endif()
+
 if(TARGET epanet2 AND UNIX AND NOT APPLE)
     target_link_libraries(epanet2 PUBLIC m)
 endif()
