@@ -15,9 +15,9 @@
 #error "Could not find EPANET header."
 #endif
 
-#include "model/simulation_request.h"
-#include "model/simulation_result.h"
-#include "model/epanet_status.h"
+#include <aowis/model/hydraulic/simulation_request.h>
+#include <aowis/model/hydraulic/simulation_result.h>
+#include <aowis/model/hydraulic/epanet_status.h>
 
 #include "epanet_resolvers.h"
 

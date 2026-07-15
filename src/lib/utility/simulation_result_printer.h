@@ -3,7 +3,7 @@
 
 #include <QString>
 
-#include "model/simulation_result.h"
+#include <aowis/model/hydraulic/simulation_result.h>
 
 class SimulationResultPrinter
 {

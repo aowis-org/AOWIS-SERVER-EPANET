@@ -3,7 +3,7 @@
 
 #include <QString>
 
-#include "model/epanet_status.h"
+#include <aowis/model/hydraulic/epanet_status.h>
 
 class SimulationStatusPrinter
 {

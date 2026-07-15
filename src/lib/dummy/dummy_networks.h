@@ -1,7 +1,7 @@
 #ifndef DUMMY_NETWORKS_H
 #define DUMMY_NETWORKS_H
 
-#include "model/simulation_request.h"
+#include <aowis/model/hydraulic/simulation_request.h>
 
 class DummyNetworks
 {
