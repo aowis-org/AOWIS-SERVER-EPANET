@@ -1,17 +1,20 @@
 #include "dummy_networks.h"
 
-SimulationRequest DummyNetworks::networkSimple()
+NetworkHydraulic DummyNetworks::networkSimple()
 {
     Reservoir reservoir;
+    reservoir.uuid = QUuid::createUuid();
     reservoir.id = "R1";
     reservoir.head_m = 30.0;
     
     Junction junction;
+    junction.uuid = QUuid::createUuid();
     junction.id = "J1";
     junction.elevation_m = 0.0;
     junction.demand_lps = 1.0;
     
     Pipe pipe;
+    pipe.uuid = QUuid::createUuid();
     pipe.id = "P1";
     pipe.node_id_from = reservoir.id;
     pipe.node_id_to = junction.id;
@@ -21,7 +24,7 @@ SimulationRequest DummyNetworks::networkSimple()
     pipe.minor_loss = 0.0;
     pipe.open = true;
     
-    SimulationRequest request;
+    NetworkHydraulic request;
     request.reservoirs.append(reservoir);
     request.junctions.append(junction);
     request.pipes.append(pipe);
@@ -29,7 +32,7 @@ SimulationRequest DummyNetworks::networkSimple()
     return request;
 }
 
-SimulationRequest DummyNetworks::networkTanks()
+NetworkHydraulic DummyNetworks::networkTanks()
 {
     // Create a more complex dummy network.
     
@@ -38,6 +41,7 @@ SimulationRequest DummyNetworks::networkTanks()
     // ------------------------------------------------------------
     
     Reservoir reservoir;
+    reservoir.uuid = QUuid::createUuid();
     reservoir.id = "R1";
     reservoir.head_m = 75.0;
     
@@ -47,26 +51,31 @@ SimulationRequest DummyNetworks::networkTanks()
     // ------------------------------------------------------------
     
     Junction junction_1;
+    junction_1.uuid = QUuid::createUuid();
     junction_1.id = "J1";
     junction_1.elevation_m = 45.0;
     junction_1.demand_lps = 1.5;
     
     Junction junction_2;
+    junction_2.uuid = QUuid::createUuid();
     junction_2.id = "J2";
     junction_2.elevation_m = 50.0;
     junction_2.demand_lps = 2.0;
     
     Junction junction_3;
+    junction_3.uuid = QUuid::createUuid();
     junction_3.id = "J3";
     junction_3.elevation_m = 60.0;
     junction_3.demand_lps = 1.0;
     
     Junction junction_4;
+    junction_4.uuid = QUuid::createUuid();
     junction_4.id = "J4";
     junction_4.elevation_m = 35.0;
     junction_4.demand_lps = 1.5;
     
     Junction junction_5;
+    junction_5.uuid = QUuid::createUuid();
     junction_5.id = "J5";
     junction_5.elevation_m = 55.0;
     junction_5.demand_lps = 1.0;
@@ -83,6 +92,7 @@ SimulationRequest DummyNetworks::networkTanks()
     // ------------------------------------------------------------
     
     Tank tank_1;
+    tank_1.uuid = QUuid::createUuid();
     tank_1.id = "T1";
     
     tank_1.bottom_elevation_m = 58.0;
@@ -91,8 +101,7 @@ SimulationRequest DummyNetworks::networkTanks()
     tank_1.minimum_level_m = 2.0;
     tank_1.maximum_level_m = 16.0;
     
-    tank_1.geometry_input_type =
-        TankGeometryInputType::Cylindrical;
+    tank_1.geometry_input_type = TankGeometryInputType::Cylindrical;
     
     tank_1.diameter_m = 8.0;
     tank_1.minimum_volume_m3 = 0.0;
@@ -110,6 +119,7 @@ SimulationRequest DummyNetworks::networkTanks()
     // ------------------------------------------------------------
     
     Tank tank_2;
+    tank_2.uuid = QUuid::createUuid();
     tank_2.id = "T2";
     
     tank_2.bottom_elevation_m = 68.0;
@@ -118,8 +128,7 @@ SimulationRequest DummyNetworks::networkTanks()
     tank_2.minimum_level_m = 2.0;
     tank_2.maximum_level_m = 18.0;
     
-    tank_2.geometry_input_type =
-        TankGeometryInputType::UniformArea;
+    tank_2.geometry_input_type = TankGeometryInputType::UniformArea;
     
     tank_2.cross_section_area_m2 = 60.0;
     tank_2.minimum_volume_m3 = 20.0;
@@ -146,6 +155,7 @@ SimulationRequest DummyNetworks::networkTanks()
     // ------------------------------------------------------------
     
     Tank tank_3;
+    tank_3.uuid = QUuid::createUuid();
     tank_3.id = "T3";
     
     tank_3.bottom_elevation_m = 45.0;
@@ -154,8 +164,7 @@ SimulationRequest DummyNetworks::networkTanks()
     tank_3.minimum_level_m = 2.0;
     tank_3.maximum_level_m = 20.0;
     
-    tank_3.geometry_input_type =
-        TankGeometryInputType::VolumeAtMaximumLevel;
+    tank_3.geometry_input_type = TankGeometryInputType::VolumeAtMaximumLevel;
     
     tank_3.minimum_volume_m3 = 40.0;
     tank_3.volume_at_maximum_level_m3 = 490.0;
@@ -173,6 +182,7 @@ SimulationRequest DummyNetworks::networkTanks()
     // ------------------------------------------------------------
     
     TankVolumeCurve tank_4_curve;
+    tank_4_curve.uuid = QUuid::createUuid();
     tank_4_curve.id = "VC_T4";
     
     TankVolumeCurvePoint tank_4_curve_point_1;
@@ -206,6 +216,7 @@ SimulationRequest DummyNetworks::networkTanks()
     tank_4_curve.points.append(tank_4_curve_point_6);
     
     Tank tank_4;
+    tank_4.uuid = QUuid::createUuid();
     tank_4.id = "T4";
     
     tank_4.bottom_elevation_m = 70.0;
@@ -214,8 +225,7 @@ SimulationRequest DummyNetworks::networkTanks()
     tank_4.minimum_level_m = 3.0;
     tank_4.maximum_level_m = 16.0;
     
-    tank_4.geometry_input_type =
-        TankGeometryInputType::VolumeCurve;
+    tank_4.geometry_input_type = TankGeometryInputType::VolumeCurve;
     
     tank_4.volume_curve_id = tank_4_curve.id;
     
@@ -231,6 +241,7 @@ SimulationRequest DummyNetworks::networkTanks()
     
     // Reservoir connection.
     Pipe pipe_1;
+    pipe_1.uuid = QUuid::createUuid();
     pipe_1.id = "P1";
     pipe_1.node_id_from = reservoir.id;
     pipe_1.node_id_to = junction_1.id;
@@ -242,6 +253,7 @@ SimulationRequest DummyNetworks::networkTanks()
     
     // Upper-left distribution branch.
     Pipe pipe_2;
+    pipe_2.uuid = QUuid::createUuid();
     pipe_2.id = "P2";
     pipe_2.node_id_from = junction_1.id;
     pipe_2.node_id_to = junction_2.id;
@@ -253,6 +265,7 @@ SimulationRequest DummyNetworks::networkTanks()
     
     // Upper-right distribution branch.
     Pipe pipe_3;
+    pipe_3.uuid = QUuid::createUuid();
     pipe_3.id = "P3";
     pipe_3.node_id_from = junction_1.id;
     pipe_3.node_id_to = junction_3.id;
@@ -264,6 +277,7 @@ SimulationRequest DummyNetworks::networkTanks()
     
     // Left-side branch.
     Pipe pipe_4;
+    pipe_4.uuid = QUuid::createUuid();
     pipe_4.id = "P4";
     pipe_4.node_id_from = junction_2.id;
     pipe_4.node_id_to = junction_4.id;
@@ -275,6 +289,7 @@ SimulationRequest DummyNetworks::networkTanks()
     
     // Right-side branch.
     Pipe pipe_5;
+    pipe_5.uuid = QUuid::createUuid();
     pipe_5.id = "P5";
     pipe_5.node_id_from = junction_3.id;
     pipe_5.node_id_to = junction_5.id;
@@ -286,6 +301,7 @@ SimulationRequest DummyNetworks::networkTanks()
     
     // Lower cross-connection creates a loop.
     Pipe pipe_6;
+    pipe_6.uuid = QUuid::createUuid();
     pipe_6.id = "P6";
     pipe_6.node_id_from = junction_4.id;
     pipe_6.node_id_to = junction_5.id;
@@ -297,6 +313,7 @@ SimulationRequest DummyNetworks::networkTanks()
     
     // Upper cross-connection creates another loop.
     Pipe pipe_7;
+    pipe_7.uuid = QUuid::createUuid();
     pipe_7.id = "P7";
     pipe_7.node_id_from = junction_2.id;
     pipe_7.node_id_to = junction_3.id;
@@ -312,6 +329,7 @@ SimulationRequest DummyNetworks::networkTanks()
     // ------------------------------------------------------------
     
     Pipe tank_pipe_1;
+    tank_pipe_1.uuid = QUuid::createUuid();
     tank_pipe_1.id = "PT1";
     tank_pipe_1.node_id_from = tank_1.id;
     tank_pipe_1.node_id_to = junction_2.id;
@@ -322,6 +340,7 @@ SimulationRequest DummyNetworks::networkTanks()
     tank_pipe_1.open = true;
     
     Pipe tank_pipe_2;
+    tank_pipe_2.uuid = QUuid::createUuid();
     tank_pipe_2.id = "PT2";
     tank_pipe_2.node_id_from = tank_2.id;
     tank_pipe_2.node_id_to = junction_3.id;
@@ -332,6 +351,7 @@ SimulationRequest DummyNetworks::networkTanks()
     tank_pipe_2.open = true;
     
     Pipe tank_pipe_3;
+    tank_pipe_3.uuid = QUuid::createUuid();
     tank_pipe_3.id = "PT3";
     tank_pipe_3.node_id_from = tank_3.id;
     tank_pipe_3.node_id_to = junction_4.id;
@@ -342,6 +362,7 @@ SimulationRequest DummyNetworks::networkTanks()
     tank_pipe_3.open = true;
     
     Pipe tank_pipe_4;
+    tank_pipe_4.uuid = QUuid::createUuid();
     tank_pipe_4.id = "PT4";
     tank_pipe_4.node_id_from = tank_4.id;
     tank_pipe_4.node_id_to = junction_5.id;
@@ -356,7 +377,7 @@ SimulationRequest DummyNetworks::networkTanks()
     // Simulation request
     // ------------------------------------------------------------
     
-    SimulationRequest request;
+    NetworkHydraulic request;
     
     request.reservoirs.append(reservoir);
     
@@ -389,17 +410,22 @@ SimulationRequest DummyNetworks::networkTanks()
     return request;
 }
 
-SimulationRequest DummyNetworks::networkSimpleTimeline()
+NetworkHydraulic DummyNetworks::networkSimpleTimeline()
 {
-    SimulationRequest request = networkSimple();
+    NetworkHydraulic request = networkSimple();
     request.duration_s = 24 * 60 * 60;
     request.hydraulic_timestep_s = 60 * 60;
     return request;
 }
-SimulationRequest DummyNetworks::networkTanksTimeline()
+NetworkHydraulic DummyNetworks::networkTanksTimeline()
 {
-    SimulationRequest request = networkTanks();
+    NetworkHydraulic request = networkTanks();
     request.duration_s = 24 * 60 * 60;
     request.hydraulic_timestep_s = 60 * 60;
     return request;
+}
+
+NetworkHydraulic DummyNetworks::networkOnMap()
+{
+    
 }

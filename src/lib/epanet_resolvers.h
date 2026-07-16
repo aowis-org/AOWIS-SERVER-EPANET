@@ -4,7 +4,7 @@
 #include <QObject>
 #include <QtMath>
 
-#include <aowis/model/hydraulic/simulation_request.h>
+#include <aowis/model/hydraulic/network.h>
 
 class EpanetResolvers : public QObject
 {

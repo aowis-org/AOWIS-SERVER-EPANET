@@ -1,16 +1,21 @@
 #ifndef DUMMY_NETWORKS_H
 #define DUMMY_NETWORKS_H
 
-#include <aowis/model/hydraulic/simulation_request.h>
+#include <QDateTime>
+#include <QUuid>
+
+#include <aowis/model/hydraulic/network.h>
 
 class DummyNetworks
 {
 public:
-    static SimulationRequest networkSimple();
-    static SimulationRequest networkTanks();
+    static NetworkHydraulic networkSimple();
+    static NetworkHydraulic networkTanks();
     
-    static SimulationRequest networkSimpleTimeline();
-    static SimulationRequest networkTanksTimeline();
+    static NetworkHydraulic networkSimpleTimeline();
+    static NetworkHydraulic networkTanksTimeline();
+    
+    static NetworkHydraulic networkOnMap();
 };
 
 #endif // DUMMY_NETWORKS_H

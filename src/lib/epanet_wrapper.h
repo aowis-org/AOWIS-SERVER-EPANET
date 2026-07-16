@@ -15,7 +15,7 @@
 #error "Could not find EPANET header."
 #endif
 
-#include <aowis/model/hydraulic/simulation_request.h>
+#include <aowis/model/hydraulic/network.h>
 #include <aowis/model/hydraulic/simulation_result.h>
 #include <aowis/model/hydraulic/epanet_status.h>
 
@@ -28,7 +28,7 @@ class EpanetWrapper : public QObject
 public:
     explicit EpanetWrapper(QObject *parent = nullptr);
     
-    SimulationResultTimeline run(const SimulationRequest &request);
+    SimulationResultTimeline run(const NetworkHydraulic &request);
     
     EpanetStatus runHydraulics();
     
@@ -40,7 +40,7 @@ private:
     QStringList epanet_report;
     QString getEpanetErrorMessage(int error_code) const;
     
-    SimulationRequest simulation_request;
+    NetworkHydraulic simulation_request;
     SimulationResultTimeline simulation_result_timeline;
     
     static void epanetReportCallback(
@@ -49,7 +49,7 @@ private:
         const char *line
     );
     
-    EpanetStatus addEntities(const SimulationRequest &request);
+    EpanetStatus addEntities(const NetworkHydraulic &request);
     
     EpanetStatus addTankVolumeCurve(const TankVolumeCurve &curve);
     

@@ -11,8 +11,8 @@ EpanetWrapper::EpanetWrapper(QObject *parent)
 }
 
 SimulationResultTimeline EpanetWrapper::run(
-    const SimulationRequest &request
-)
+    const NetworkHydraulic &request
+    )
 {
     if (this->epanet_project != nullptr)
     {

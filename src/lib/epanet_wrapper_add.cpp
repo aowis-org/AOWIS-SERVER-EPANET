@@ -1,6 +1,6 @@
 #include "epanet_wrapper.h"
 
-EpanetStatus EpanetWrapper::addEntities(const SimulationRequest &request)
+EpanetStatus EpanetWrapper::addEntities(const NetworkHydraulic &request)
 {
     // Tank volume curves
     for (int i = 0; i < request.tank_volume_curves.length(); i++)

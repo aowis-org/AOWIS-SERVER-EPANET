@@ -7,7 +7,7 @@
 
 #include <atomic>
 
-#include <aowis/model/hydraulic/simulation_request.h>
+#include <aowis/model/hydraulic/network.h>
 #include <aowis/model/hydraulic/simulation_result.h>
 #include <aowis/model/hydraulic/epanet_status.h>
 
@@ -19,7 +19,7 @@ public:
     explicit EpanetSimulationManager(QObject *parent = nullptr);
     ~EpanetSimulationManager() override;
     
-    QUuid submit(const SimulationRequest &request);
+    QUuid submit(const NetworkHydraulic &request);
     
     void setMaxWorkerCount(int count);
     int maxWorkerCount() const;
