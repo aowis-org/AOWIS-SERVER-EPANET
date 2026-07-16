@@ -10,12 +10,11 @@ class DummyNetworks
 {
 public:
     static NetworkHydraulic networkSimple();
+    static NetworkHydraulic networkOnMap();
     static NetworkHydraulic networkTanks();
     
     static NetworkHydraulic networkSimpleTimeline();
     static NetworkHydraulic networkTanksTimeline();
-    
-    static NetworkHydraulic networkOnMap();
 };
 
 #endif // DUMMY_NETWORKS_H

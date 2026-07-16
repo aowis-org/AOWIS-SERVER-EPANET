@@ -24,12 +24,64 @@ NetworkHydraulic DummyNetworks::networkSimple()
     pipe.minor_loss = 0.0;
     pipe.open = true;
     
-    NetworkHydraulic request;
-    request.reservoirs.append(reservoir);
-    request.junctions.append(junction);
-    request.pipes.append(pipe);
+    NetworkHydraulic network;
+    network.reservoirs.append(reservoir);
+    network.junctions.append(junction);
+    network.pipes.append(pipe);
     
-    return request;
+    return network;
+}
+
+NetworkHydraulic DummyNetworks::networkOnMap()
+{
+    Tank tank_1;
+    tank_1.uuid = QUuid::createUuid();
+    tank_1.id = "T1";
+
+    tank_1.latitude = 11.98385;
+    tank_1.longitude = 18.20381;
+    
+    tank_1.bottom_elevation_m = 533.0;
+    
+    tank_1.initial_level_m = 6.0;
+    tank_1.minimum_level_m = 2.0;
+    tank_1.maximum_level_m = 16.0;
+    
+    tank_1.geometry_input_type = TankGeometryInputType::Cylindrical;
+    
+    tank_1.diameter_m = 8.0;
+    tank_1.minimum_volume_m3 = 0.0;
+    tank_1.can_overflow = false;
+    
+    Junction junction_1;
+    junction_1.uuid = QUuid::createUuid();
+    junction_1.id = "J1";
+    
+    junction_1.latitude = 11.98108;
+    junction_1.longitude = 18.20373;
+    
+    junction_1.elevation_m = 477.0;
+    junction_1.demand_lps = 1.0;
+    
+    Pipe pipe_1;
+    pipe_1.uuid = QUuid::createUuid();
+    pipe_1.id = "P1";
+    
+    pipe_1.node_id_from = tank_1.id;
+    pipe_1.node_id_to = junction_1.id;
+    
+    pipe_1.length_m = 250.0;
+    pipe_1.diameter_mm = 300.0;
+    pipe_1.roughness_hw = 130.0;
+    pipe_1.minor_loss = 0.0;
+    pipe_1.open = true;
+    
+    NetworkHydraulic network;
+    network.tanks.append(tank_1);
+    network.junctions.append(junction_1);
+    network.pipes.append(pipe_1);
+    
+    return network;
 }
 
 NetworkHydraulic DummyNetworks::networkTanks()
@@ -425,7 +477,4 @@ NetworkHydraulic DummyNetworks::networkTanksTimeline()
     return request;
 }
 
-NetworkHydraulic DummyNetworks::networkOnMap()
-{
-    
-}
+
