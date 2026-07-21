@@ -36,7 +36,7 @@ NetworkHydraulic DummyNetworks::networkOnMap()
 {
     Tank tank_1;
     tank_1.uuid = QUuid::createUuid();
-    tank_1.id = "T1";
+    tank_1.id = "T34";
 
     tank_1.latitude = 11.98385;
     tank_1.longitude = 18.20381;
