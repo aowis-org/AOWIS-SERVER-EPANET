@@ -18,7 +18,7 @@ NetworkHydraulic DummyNetworks::networkSimple()
     pipe.id = "P1";
     pipe.node_id_from = reservoir.id;
     pipe.node_id_to = junction.id;
-    pipe.length_m = 100.0;
+    pipe.length_calculated_m = 100.0;
     pipe.diameter_mm = 150.0;
     pipe.roughness_hw = 130.0;
     pipe.minor_loss = 0.0;
@@ -70,7 +70,7 @@ NetworkHydraulic DummyNetworks::networkOnMap()
     pipe_1.node_id_from = tank_1.id;
     pipe_1.node_id_to = junction_1.id;
     
-    pipe_1.length_m = 250.0;
+    pipe_1.length_calculated_m = 250.0;
     pipe_1.diameter_mm = 300.0;
     pipe_1.roughness_hw = 130.0;
     pipe_1.minor_loss = 0.0;
@@ -297,7 +297,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_1.id = "P1";
     pipe_1.node_id_from = reservoir.id;
     pipe_1.node_id_to = junction_1.id;
-    pipe_1.length_m = 250.0;
+    pipe_1.length_calculated_m = 250.0;
     pipe_1.diameter_mm = 300.0;
     pipe_1.roughness_hw = 130.0;
     pipe_1.minor_loss = 0.0;
@@ -309,7 +309,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_2.id = "P2";
     pipe_2.node_id_from = junction_1.id;
     pipe_2.node_id_to = junction_2.id;
-    pipe_2.length_m = 300.0;
+    pipe_2.length_calculated_m = 300.0;
     pipe_2.diameter_mm = 250.0;
     pipe_2.roughness_hw = 130.0;
     pipe_2.minor_loss = 0.0;
@@ -321,7 +321,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_3.id = "P3";
     pipe_3.node_id_from = junction_1.id;
     pipe_3.node_id_to = junction_3.id;
-    pipe_3.length_m = 350.0;
+    pipe_3.length_calculated_m = 350.0;
     pipe_3.diameter_mm = 250.0;
     pipe_3.roughness_hw = 130.0;
     pipe_3.minor_loss = 0.0;
@@ -333,7 +333,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_4.id = "P4";
     pipe_4.node_id_from = junction_2.id;
     pipe_4.node_id_to = junction_4.id;
-    pipe_4.length_m = 400.0;
+    pipe_4.length_calculated_m = 400.0;
     pipe_4.diameter_mm = 200.0;
     pipe_4.roughness_hw = 130.0;
     pipe_4.minor_loss = 0.0;
@@ -345,7 +345,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_5.id = "P5";
     pipe_5.node_id_from = junction_3.id;
     pipe_5.node_id_to = junction_5.id;
-    pipe_5.length_m = 375.0;
+    pipe_5.length_calculated_m = 375.0;
     pipe_5.diameter_mm = 200.0;
     pipe_5.roughness_hw = 130.0;
     pipe_5.minor_loss = 0.0;
@@ -357,7 +357,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_6.id = "P6";
     pipe_6.node_id_from = junction_4.id;
     pipe_6.node_id_to = junction_5.id;
-    pipe_6.length_m = 500.0;
+    pipe_6.length_calculated_m = 500.0;
     pipe_6.diameter_mm = 180.0;
     pipe_6.roughness_hw = 130.0;
     pipe_6.minor_loss = 0.0;
@@ -369,7 +369,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_7.id = "P7";
     pipe_7.node_id_from = junction_2.id;
     pipe_7.node_id_to = junction_3.id;
-    pipe_7.length_m = 450.0;
+    pipe_7.length_calculated_m = 450.0;
     pipe_7.diameter_mm = 180.0;
     pipe_7.roughness_hw = 130.0;
     pipe_7.minor_loss = 0.0;
@@ -385,7 +385,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     tank_pipe_1.id = "PT1";
     tank_pipe_1.node_id_from = tank_1.id;
     tank_pipe_1.node_id_to = junction_2.id;
-    tank_pipe_1.length_m = 80.0;
+    tank_pipe_1.length_calculated_m = 80.0;
     tank_pipe_1.diameter_mm = 200.0;
     tank_pipe_1.roughness_hw = 130.0;
     tank_pipe_1.minor_loss = 0.0;
@@ -396,7 +396,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     tank_pipe_2.id = "PT2";
     tank_pipe_2.node_id_from = tank_2.id;
     tank_pipe_2.node_id_to = junction_3.id;
-    tank_pipe_2.length_m = 100.0;
+    tank_pipe_2.length_calculated_m = 100.0;
     tank_pipe_2.diameter_mm = 200.0;
     tank_pipe_2.roughness_hw = 130.0;
     tank_pipe_2.minor_loss = 0.0;
@@ -407,7 +407,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     tank_pipe_3.id = "PT3";
     tank_pipe_3.node_id_from = tank_3.id;
     tank_pipe_3.node_id_to = junction_4.id;
-    tank_pipe_3.length_m = 120.0;
+    tank_pipe_3.length_calculated_m = 120.0;
     tank_pipe_3.diameter_mm = 180.0;
     tank_pipe_3.roughness_hw = 130.0;
     tank_pipe_3.minor_loss = 0.0;
@@ -418,7 +418,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     tank_pipe_4.id = "PT4";
     tank_pipe_4.node_id_from = tank_4.id;
     tank_pipe_4.node_id_to = junction_5.id;
-    tank_pipe_4.length_m = 90.0;
+    tank_pipe_4.length_calculated_m = 90.0;
     tank_pipe_4.diameter_mm = 180.0;
     tank_pipe_4.roughness_hw = 130.0;
     tank_pipe_4.minor_loss = 0.0;
