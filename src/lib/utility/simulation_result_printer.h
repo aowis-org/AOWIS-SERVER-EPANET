@@ -16,3 +16,4 @@ public:
 };
 
 #endif // SIMULATION_RESULT_PRINTER_H
+
