@@ -1,6 +1,6 @@
 #include "epanet_wrapper.h"
 
-EpanetStatus EpanetWrapper::addEntities(const SimulationRequest &request)
+EpanetStatus EpanetWrapper::addEntities(const NetworkHydraulic &request)
 {
     // Tank volume curves
     for (int i = 0; i < request.tank_volume_curves.length(); i++)
@@ -468,10 +468,12 @@ EpanetStatus EpanetWrapper::addPipe(const Pipe &pipe)
         return status;
     }
     
+    const double length_m = pipe.length_measured_m.value_or(pipe.length_calculated_m);
+    
     error = EN_setpipedata(
         this->epanet_project,
         pipe_index,
-        pipe.length_m,
+        length_m,
         pipe.diameter_mm,
         pipe.roughness_hw,
         pipe.minor_loss

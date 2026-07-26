@@ -10,9 +10,9 @@ add_library(aowis-server-epanet-core STATIC
     epanet_wrapper_hydraulics.cpp
     epanet_wrapper_read.cpp
     
-    model/simulation_request.h
-    model/simulation_result.h
-    model/epanet_status.h
+    
+    
+    
     epanet_resolvers.h epanet_resolvers.cpp
     
     utility/simulation_status_printer.h
@@ -31,6 +31,7 @@ target_include_directories(aowis-server-epanet-core
 target_link_libraries(aowis-server-epanet-core
     PUBLIC
         Qt6::Core
+        AOWIS::ServerModel
         epanet2
 )
 

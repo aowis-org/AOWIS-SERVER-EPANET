@@ -46,7 +46,7 @@ EpanetSimulationManager::~EpanetSimulationManager()
 }
 
 QUuid EpanetSimulationManager::submit(
-    const SimulationRequest &request
+    const NetworkHydraulic &request
     )
 {
     const QUuid simulation_id =
