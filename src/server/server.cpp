@@ -1,5 +1,10 @@
 #include "server.h"
 
+#include <aowis/epanet/dummy/dummy_networks.h>
+#include <aowis/epanet/epanet_wrapper.h>
+#include <aowis/epanet/utility/simulation_result_printer.h>
+#include <aowis/epanet/utility/simulation_status_printer.h>
+
 Server::Server(QCoreApplication *app, QObject *parent)
     : QObject{parent}
 {
@@ -8,7 +13,7 @@ Server::Server(QCoreApplication *app, QObject *parent)
     setupRoutes();
 }
 
-/* deprecated: use reverse proxy instead doing this */
+/* deprecated: use reverse proxy instead of doing this */
 QHttpHeaders makeCorsHeaders() {
     QHttpHeaders h;
     h.append("Access-Control-Allow-Origin", "*");
@@ -21,8 +26,8 @@ void Server::setupRoutes()
 {
     qDebug() << "Starting Server";
     
-    SimulationRequest request = DummyNetworks::networkSimple();
-    //SimulationRequest request = DummyNetworks::networkTanks();
+    //NetworkHydraulic network = DummyNetworks::networkSimple();
+    NetworkHydraulic network = DummyNetworks::networkTanks();
     
     EpanetWrapper *epanet = new EpanetWrapper(this);
     connect(epanet, &EpanetWrapper::signalSimulationFailed, this, [this](EpanetStatus status)
@@ -30,7 +35,7 @@ void Server::setupRoutes()
         SimulationStatusPrinter::print(status);
     });
     
-    SimulationResultTimeline result = epanet->run(request);
+    SimulationResultTimeline result = epanet->run(network);
     SimulationResultPrinter::print(result);
     
     qDebug().noquote() << epanet->reportText();
