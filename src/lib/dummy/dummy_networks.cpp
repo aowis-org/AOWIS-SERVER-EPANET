@@ -1,4 +1,4 @@
-#include "dummy_networks.h"
+#include <aowis/epanet/dummy/dummy_networks.h>
 
 NetworkHydraulic DummyNetworks::networkSimple()
 {

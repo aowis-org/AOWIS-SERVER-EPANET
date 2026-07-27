@@ -1,4 +1,4 @@
-#include "epanet_resolvers.h"
+#include <aowis/epanet/epanet_resolvers.h>
 
 EpanetResolvers::EpanetResolvers(QObject *parent)
     : QObject{parent}

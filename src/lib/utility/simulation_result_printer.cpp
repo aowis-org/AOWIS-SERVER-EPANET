@@ -1,4 +1,4 @@
-#include "simulation_result_printer.h"
+#include <aowis/epanet/utility/simulation_result_printer.h>
 
 #include <QTextStream>
 

@@ -1,4 +1,4 @@
-#include "simulation_status_printer.h"
+#include <aowis/epanet/utility/simulation_status_printer.h>
 
 #include <QMetaEnum>
 #include <QRegularExpression>

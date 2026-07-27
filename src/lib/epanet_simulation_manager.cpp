@@ -1,6 +1,6 @@
-#include "epanet_simulation_manager.h"
 
-#include "epanet_wrapper.h"
+#include <aowis/epanet/epanet_simulation_manager.h>
+#include <aowis/epanet/epanet_wrapper.h>
 
 #include <QMetaObject>
 #include <QThread>

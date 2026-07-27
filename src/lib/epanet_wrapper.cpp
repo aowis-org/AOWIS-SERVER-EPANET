@@ -1,4 +1,4 @@
-#include "epanet_wrapper.h"
+#include <aowis/epanet/epanet_wrapper.h>
 
 
 EpanetWrapper::EpanetWrapper(QObject *parent)
