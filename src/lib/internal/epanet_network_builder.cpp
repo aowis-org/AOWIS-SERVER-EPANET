@@ -55,36 +55,41 @@ EpanetStatus EpanetNetworkBuilder::build(const NetworkHydraulic &request)
 EpanetStatus EpanetNetworkBuilder::addTankVolumeCurve(const TankVolumeCurve &curve)
 {
     if (curve.id.isEmpty())
-        return makeEpanetStatus(EpanetStage::AddTankVolumeCurve, EpanetOperation::None, EpanetEntityType::Curve, QString(), "Tank volume curve has no ID");
+        return makeEpanetStatus(EpanetStage::AddCurve, EpanetOperation::None, EpanetEntityType::Curve, QString(), "Tank volume curve has no ID");
 
     if (curve.points.length() < 2)
-        return makeEpanetStatus(EpanetStage::AddTankVolumeCurve, EpanetOperation::None, EpanetEntityType::Curve, curve.id, "Tank volume curve requires at least two points");
+        return makeEpanetStatus(EpanetStage::AddCurve, EpanetOperation::None, EpanetEntityType::Curve, curve.id, "Tank volume curve requires at least two points");
 
     const QByteArray curve_id = curve.id.toUtf8();
+
     int error = EN_addcurve(this->project.handle(), curve_id.constData());
     if (error != 0)
-        return makeEpanetError(this->project, error, EpanetStage::AddTankVolumeCurve, EpanetOperation::EN_addcurve, EpanetEntityType::Curve, curve.id, "Failed to add tank volume curve");
+        return makeEpanetError(this->project, error, EpanetStage::AddCurve, EpanetOperation::EN_addcurve, EpanetEntityType::Curve, curve.id, "Failed to add tank volume curve");
 
     int curve_index = 0;
     error = EN_getcurveindex(this->project.handle(), curve_id.constData(), &curve_index);
     if (error != 0)
-        return makeEpanetError(this->project, error, EpanetStage::AddTankVolumeCurve, EpanetOperation::EN_getcurveindex, EpanetEntityType::Curve, curve.id, "Failed to get tank volume curve index");
+        return makeEpanetError(this->project, error, EpanetStage::AddCurve, EpanetOperation::EN_getcurveindex, EpanetEntityType::Curve, curve.id, "Failed to get tank volume curve index");
 
     QList<double> levels_m;
     QList<double> volumes_m3;
+
     levels_m.reserve(curve.points.length());
     volumes_m3.reserve(curve.points.length());
 
     for (int index = 0; index < curve.points.length(); index++)
     {
         const TankVolumeCurvePoint &point = curve.points.at(index);
+
         if (index > 0)
         {
             const TankVolumeCurvePoint &previous_point = curve.points.at(index - 1);
+
             if (point.level_m <= previous_point.level_m)
-                return makeEpanetStatus(EpanetStage::AddTankVolumeCurve, EpanetOperation::None, EpanetEntityType::Curve, curve.id, "Tank volume curve levels must increase");
+                return makeEpanetStatus(EpanetStage::AddCurve, EpanetOperation::None, EpanetEntityType::Curve, curve.id, "Tank volume curve levels must increase");
+
             if (point.volume_m3 <= previous_point.volume_m3)
-                return makeEpanetStatus(EpanetStage::AddTankVolumeCurve, EpanetOperation::None, EpanetEntityType::Curve, curve.id, "Tank volume curve volumes must increase");
+                return makeEpanetStatus(EpanetStage::AddCurve, EpanetOperation::None, EpanetEntityType::Curve, curve.id, "Tank volume curve volumes must increase");
         }
 
         levels_m.append(point.level_m);
@@ -94,12 +99,13 @@ EpanetStatus EpanetNetworkBuilder::addTankVolumeCurve(const TankVolumeCurve &cur
     error = EN_setcurve(this->project.handle(), curve_index, levels_m.data(), volumes_m3.data(), levels_m.length());
     if (error != 0)
     {
-        EpanetStatus status = makeEpanetError(this->project, error, EpanetStage::AddTankVolumeCurve, EpanetOperation::EN_setcurve, EpanetEntityType::Curve, curve.id, "Failed to set tank volume curve data");
+        EpanetStatus status = makeEpanetError(this->project, error, EpanetStage::AddCurve, EpanetOperation::EN_setcurve, EpanetEntityType::Curve, curve.id, "Failed to set tank volume curve data");
         status.entity.index = curve_index;
         return status;
     }
 
     this->indices.curves.insert(curve.id, curve_index);
+
     return makeEpanetSuccess();
 }
 

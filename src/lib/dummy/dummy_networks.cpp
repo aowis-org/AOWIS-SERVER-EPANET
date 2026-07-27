@@ -676,7 +676,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     tank.minimum_volume_m3 = 80.0;
     tank.volume_curve_id = tank_volume_curve.id;
     tank.can_overflow = true;
-    tank.quality_source_type = QualitySourceType::MassBooster;
+    tank.quality_source.type = QualitySourceType::MassBooster;
     tank.mixing_model = TankMixingModel::FirstInFirstOut;
     network.tanks.append(tank);
     
