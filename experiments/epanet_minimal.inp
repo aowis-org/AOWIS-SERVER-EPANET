@@ -1,32 +1,23 @@
 [TITLE]
-Minimal EPANET metric hello world: reservoir to junction
-
-[REPORT]
-STATUS              YES
-SUMMARY             YES
-NODES               ALL
-LINKS               ALL
-
-[OPTIONS]
-UNITS              LPS
-HEADLOSS           H-W
+Minimal AOWIS EPANET example
 
 [JUNCTIONS]
-;ID        Elevation_m   Demand_LPS
- J1        0             1.0
+;ID Elevation Demand Pattern
+ J1 90 5
 
 [RESERVOIRS]
-;ID        Head_m
- R1        30
+;ID Head Pattern
+ R1 110
 
 [PIPES]
-;ID        Node1   Node2   Length_m   Diameter_mm   Roughness   MinorLoss   Status
- P1        R1      J1      100        150           130         0           Open
+;ID Node1 Node2 Length Diameter Roughness MinorLoss Status
+ P1 R1 J1 500 200 130 0 Open
 
-[COORDINATES]
-;Node      X       Y
- R1        0       0
- J1        100     0
+[OPTIONS]
+ Units LPS
+ Headloss H-W
+
+[TIMES]
+ Duration 0
 
 [END]
-

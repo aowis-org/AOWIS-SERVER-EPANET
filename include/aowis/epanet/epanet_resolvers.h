@@ -1,21 +1,13 @@
-#ifndef EPANET_RESOLVERS_H
-#define EPANET_RESOLVERS_H
-
-#include <QObject>
-#include <QtMath>
+#ifndef AOWIS_EPANET_RESOLVERS_H
+#define AOWIS_EPANET_RESOLVERS_H
 
 #include <aowis/model/hydraulic/network.h>
 
-class EpanetResolvers : public QObject
+class EpanetResolvers
 {
-    Q_OBJECT
 public:
-    explicit EpanetResolvers(QObject *parent = nullptr);
-    
-    double resolveTankBottomElevation(const Tank &tank);
-    double resolveTankDiameter(const Tank &tank);
-
-signals:
+    static double resolveTankBottomElevation(const Tank &tank);
+    static double resolveTankDiameter(const Tank &tank);
 };
 
-#endif // EPANET_RESOLVERS_H
+#endif

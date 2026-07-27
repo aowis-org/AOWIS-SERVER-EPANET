@@ -2,7 +2,6 @@
 #define SIMULATION_STATUS_PRINTER_H
 
 #include <QString>
-
 #include <aowis/model/hydraulic/epanet_status.h>
 
 class SimulationStatusPrinter
@@ -12,4 +11,4 @@ public:
     static void print(const EpanetStatus &status);
 };
 
-#endif // SIMULATION_STATUS_PRINTER_H
+#endif

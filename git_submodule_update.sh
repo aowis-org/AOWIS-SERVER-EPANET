@@ -1,3 +1,3 @@
-#!/bin/bash
-
-git submodule update --recursive --remote
+#!/usr/bin/env bash
+set -euo pipefail
+git submodule update --remote --recursive

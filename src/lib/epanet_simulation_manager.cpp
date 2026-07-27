@@ -1,150 +1,68 @@
-
 #include <aowis/epanet/epanet_simulation_manager.h>
-#include <aowis/epanet/epanet_wrapper.h>
+#include <aowis/epanet/epanet_runner.h>
 
 #include <QMetaObject>
+#include <QMetaType>
+#include <QRunnable>
 #include <QThread>
-
+#include <algorithm>
 #include <utility>
 
 EpanetSimulationManager::EpanetSimulationManager(QObject *parent)
     : QObject(parent)
 {
-    int worker_count = QThread::idealThreadCount();
-    
-    // Keep one logical CPU available for the GUI, HTTP server,
-    // operating system, and other application work.
-    if (worker_count > 1)
-        worker_count--;
-    
-    if (worker_count < 1)
-        worker_count = 1;
-    
-    this->thread_pool.setMaxThreadCount(worker_count);
-    
-    qRegisterMetaType<SimulationResultTimeline>(
-        "SimulationResultTimeline"
-        );
-    
-    qRegisterMetaType<EpanetStatus>(
-        "EpanetStatus"
-        );
+    qRegisterMetaType<SimulationResultTimeline>();
+    qRegisterMetaType<EpanetStatus>();
+    qRegisterMetaType<QStringList>();
+    qRegisterMetaType<QUuid>();
+    this->thread_pool.setMaxThreadCount(std::max(1, QThread::idealThreadCount()));
 }
 
 EpanetSimulationManager::~EpanetSimulationManager()
 {
-    this->shutting_down.store(
-        true,
-        std::memory_order_release
-        );
-    
-    // Remove requests that have not started yet.
+    this->shutting_down.store(true);
     this->thread_pool.clear();
-    
-    // Running EPANET calls cannot simply be killed safely.
     this->thread_pool.waitForDone();
 }
 
-QUuid EpanetSimulationManager::submit(
-    const NetworkHydraulic &request
-    )
+QUuid EpanetSimulationManager::submit(const NetworkHydraulic &request)
 {
-    const QUuid simulation_id =
-        QUuid::createUuid();
-    
+    const QUuid simulation_id = QUuid::createUuid();
     emit signalSimulationQueued(simulation_id);
-    
-    this->thread_pool.start(
-        [this, simulation_id, request]()
+
+    QRunnable *task = QRunnable::create([this, simulation_id, request]()
+    {
+        if (this->shutting_down.load())
+            return;
+
+        QMetaObject::invokeMethod(this, [this, simulation_id]()
         {
-            if (
-                this->shutting_down.load(
-                    std::memory_order_acquire
-                    )
-                )
-            {
+            if (!this->shutting_down.load())
+                emit signalSimulationStarted(simulation_id);
+        }, Qt::QueuedConnection);
+
+        EpanetRunner runner;
+        EpanetRunResult run_result = runner.run(request);
+
+        QMetaObject::invokeMethod(this, [this, simulation_id, run_result = std::move(run_result)]() mutable
+        {
+            if (this->shutting_down.load())
                 return;
-            }
-            
-            QMetaObject::invokeMethod(
-                this,
-                [this, simulation_id]()
-                {
-                    emit signalSimulationStarted(
-                        simulation_id
-                        );
-                },
-                Qt::QueuedConnection
-                );
-            
-            /*
-             * This wrapper is local to this worker task.
-             * Every simultaneous task therefore has its own
-             * EpanetWrapper, EN_Project, request, result timeline,
-             * and report callback data.
-             */
-            EpanetWrapper wrapper;
-            
-            SimulationResultTimeline timeline =
-                wrapper.run(request);
-            
-            QStringList report =
-                wrapper.reportTextList();
-            
-            if (
-                this->shutting_down.load(
-                    std::memory_order_acquire
-                    )
-                )
-            {
-                return;
-            }
-            
-            QMetaObject::invokeMethod(
-                this,
-                [
-                    this,
-                    simulation_id,
-                    timeline = std::move(timeline),
-                    report = std::move(report)
-            ]() mutable
-                {
-                    if (timeline.status.success)
-                    {
-                        emit signalSimulationFinished(
-                            simulation_id,
-                            std::move(timeline),
-                            std::move(report)
-                            );
-                    }
-                    else
-                    {
-                        EpanetStatus status =
-                            std::move(timeline.status);
-                        
-                        emit signalSimulationFailed(
-                            simulation_id,
-                            std::move(status),
-                            std::move(report)
-                            );
-                    }
-                },
-                Qt::QueuedConnection
-                );
-        }
-        );
-    
+
+            if (run_result.timeline.status.success)
+                emit signalSimulationFinished(simulation_id, std::move(run_result.timeline), std::move(run_result.report));
+            else
+                emit signalSimulationFailed(simulation_id, std::move(run_result.timeline.status), std::move(run_result.report));
+        }, Qt::QueuedConnection);
+    });
+
+    this->thread_pool.start(task);
     return simulation_id;
 }
 
-void EpanetSimulationManager::setMaxWorkerCount(
-    int count
-    )
+void EpanetSimulationManager::setMaxWorkerCount(int count)
 {
-    if (count < 1)
-        count = 1;
-    
-    this->thread_pool.setMaxThreadCount(count);
+    this->thread_pool.setMaxThreadCount(std::max(1, count));
 }
 
 int EpanetSimulationManager::maxWorkerCount() const
