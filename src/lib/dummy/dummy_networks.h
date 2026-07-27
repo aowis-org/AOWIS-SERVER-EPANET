@@ -12,9 +12,11 @@ public:
     static NetworkHydraulic networkSimple();
     static NetworkHydraulic networkOnMap();
     static NetworkHydraulic networkTanks();
+    static NetworkHydraulic networkFull();
     
     static NetworkHydraulic networkSimpleTimeline();
     static NetworkHydraulic networkTanksTimeline();
+    static NetworkHydraulic networkFullTimeline();
 };
 
 #endif // DUMMY_NETWORKS_H

@@ -214,7 +214,7 @@ EpanetStatus EpanetWrapper::addReservoir(const Reservoir &reservoir)
         reservoir_id.constData(),
         EN_RESERVOIR,
         &reservoir_index
-    );
+        );
     if (error != 0)
     {
         EpanetStatus status;
@@ -231,10 +231,10 @@ EpanetStatus EpanetWrapper::addReservoir(const Reservoir &reservoir)
     }
     
     error = EN_setnodevalue(this->epanet_project,
-        reservoir_index,
-        EN_ELEVATION,
-        reservoir.head_m
-    );
+                            reservoir_index,
+                            EN_ELEVATION,
+                            reservoir.head_m
+                            );
     if (error != 0)
     {
         EpanetStatus status;
@@ -265,7 +265,8 @@ EpanetStatus EpanetWrapper::addJunction(const Junction &junction)
         junction_id.constData(),
         EN_JUNCTION,
         &junction_index
-    );
+        );
+    
     if (error != 0)
     {
         EpanetStatus status;
@@ -275,31 +276,168 @@ EpanetStatus EpanetWrapper::addJunction(const Junction &junction)
         status.operation = EpanetOperation::EN_addnode;
         status.entity.type = EpanetEntityType::Junction;
         status.entity.id = junction.id;
-        status.message = "Failed to add Junction";
+        status.message = "Failed to add junction";
         status.message_epanet = getEpanetErrorMessage(error);
         status.details << "Node: " + junction.id;
         return status;
     }
     
-    error = EN_setjuncdata(
+    double elevation_m = junction.elevation_m;
+    
+    if (junction.elevation_input_type == ElevationInputType::TerrainElevationAndOffset)
+        elevation_m = junction.terrain_elevation_m + junction.elevation_offset_m;
+    
+    if (junction.demands.isEmpty())
+    {
+        error = EN_setjuncdata(
+            this->epanet_project,
+            junction_index,
+            elevation_m,
+            0.0,
+            ""
+            );
+        
+        if (error != 0)
+        {
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::AddJunction;
+            status.operation = EpanetOperation::EN_setjuncdata;
+            status.entity.type = EpanetEntityType::Junction;
+            status.entity.id = junction.id;
+            status.entity.index = junction_index;
+            status.message = "Failed to set junction data";
+            status.message_epanet = getEpanetErrorMessage(error);
+            status.details
+                << "Node: " + junction.id
+                << "Elevation: " + QString::number(elevation_m)
+                << "Demand categories: 0";
+            return status;
+        }
+    }
+    else
+    {
+        const JunctionDemand &first_demand = junction.demands.first();
+        
+        const double first_demand_lps =
+            first_demand.base_demand_m3h / 3.6;
+        
+        QByteArray first_pattern_id =
+            first_demand.pattern_id.toUtf8();
+        
+        error = EN_setjuncdata(
+            this->epanet_project,
+            junction_index,
+            elevation_m,
+            first_demand_lps,
+            first_pattern_id.constData()
+            );
+        
+        if (error != 0)
+        {
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::AddJunction;
+            status.operation = EpanetOperation::EN_setjuncdata;
+            status.entity.type = EpanetEntityType::Junction;
+            status.entity.id = junction.id;
+            status.entity.index = junction_index;
+            status.message = "Failed to set primary junction demand";
+            status.message_epanet = getEpanetErrorMessage(error);
+            status.details
+                << "Node: " + junction.id
+                << "Elevation: " + QString::number(elevation_m)
+                << "Base demand: " + QString::number(first_demand_lps) + " L/s"
+                << "Pattern: " + first_demand.pattern_id;
+            return status;
+        }
+        
+        QByteArray first_demand_name = QStringLiteral("Demand 1").toUtf8();
+        
+        error = EN_setdemandname(
+            this->epanet_project,
+            junction_index,
+            1,
+            first_demand_name.constData()
+            );
+        
+        if (error != 0)
+        {
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::AddJunction;
+            status.entity.type = EpanetEntityType::Junction;
+            status.entity.id = junction.id;
+            status.entity.index = junction_index;
+            status.message = "Failed to name primary junction demand";
+            status.message_epanet = getEpanetErrorMessage(error);
+            return status;
+        }
+        
+        for (int i = 1; i < junction.demands.length(); i++)
+        {
+            const JunctionDemand &demand = junction.demands.at(i);
+            
+            const double base_demand_lps =
+                demand.base_demand_m3h / 3.6;
+            
+            QByteArray pattern_id = demand.pattern_id.toUtf8();
+            QByteArray demand_name =
+                QStringLiteral("Demand %1").arg(i + 1).toUtf8();
+            
+            error = EN_adddemand(
+                this->epanet_project,
+                junction_index,
+                base_demand_lps,
+                pattern_id.constData(),
+                demand_name.constData()
+                );
+            
+            if (error != 0)
+            {
+                EpanetStatus status;
+                status.success = false;
+                status.epanet_error_code = error;
+                status.stage = EpanetStage::AddJunction;
+                status.entity.type = EpanetEntityType::Junction;
+                status.entity.id = junction.id;
+                status.entity.index = junction_index;
+                status.message = "Failed to add junction demand category";
+                status.message_epanet = getEpanetErrorMessage(error);
+                status.details
+                    << "Node: " + junction.id
+                    << "Demand category: " + QString::number(i + 1)
+                    << "Base demand: " + QString::number(base_demand_lps) + " L/s"
+                    << "Pattern: " + demand.pattern_id;
+                return status;
+            }
+        }
+    }
+    
+    error = EN_setcoord(
         this->epanet_project,
         junction_index,
-        junction.elevation_m,
-        junction.demand_lps,
-        ""
-    );
+        junction.longitude,
+        junction.latitude
+        );
+    
     if (error != 0)
     {
         EpanetStatus status;
         status.success = false;
         status.epanet_error_code = error;
         status.stage = EpanetStage::AddJunction;
-        status.operation = EpanetOperation::EN_setjuncdata;
         status.entity.type = EpanetEntityType::Junction;
         status.entity.id = junction.id;
-        status.message = "Failed to add Junction Data";
+        status.entity.index = junction_index;
+        status.message = "Failed to set junction coordinates";
         status.message_epanet = getEpanetErrorMessage(error);
-        status.details << "Node: " + junction.id;
+        status.details
+            << "Longitude: " + QString::number(junction.longitude)
+            << "Latitude: " + QString::number(junction.latitude);
         return status;
     }
     
@@ -372,7 +510,7 @@ EpanetStatus EpanetWrapper::addTank(const Tank &tank)
         diameter_m,
         tank.minimum_volume_m3,
         volume_curve_id.data()
-    );
+        );
     if (error != 0)
     {
         EpanetStatus status;
@@ -415,7 +553,7 @@ EpanetStatus EpanetWrapper::addTank(const Tank &tank)
         tank_index,
         EN_CANOVERFLOW,
         tank.can_overflow ? 1.0 : 0.0
-    );
+        );
     if (error != 0)
     {
         EpanetStatus status;
@@ -443,15 +581,16 @@ EpanetStatus EpanetWrapper::addPipe(const Pipe &pipe)
     QByteArray node_id_to = pipe.node_id_to.toUtf8();
     
     int pipe_index = 0;
+    const int pipe_type = pipe.initial_status == PipeInitialStatus::CheckValve ? EN_CVPIPE : EN_PIPE;
     
     int error = EN_addlink(
         this->epanet_project,
         pipe_id.constData(),
-        EN_PIPE,
+        pipe_type,
         node_id_from.constData(),
         node_id_to.constData(),
         &pipe_index
-    );
+        );
     if (error != 0)
     {
         EpanetStatus status;
@@ -477,7 +616,7 @@ EpanetStatus EpanetWrapper::addPipe(const Pipe &pipe)
         pipe.diameter_mm,
         pipe.roughness_hw,
         pipe.minor_loss
-    );
+        );
     if (error != 0)
     {
         EpanetStatus status;
@@ -494,26 +633,31 @@ EpanetStatus EpanetWrapper::addPipe(const Pipe &pipe)
         return status;
     }
     
-    error = EN_setlinkvalue(
-        this->epanet_project,
-        pipe_index,
-        EN_INITSTATUS,
-        pipe.open ? EN_OPEN : EN_CLOSED
-    );
-    if (error != 0)
+    if (pipe.initial_status != PipeInitialStatus::CheckValve)
     {
-        EpanetStatus status;
-        status.success = false;
-        status.epanet_error_code = error;
-        status.stage = EpanetStage::AddPipe;
-        status.operation = EpanetOperation::EN_setlinkvalue;
-        status.entity.type = EpanetEntityType::Pipe;
-        status.entity.id = pipe.id;
-        status.message = "Failed to add pipe status";
-        status.message_epanet = getEpanetErrorMessage(error);
-        status.details << "From node: " + pipe.node_id_from;
-        status.details << "To node: " + pipe.node_id_to;
-        return status;
+        const double initial_status = pipe.initial_status == PipeInitialStatus::Open ? EN_OPEN : EN_CLOSED;
+        
+        error = EN_setlinkvalue(
+            this->epanet_project,
+            pipe_index,
+            EN_INITSTATUS,
+            initial_status
+            );
+        if (error != 0)
+        {
+            EpanetStatus status;
+            status.success = false;
+            status.epanet_error_code = error;
+            status.stage = EpanetStage::AddPipe;
+            status.operation = EpanetOperation::EN_setlinkvalue;
+            status.entity.type = EpanetEntityType::Pipe;
+            status.entity.id = pipe.id;
+            status.message = "Failed to add pipe status";
+            status.message_epanet = getEpanetErrorMessage(error);
+            status.details << "From node: " + pipe.node_id_from;
+            status.details << "To node: " + pipe.node_id_to;
+            return status;
+        }
     }
     
     EpanetStatus status;
