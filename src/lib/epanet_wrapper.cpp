@@ -31,20 +31,6 @@ SimulationResultTimeline EpanetWrapper::run(const NetworkHydraulic &request)
     return run_result.timeline;
 }
 
-EpanetStatus EpanetWrapper::runHydraulics()
-{
-    QMutexLocker locker(&this->run_mutex);
-    if (this->has_run)
-        return this->latest_status;
-
-    EpanetStatus status;
-    status.success = false;
-    status.stage = EpanetStage::RunHydraulics;
-    status.entity.type = EpanetEntityType::HydraulicSolver;
-    status.message = QStringLiteral("runHydraulics() no longer owns a staged EPANET project; call run() or EpanetRunner::run() instead");
-    return status;
-}
-
 QStringList EpanetWrapper::reportTextList() const
 {
     QMutexLocker locker(&this->run_mutex);

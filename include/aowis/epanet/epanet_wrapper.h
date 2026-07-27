@@ -16,7 +16,6 @@ public:
     explicit EpanetWrapper(QObject *parent = nullptr);
 
     SimulationResultTimeline run(const NetworkHydraulic &request);
-    [[deprecated("Use run() or EpanetRunner::run().")]] EpanetStatus runHydraulics();
     QStringList reportTextList() const;
     QString reportText() const;
 
