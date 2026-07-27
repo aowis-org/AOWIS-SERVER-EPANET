@@ -17,38 +17,69 @@ set(AOWIS_SERVER_MODEL_GIT_REPOSITORY "https://github.com/aowis-org/AOWIS-SERVER
 set(AOWIS_SERVER_MODEL_GIT_TAG "main" CACHE STRING "Git branch, tag, or commit used to fetch AOWIS-SERVER-MODEL")
 
 find_package(Qt6 REQUIRED COMPONENTS Core Network)
+
 if(AOWIS_SERVER_EPANET_BUILD_SERVER)
     find_package(Qt6 REQUIRED COMPONENTS HttpServer)
 endif()
 
 if(NOT TARGET AOWIS::ServerModel)
     if(AOWIS_SERVER_MODEL_SOURCE_DIR)
-        get_filename_component(AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE "${AOWIS_SERVER_MODEL_SOURCE_DIR}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+        get_filename_component(
+            AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE
+            "${AOWIS_SERVER_MODEL_SOURCE_DIR}"
+            ABSOLUTE
+            BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+
         if(NOT EXISTS "${AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE}/CMakeLists.txt")
-            message(FATAL_ERROR "AOWIS_SERVER_MODEL_SOURCE_DIR does not contain a CMake project: ${AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE}")
+            message(FATAL_ERROR
+                "AOWIS_SERVER_MODEL_SOURCE_DIR does not contain a CMake project: "
+                "${AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE}"
+            )
         endif()
-        add_subdirectory("${AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE}" "${CMAKE_CURRENT_BINARY_DIR}/_deps/aowis-server-model-build" EXCLUDE_FROM_ALL)
+
+        add_subdirectory(
+            "${AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE}"
+            "${CMAKE_CURRENT_BINARY_DIR}/_deps/aowis-server-model-build"
+            EXCLUDE_FROM_ALL
+        )
     elseif(AOWIS_SERVER_EPANET_FETCH_MODEL)
         include(FetchContent)
-        FetchContent_Declare(aowis_server_model GIT_REPOSITORY "${AOWIS_SERVER_MODEL_GIT_REPOSITORY}" GIT_TAG "${AOWIS_SERVER_MODEL_GIT_TAG}" GIT_PROGRESS TRUE)
+
+        FetchContent_Declare(
+            aowis_server_model
+            GIT_REPOSITORY "${AOWIS_SERVER_MODEL_GIT_REPOSITORY}"
+            GIT_TAG "${AOWIS_SERVER_MODEL_GIT_TAG}"
+            GIT_PROGRESS TRUE
+        )
+
         FetchContent_MakeAvailable(aowis_server_model)
     else()
-        message(FATAL_ERROR "AOWIS::ServerModel is unavailable. Provide it from the parent project, set AOWIS_SERVER_MODEL_SOURCE_DIR, or enable AOWIS_SERVER_EPANET_FETCH_MODEL.")
+        message(FATAL_ERROR
+            "AOWIS::ServerModel is unavailable. Provide it from the parent project, "
+            "set AOWIS_SERVER_MODEL_SOURCE_DIR, or enable "
+            "AOWIS_SERVER_EPANET_FETCH_MODEL."
+        )
     endif()
 endif()
 
 if(NOT TARGET AOWIS::ServerModel)
-    message(FATAL_ERROR "The AOWIS-SERVER-MODEL project did not create AOWIS::ServerModel.")
+    message(FATAL_ERROR
+        "The AOWIS-SERVER-MODEL project did not create AOWIS::ServerModel."
+    )
 endif()
 
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/epanet/CMakeLists.txt")
-    message(FATAL_ERROR "EPANET submodule is missing. Run: git submodule update --init --recursive")
+    message(FATAL_ERROR
+        "EPANET submodule is missing. Run: git submodule update --init --recursive"
+    )
 endif()
 
 set(BUILD_TESTS OFF CACHE BOOL "Build EPANET tests" FORCE)
 set(BUILD_DOCS OFF CACHE BOOL "Build EPANET docs" FORCE)
 set(BUILD_COVERAGE OFF CACHE BOOL "Build EPANET coverage" FORCE)
 set(BUILD_SHARED_LIBS ${AOWIS_SERVER_EPANET_BUILD_SHARED_EPANET} CACHE BOOL "Build shared libraries" FORCE)
+
 add_subdirectory(external/epanet EXCLUDE_FROM_ALL)
 
 if(WIN32 AND NOT AOWIS_SERVER_EPANET_BUILD_SHARED_EPANET)
@@ -59,7 +90,11 @@ if(TARGET epanet2 AND UNIX AND NOT APPLE)
     target_link_libraries(epanet2 PUBLIC m)
 endif()
 
-add_subdirectory(src/lib)
+# Deliberately include this file instead of add_subdirectory(src/lib).
+# This causes the library target to belong to the repository root, so Qt Creator
+# treats both include/ and src/ as normal project paths instead of Other Locations.
+include(src/lib/CMakeLists.txt)
+
 if(AOWIS_SERVER_EPANET_BUILD_SERVER)
     add_subdirectory(src/server)
 endif()

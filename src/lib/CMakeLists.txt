@@ -1,43 +1,40 @@
-set(AOWIS_SERVER_EPANET_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-set(AOWIS_SERVER_EPANET_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
-
 set(AOWIS_SERVER_EPANET_SOURCES
-    epanet_resolvers.cpp
-    epanet_runner.cpp
-    epanet_simulation_manager.cpp
-    epanet_wrapper.cpp
-    dummy/dummy_networks.cpp
-    utility/simulation_result_printer.cpp
-    utility/simulation_status_printer.cpp
-    internal/epanet_hydraulic_solver.cpp
-    internal/epanet_network_builder.cpp
-    internal/epanet_project.cpp
-    internal/epanet_report_collector.cpp
-    internal/epanet_result_reader.cpp
-    internal/epanet_status_helpers.cpp
+    src/lib/epanet_resolvers.cpp
+    src/lib/epanet_runner.cpp
+    src/lib/epanet_simulation_manager.cpp
+    src/lib/epanet_wrapper.cpp
+    src/lib/dummy/dummy_networks.cpp
+    src/lib/utility/simulation_result_printer.cpp
+    src/lib/utility/simulation_status_printer.cpp
+    src/lib/internal/epanet_hydraulic_solver.cpp
+    src/lib/internal/epanet_network_builder.cpp
+    src/lib/internal/epanet_project.cpp
+    src/lib/internal/epanet_report_collector.cpp
+    src/lib/internal/epanet_result_reader.cpp
+    src/lib/internal/epanet_status_helpers.cpp
 )
 
 set(AOWIS_SERVER_EPANET_PUBLIC_HEADERS
-    ${AOWIS_SERVER_EPANET_INCLUDE_DIR}/aowis/epanet/epanet.h
-    ${AOWIS_SERVER_EPANET_INCLUDE_DIR}/aowis/epanet/epanet_api.h
-    ${AOWIS_SERVER_EPANET_INCLUDE_DIR}/aowis/epanet/epanet_resolvers.h
-    ${AOWIS_SERVER_EPANET_INCLUDE_DIR}/aowis/epanet/epanet_run_result.h
-    ${AOWIS_SERVER_EPANET_INCLUDE_DIR}/aowis/epanet/epanet_runner.h
-    ${AOWIS_SERVER_EPANET_INCLUDE_DIR}/aowis/epanet/epanet_simulation_manager.h
-    ${AOWIS_SERVER_EPANET_INCLUDE_DIR}/aowis/epanet/epanet_wrapper.h
-    ${AOWIS_SERVER_EPANET_INCLUDE_DIR}/aowis/epanet/dummy/dummy_networks.h
-    ${AOWIS_SERVER_EPANET_INCLUDE_DIR}/aowis/epanet/utility/simulation_result_printer.h
-    ${AOWIS_SERVER_EPANET_INCLUDE_DIR}/aowis/epanet/utility/simulation_status_printer.h
+    include/aowis/epanet/epanet.h
+    include/aowis/epanet/epanet_api.h
+    include/aowis/epanet/epanet_resolvers.h
+    include/aowis/epanet/epanet_run_result.h
+    include/aowis/epanet/epanet_runner.h
+    include/aowis/epanet/epanet_simulation_manager.h
+    include/aowis/epanet/epanet_wrapper.h
+    include/aowis/epanet/dummy/dummy_networks.h
+    include/aowis/epanet/utility/simulation_result_printer.h
+    include/aowis/epanet/utility/simulation_status_printer.h
 )
 
 set(AOWIS_SERVER_EPANET_INTERNAL_HEADERS
-    internal/epanet_hydraulic_solver.h
-    internal/epanet_index_registry.h
-    internal/epanet_network_builder.h
-    internal/epanet_project.h
-    internal/epanet_report_collector.h
-    internal/epanet_result_reader.h
-    internal/epanet_status_helpers.h
+    src/lib/internal/epanet_hydraulic_solver.h
+    src/lib/internal/epanet_index_registry.h
+    src/lib/internal/epanet_network_builder.h
+    src/lib/internal/epanet_project.h
+    src/lib/internal/epanet_report_collector.h
+    src/lib/internal/epanet_result_reader.h
+    src/lib/internal/epanet_status_helpers.h
 )
 
 add_library(aowis-server-epanet INTERFACE)
@@ -50,8 +47,35 @@ add_library(aowis-server-epanet-core STATIC
     ${AOWIS_SERVER_EPANET_INTERNAL_HEADERS}
 )
 
-target_include_directories(aowis-server-epanet-core PUBLIC "${AOWIS_SERVER_EPANET_INCLUDE_DIR}" PRIVATE "${AOWIS_SERVER_EPANET_SOURCE_DIR}")
-target_link_libraries(aowis-server-epanet-core PUBLIC Qt6::Core AOWIS::ServerModel epanet2)
+source_group(
+    TREE "${PROJECT_SOURCE_DIR}"
+    FILES
+        ${AOWIS_SERVER_EPANET_SOURCES}
+        ${AOWIS_SERVER_EPANET_PUBLIC_HEADERS}
+        ${AOWIS_SERVER_EPANET_INTERNAL_HEADERS}
+)
+
+target_include_directories(aowis-server-epanet-core
+    PUBLIC
+        "${PROJECT_SOURCE_DIR}/include"
+    PRIVATE
+        "${PROJECT_SOURCE_DIR}/src/lib"
+)
+
+target_link_libraries(aowis-server-epanet-core
+    PUBLIC
+        Qt6::Core
+        AOWIS::ServerModel
+        epanet2
+)
+
 target_compile_features(aowis-server-epanet-core PUBLIC cxx_std_20)
-set_target_properties(aowis-server-epanet-core PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(aowis-server-epanet INTERFACE aowis-server-epanet-core)
+
+set_target_properties(aowis-server-epanet-core PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
+target_link_libraries(aowis-server-epanet
+    INTERFACE
+        aowis-server-epanet-core
+)
