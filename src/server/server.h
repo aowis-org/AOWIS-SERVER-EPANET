@@ -18,7 +18,7 @@
 
 #include <variant>
 
-#include "../lib/epanet_wrapper.h"
+#include <aowis/epanet/epanet_wrapper.h>
 
 #include "../lib/model/simulation_request.h"
 
