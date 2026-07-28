@@ -2,7 +2,6 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/epanet_resolvers.cpp
     src/lib/epanet_runner.cpp
     src/lib/epanet_simulation_manager.cpp
-    src/lib/epanet_wrapper.cpp
     src/lib/dummy/dummy_networks.cpp
     src/lib/utility/simulation_result_printer.cpp
     src/lib/utility/simulation_status_printer.cpp
@@ -21,7 +20,6 @@ set(AOWIS_SERVER_EPANET_PUBLIC_HEADERS
     include/aowis/epanet/epanet_run_result.h
     include/aowis/epanet/epanet_runner.h
     include/aowis/epanet/epanet_simulation_manager.h
-    include/aowis/epanet/epanet_wrapper.h
     include/aowis/epanet/dummy/dummy_networks.h
     include/aowis/epanet/utility/simulation_result_printer.h
     include/aowis/epanet/utility/simulation_status_printer.h
@@ -37,45 +35,36 @@ set(AOWIS_SERVER_EPANET_INTERNAL_HEADERS
     src/lib/internal/epanet_status_helpers.h
 )
 
-add_library(aowis-server-epanet INTERFACE)
-add_library(AOWIS::ServerEpanet ALIAS aowis-server-epanet)
-add_library(AOWIS::Epanet ALIAS aowis-server-epanet)
-
-add_library(aowis-server-epanet-core STATIC
+add_library(aowis-server-epanet STATIC
     ${AOWIS_SERVER_EPANET_SOURCES}
     ${AOWIS_SERVER_EPANET_PUBLIC_HEADERS}
     ${AOWIS_SERVER_EPANET_INTERNAL_HEADERS}
 )
 
-source_group(
-    TREE "${PROJECT_SOURCE_DIR}"
-    FILES
-        ${AOWIS_SERVER_EPANET_SOURCES}
-        ${AOWIS_SERVER_EPANET_PUBLIC_HEADERS}
-        ${AOWIS_SERVER_EPANET_INTERNAL_HEADERS}
+add_library(AOWIS::ServerEpanet ALIAS aowis-server-epanet)
+
+source_group(TREE "${PROJECT_SOURCE_DIR}" FILES
+    ${AOWIS_SERVER_EPANET_SOURCES}
+    ${AOWIS_SERVER_EPANET_PUBLIC_HEADERS}
+    ${AOWIS_SERVER_EPANET_INTERNAL_HEADERS}
 )
 
-target_include_directories(aowis-server-epanet-core
+target_include_directories(aowis-server-epanet
     PUBLIC
         "${PROJECT_SOURCE_DIR}/include"
     PRIVATE
         "${PROJECT_SOURCE_DIR}/src/lib"
 )
 
-target_link_libraries(aowis-server-epanet-core
+target_link_libraries(aowis-server-epanet
     PUBLIC
         Qt6::Core
         AOWIS::ServerModel
         epanet2
 )
 
-target_compile_features(aowis-server-epanet-core PUBLIC cxx_std_20)
+target_compile_features(aowis-server-epanet PUBLIC cxx_std_20)
 
-set_target_properties(aowis-server-epanet-core PROPERTIES
+set_target_properties(aowis-server-epanet PROPERTIES
     POSITION_INDEPENDENT_CODE ON
-)
-
-target_link_libraries(aowis-server-epanet
-    INTERFACE
-        aowis-server-epanet-core
 )
