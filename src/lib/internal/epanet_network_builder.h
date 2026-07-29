@@ -4,6 +4,9 @@
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
 #include <aowis/model/hydraulic/network_hydraulic.h>
 
+#include <QHash>
+#include <QUuid>
+
 class EpanetProject;
 struct EpanetIndexRegistry;
 
@@ -23,6 +26,7 @@ private:
 
     EpanetProject &project;
     EpanetIndexRegistry &indices;
+    QHash<QUuid, QString> node_ids_by_uuid;
 };
 
 #endif // AOWIS_EPANET_NETWORK_BUILDER_H

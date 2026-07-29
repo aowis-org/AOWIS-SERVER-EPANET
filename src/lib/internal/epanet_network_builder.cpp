@@ -14,6 +14,17 @@ EpanetNetworkBuilder::EpanetNetworkBuilder(EpanetProject &project, EpanetIndexRe
 
 HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulic &request)
 {
+    this->node_ids_by_uuid.clear();
+
+    for (const HydraulicNodeReservoir &reservoir : request.nodes_reservoirs)
+        this->node_ids_by_uuid.insert(reservoir.uuid, reservoir.id);
+
+    for (const HydraulicNodeJunction &junction : request.nodes_junctions)
+        this->node_ids_by_uuid.insert(junction.uuid, junction.id);
+
+    for (const HydraulicNodeTank &tank : request.nodes_tanks)
+        this->node_ids_by_uuid.insert(tank.uuid, tank.id);
+
     for (const HydraulicCurveTankVolume &curve : request.curves_tank_volume)
     {
         const HydraulicSimulationStatus status = addCurveTankVolume(curve);
@@ -121,6 +132,10 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeReservoir(const Hydraulic
     if (error != 0)
         return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setnodevalue"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, "Failed to set reservoir head");
 
+    error = EN_setcoord(this->project.handle(), reservoir_index, reservoir.coordinate_wgs84.longitude_deg, reservoir.coordinate_wgs84.latitude_deg);
+    if (error != 0)
+        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setcoord"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, QStringLiteral("Failed to set reservoir coordinates"));
+
     this->indices.nodes_reservoirs.insert(reservoir.id, reservoir_index);
     return makeEpanetSuccess();
 }
@@ -167,7 +182,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
         }
     }
 
-    error = EN_setcoord(this->project.handle(), junction_index, junction.longitude_deg, junction.latitude_deg);
+    error = EN_setcoord(this->project.handle(), junction_index, junction.coordinate_wgs84.longitude_deg, junction.coordinate_wgs84.latitude_deg);
     if (error != 0)
         return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setcoord"), HydraulicSimulationStatusEntityType::Junction, junction.id, QStringLiteral("Failed to set junction coordinates"));
 
@@ -202,15 +217,27 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeTank(const HydraulicNodeT
     if (error != 0)
         return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setnodevalue"), HydraulicSimulationStatusEntityType::Tank, tank.id, "Failed to set tank overflow option");
 
+    error = EN_setcoord(this->project.handle(), tank_index, tank.coordinate_wgs84.longitude_deg, tank.coordinate_wgs84.latitude_deg);
+    if (error != 0)
+        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setcoord"), HydraulicSimulationStatusEntityType::Tank, tank.id, QStringLiteral("Failed to set tank coordinates"));
+
     this->indices.nodes_tanks.insert(tank.id, tank_index);
     return makeEpanetSuccess();
 }
 
 HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPipe(const HydraulicLinkPipe &pipe)
 {
+    const QString node_id_from_string = this->node_ids_by_uuid.value(pipe.node_uuid_from);
+    if (node_id_from_string.isEmpty())
+        return makeEpanetStatus(HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Pipe, pipe.id, QStringLiteral("Could not resolve pipe start-node UUID"));
+
+    const QString node_id_to_string = this->node_ids_by_uuid.value(pipe.node_uuid_to);
+    if (node_id_to_string.isEmpty())
+        return makeEpanetStatus(HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Pipe, pipe.id, QStringLiteral("Could not resolve pipe end-node UUID"));
+
     const QByteArray pipe_id = pipe.id.toUtf8();
-    const QByteArray node_id_from = pipe.node_id_from.toUtf8();
-    const QByteArray node_id_to = pipe.node_id_to.toUtf8();
+    const QByteArray node_id_from = node_id_from_string.toUtf8();
+    const QByteArray node_id_to = node_id_to_string.toUtf8();
     const int pipe_type = pipe.initial_status == HydraulicLinkPipeInitialStatus::CheckValve ? EN_CVPIPE : EN_PIPE;
     int pipe_index = 0;
 

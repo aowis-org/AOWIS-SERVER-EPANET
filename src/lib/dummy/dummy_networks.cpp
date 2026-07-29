@@ -21,8 +21,8 @@ NetworkHydraulic DummyNetworks::networkSimple()
     HydraulicLinkPipe pipe;
     pipe.uuid = QUuid::createUuid();
     pipe.id = "P1";
-    pipe.node_id_from = reservoir.id;
-    pipe.node_id_to = junction.id;
+    pipe.node_uuid_from = reservoir.uuid;
+    pipe.node_uuid_to = junction.uuid;
     pipe.length_calculated_m = 100.0;
     pipe.diameter_mm = 150.0;
     pipe.roughness_hw = 130.0;
@@ -43,8 +43,8 @@ NetworkHydraulic DummyNetworks::networkOnMap()
     tank_1.uuid = QUuid::createUuid();
     tank_1.id = "T34";
     
-    tank_1.latitude_deg = 11.98385;
-    tank_1.longitude_deg = 18.20381;
+    tank_1.coordinate_wgs84.latitude_deg = 11.98385;
+    tank_1.coordinate_wgs84.longitude_deg = 18.20381;
     
     tank_1.bottom_elevation_m = 533.0;
     
@@ -62,8 +62,8 @@ NetworkHydraulic DummyNetworks::networkOnMap()
     junction_1.uuid = QUuid::createUuid();
     junction_1.id = "J1";
     
-    junction_1.latitude_deg = 11.98108;
-    junction_1.longitude_deg = 18.20373;
+    junction_1.coordinate_wgs84.latitude_deg = 11.98108;
+    junction_1.coordinate_wgs84.longitude_deg = 18.20373;
     
     junction_1.elevation_m = 477.0;
     HydraulicNodeJunctionDemand junction_1_demand;
@@ -74,8 +74,8 @@ NetworkHydraulic DummyNetworks::networkOnMap()
     pipe_1.uuid = QUuid::createUuid();
     pipe_1.id = "P1";
     
-    pipe_1.node_id_from = tank_1.id;
-    pipe_1.node_id_to = junction_1.id;
+    pipe_1.node_uuid_from = tank_1.uuid;
+    pipe_1.node_uuid_to = junction_1.uuid;
     
     pipe_1.length_calculated_m = 250.0;
     pipe_1.diameter_mm = 300.0;
@@ -312,8 +312,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicLinkPipe pipe_1;
     pipe_1.uuid = QUuid::createUuid();
     pipe_1.id = "P1";
-    pipe_1.node_id_from = reservoir.id;
-    pipe_1.node_id_to = junction_1.id;
+    pipe_1.node_uuid_from = reservoir.uuid;
+    pipe_1.node_uuid_to = junction_1.uuid;
     pipe_1.length_calculated_m = 250.0;
     pipe_1.diameter_mm = 300.0;
     pipe_1.roughness_hw = 130.0;
@@ -324,8 +324,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicLinkPipe pipe_2;
     pipe_2.uuid = QUuid::createUuid();
     pipe_2.id = "P2";
-    pipe_2.node_id_from = junction_1.id;
-    pipe_2.node_id_to = junction_2.id;
+    pipe_2.node_uuid_from = junction_1.uuid;
+    pipe_2.node_uuid_to = junction_2.uuid;
     pipe_2.length_calculated_m = 300.0;
     pipe_2.diameter_mm = 250.0;
     pipe_2.roughness_hw = 130.0;
@@ -336,8 +336,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicLinkPipe pipe_3;
     pipe_3.uuid = QUuid::createUuid();
     pipe_3.id = "P3";
-    pipe_3.node_id_from = junction_1.id;
-    pipe_3.node_id_to = junction_3.id;
+    pipe_3.node_uuid_from = junction_1.uuid;
+    pipe_3.node_uuid_to = junction_3.uuid;
     pipe_3.length_calculated_m = 350.0;
     pipe_3.diameter_mm = 250.0;
     pipe_3.roughness_hw = 130.0;
@@ -348,8 +348,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicLinkPipe pipe_4;
     pipe_4.uuid = QUuid::createUuid();
     pipe_4.id = "P4";
-    pipe_4.node_id_from = junction_2.id;
-    pipe_4.node_id_to = junction_4.id;
+    pipe_4.node_uuid_from = junction_2.uuid;
+    pipe_4.node_uuid_to = junction_4.uuid;
     pipe_4.length_calculated_m = 400.0;
     pipe_4.diameter_mm = 200.0;
     pipe_4.roughness_hw = 130.0;
@@ -360,8 +360,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicLinkPipe pipe_5;
     pipe_5.uuid = QUuid::createUuid();
     pipe_5.id = "P5";
-    pipe_5.node_id_from = junction_3.id;
-    pipe_5.node_id_to = junction_5.id;
+    pipe_5.node_uuid_from = junction_3.uuid;
+    pipe_5.node_uuid_to = junction_5.uuid;
     pipe_5.length_calculated_m = 375.0;
     pipe_5.diameter_mm = 200.0;
     pipe_5.roughness_hw = 130.0;
@@ -372,8 +372,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicLinkPipe pipe_6;
     pipe_6.uuid = QUuid::createUuid();
     pipe_6.id = "P6";
-    pipe_6.node_id_from = junction_4.id;
-    pipe_6.node_id_to = junction_5.id;
+    pipe_6.node_uuid_from = junction_4.uuid;
+    pipe_6.node_uuid_to = junction_5.uuid;
     pipe_6.length_calculated_m = 500.0;
     pipe_6.diameter_mm = 180.0;
     pipe_6.roughness_hw = 130.0;
@@ -384,8 +384,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicLinkPipe pipe_7;
     pipe_7.uuid = QUuid::createUuid();
     pipe_7.id = "P7";
-    pipe_7.node_id_from = junction_2.id;
-    pipe_7.node_id_to = junction_3.id;
+    pipe_7.node_uuid_from = junction_2.uuid;
+    pipe_7.node_uuid_to = junction_3.uuid;
     pipe_7.length_calculated_m = 450.0;
     pipe_7.diameter_mm = 180.0;
     pipe_7.roughness_hw = 130.0;
@@ -400,8 +400,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicLinkPipe tank_pipe_1;
     tank_pipe_1.uuid = QUuid::createUuid();
     tank_pipe_1.id = "PT1";
-    tank_pipe_1.node_id_from = tank_1.id;
-    tank_pipe_1.node_id_to = junction_2.id;
+    tank_pipe_1.node_uuid_from = tank_1.uuid;
+    tank_pipe_1.node_uuid_to = junction_2.uuid;
     tank_pipe_1.length_calculated_m = 80.0;
     tank_pipe_1.diameter_mm = 200.0;
     tank_pipe_1.roughness_hw = 130.0;
@@ -411,8 +411,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicLinkPipe tank_pipe_2;
     tank_pipe_2.uuid = QUuid::createUuid();
     tank_pipe_2.id = "PT2";
-    tank_pipe_2.node_id_from = tank_2.id;
-    tank_pipe_2.node_id_to = junction_3.id;
+    tank_pipe_2.node_uuid_from = tank_2.uuid;
+    tank_pipe_2.node_uuid_to = junction_3.uuid;
     tank_pipe_2.length_calculated_m = 100.0;
     tank_pipe_2.diameter_mm = 200.0;
     tank_pipe_2.roughness_hw = 130.0;
@@ -422,8 +422,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicLinkPipe tank_pipe_3;
     tank_pipe_3.uuid = QUuid::createUuid();
     tank_pipe_3.id = "PT3";
-    tank_pipe_3.node_id_from = tank_3.id;
-    tank_pipe_3.node_id_to = junction_4.id;
+    tank_pipe_3.node_uuid_from = tank_3.uuid;
+    tank_pipe_3.node_uuid_to = junction_4.uuid;
     tank_pipe_3.length_calculated_m = 120.0;
     tank_pipe_3.diameter_mm = 180.0;
     tank_pipe_3.roughness_hw = 130.0;
@@ -433,8 +433,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicLinkPipe tank_pipe_4;
     tank_pipe_4.uuid = QUuid::createUuid();
     tank_pipe_4.id = "PT4";
-    tank_pipe_4.node_id_from = tank_4.id;
-    tank_pipe_4.node_id_to = junction_5.id;
+    tank_pipe_4.node_uuid_from = tank_4.uuid;
+    tank_pipe_4.node_uuid_to = junction_5.uuid;
     tank_pipe_4.length_calculated_m = 90.0;
     tank_pipe_4.diameter_mm = 180.0;
     tank_pipe_4.roughness_hw = 130.0;
@@ -555,8 +555,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicNodeReservoir reservoir;
     reservoir.uuid = QUuid::createUuid();
     reservoir.id = "R_FULL";
-    reservoir.latitude_deg = 11.9850;
-    reservoir.longitude_deg = 18.1980;
+    reservoir.coordinate_wgs84.latitude_deg = 11.9850;
+    reservoir.coordinate_wgs84.longitude_deg = 18.1980;
     reservoir.head_input_type = HydraulicNodeElevationInputType::TerrainElevationAndOffset;
     reservoir.terrain_elevation_m = 82.0;
     reservoir.head_offset_m = 18.0;
@@ -567,8 +567,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicNodeJunction junction_pump_out;
     junction_pump_out.uuid = QUuid::createUuid();
     junction_pump_out.id = "J_PUMP_OUT";
-    junction_pump_out.latitude_deg = 11.9847;
-    junction_pump_out.longitude_deg = 18.2000;
+    junction_pump_out.coordinate_wgs84.latitude_deg = 11.9847;
+    junction_pump_out.coordinate_wgs84.longitude_deg = 18.2000;
     junction_pump_out.elevation_m = 54.0;
     
     HydraulicNodeJunctionDemand junction_pump_out_demand_1;
@@ -586,8 +586,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicNodeJunction junction_prv_out;
     junction_prv_out.uuid = QUuid::createUuid();
     junction_prv_out.id = "J_PRV_OUT";
-    junction_prv_out.latitude_deg = 11.9842;
-    junction_prv_out.longitude_deg = 18.2020;
+    junction_prv_out.coordinate_wgs84.latitude_deg = 11.9842;
+    junction_prv_out.coordinate_wgs84.longitude_deg = 18.2020;
     junction_prv_out.elevation_input_type = HydraulicNodeElevationInputType::TerrainElevationAndOffset;
     junction_prv_out.terrain_elevation_m = 48.0;
     junction_prv_out.elevation_offset_m = 1.5;
@@ -601,50 +601,50 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicNodeJunction junction_psv_out;
     junction_psv_out.uuid = QUuid::createUuid();
     junction_psv_out.id = "J_PSV_OUT";
-    junction_psv_out.latitude_deg = 11.9837;
-    junction_psv_out.longitude_deg = 18.2040;
+    junction_psv_out.coordinate_wgs84.latitude_deg = 11.9837;
+    junction_psv_out.coordinate_wgs84.longitude_deg = 18.2040;
     junction_psv_out.elevation_m = 51.0;
     
     HydraulicNodeJunction junction_fcv_out;
     junction_fcv_out.uuid = QUuid::createUuid();
     junction_fcv_out.id = "J_FCV_OUT";
-    junction_fcv_out.latitude_deg = 11.9832;
-    junction_fcv_out.longitude_deg = 18.2060;
+    junction_fcv_out.coordinate_wgs84.latitude_deg = 11.9832;
+    junction_fcv_out.coordinate_wgs84.longitude_deg = 18.2060;
     junction_fcv_out.elevation_m = 52.0;
     
     HydraulicNodeJunction junction_pbv_out;
     junction_pbv_out.uuid = QUuid::createUuid();
     junction_pbv_out.id = "J_PBV_OUT";
-    junction_pbv_out.latitude_deg = 11.9827;
-    junction_pbv_out.longitude_deg = 18.2080;
+    junction_pbv_out.coordinate_wgs84.latitude_deg = 11.9827;
+    junction_pbv_out.coordinate_wgs84.longitude_deg = 18.2080;
     junction_pbv_out.elevation_m = 53.0;
     
     HydraulicNodeJunction junction_tcv_out;
     junction_tcv_out.uuid = QUuid::createUuid();
     junction_tcv_out.id = "J_TCV_OUT";
-    junction_tcv_out.latitude_deg = 11.9822;
-    junction_tcv_out.longitude_deg = 18.2100;
+    junction_tcv_out.coordinate_wgs84.latitude_deg = 11.9822;
+    junction_tcv_out.coordinate_wgs84.longitude_deg = 18.2100;
     junction_tcv_out.elevation_m = 54.0;
     
     HydraulicNodeJunction junction_gpv_out;
     junction_gpv_out.uuid = QUuid::createUuid();
     junction_gpv_out.id = "J_GPV_OUT";
-    junction_gpv_out.latitude_deg = 11.9817;
-    junction_gpv_out.longitude_deg = 18.2120;
+    junction_gpv_out.coordinate_wgs84.latitude_deg = 11.9817;
+    junction_gpv_out.coordinate_wgs84.longitude_deg = 18.2120;
     junction_gpv_out.elevation_m = 55.0;
     
     HydraulicNodeJunction junction_pcv_out;
     junction_pcv_out.uuid = QUuid::createUuid();
     junction_pcv_out.id = "J_PCV_OUT";
-    junction_pcv_out.latitude_deg = 11.9812;
-    junction_pcv_out.longitude_deg = 18.2140;
+    junction_pcv_out.coordinate_wgs84.latitude_deg = 11.9812;
+    junction_pcv_out.coordinate_wgs84.longitude_deg = 18.2140;
     junction_pcv_out.elevation_m = 56.0;
     
     HydraulicNodeJunction junction_loop;
     junction_loop.uuid = QUuid::createUuid();
     junction_loop.id = "J_LOOP";
-    junction_loop.latitude_deg = 11.9795;
-    junction_loop.longitude_deg = 18.2070;
+    junction_loop.coordinate_wgs84.latitude_deg = 11.9795;
+    junction_loop.coordinate_wgs84.longitude_deg = 18.2070;
     junction_loop.elevation_m = 47.0;
     
     HydraulicNodeJunctionDemand junction_loop_demand;
@@ -666,8 +666,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicNodeTank tank;
     tank.uuid = QUuid::createUuid();
     tank.id = "T_FULL";
-    tank.latitude_deg = 11.9780;
-    tank.longitude_deg = 18.2130;
+    tank.coordinate_wgs84.latitude_deg = 11.9780;
+    tank.coordinate_wgs84.longitude_deg = 18.2130;
     tank.elevation_input_type = HydraulicNodeElevationInputType::TerrainElevationAndOffset;
     tank.terrain_elevation_m = 58.0;
     tank.bottom_offset_m = 2.0;
@@ -687,8 +687,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkPump curve_pump;
     curve_pump.uuid = QUuid::createUuid();
     curve_pump.id = "PU_CURVE";
-    curve_pump.node_id_from = reservoir.id;
-    curve_pump.node_id_to = junction_pump_out.id;
+    curve_pump.node_uuid_from = reservoir.uuid;
+    curve_pump.node_uuid_to = junction_pump_out.uuid;
     curve_pump.definition_type = HydraulicLinkPumpDefinitionType::ThreePointCurve;
     curve_pump.head_curve_id = pump_head_curve.id;
     curve_pump.initial_speed = 1.0;
@@ -701,8 +701,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkPump power_pump;
     power_pump.uuid = QUuid::createUuid();
     power_pump.id = "PU_POWER";
-    power_pump.node_id_from = junction_loop.id;
-    power_pump.node_id_to = tank.id;
+    power_pump.node_uuid_from = junction_loop.uuid;
+    power_pump.node_uuid_to = tank.uuid;
     power_pump.definition_type = HydraulicLinkPumpDefinitionType::ConstantPower;
     power_pump.constant_power_kw = 11.0;
     power_pump.initial_speed = 0.85;
@@ -716,8 +716,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkValve prv;
     prv.uuid = QUuid::createUuid();
     prv.id = "V_PRV";
-    prv.node_id_from = junction_pump_out.id;
-    prv.node_id_to = junction_prv_out.id;
+    prv.node_uuid_from = junction_pump_out.uuid;
+    prv.node_uuid_to = junction_prv_out.uuid;
     prv.type = HydraulicLinkValveType::PRV;
     prv.setting = 38.0;
     prv.initial_status = HydraulicLinkValveInitialStatus::Active;
@@ -727,8 +727,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkValve psv;
     psv.uuid = QUuid::createUuid();
     psv.id = "V_PSV";
-    psv.node_id_from = junction_prv_out.id;
-    psv.node_id_to = junction_psv_out.id;
+    psv.node_uuid_from = junction_prv_out.uuid;
+    psv.node_uuid_to = junction_psv_out.uuid;
     psv.type = HydraulicLinkValveType::PSV;
     psv.setting = 42.0;
     psv.initial_status = HydraulicLinkValveInitialStatus::Active;
@@ -738,8 +738,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkValve fcv;
     fcv.uuid = QUuid::createUuid();
     fcv.id = "V_FCV";
-    fcv.node_id_from = junction_psv_out.id;
-    fcv.node_id_to = junction_fcv_out.id;
+    fcv.node_uuid_from = junction_psv_out.uuid;
+    fcv.node_uuid_to = junction_fcv_out.uuid;
     fcv.type = HydraulicLinkValveType::FCV;
     fcv.setting = 30.0;
     fcv.initial_status = HydraulicLinkValveInitialStatus::Active;
@@ -749,8 +749,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkValve pbv;
     pbv.uuid = QUuid::createUuid();
     pbv.id = "V_PBV";
-    pbv.node_id_from = junction_fcv_out.id;
-    pbv.node_id_to = junction_pbv_out.id;
+    pbv.node_uuid_from = junction_fcv_out.uuid;
+    pbv.node_uuid_to = junction_pbv_out.uuid;
     pbv.type = HydraulicLinkValveType::PBV;
     pbv.setting = 5.0;
     pbv.initial_status = HydraulicLinkValveInitialStatus::Active;
@@ -760,8 +760,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkValve tcv;
     tcv.uuid = QUuid::createUuid();
     tcv.id = "V_TCV";
-    tcv.node_id_from = junction_pbv_out.id;
-    tcv.node_id_to = junction_tcv_out.id;
+    tcv.node_uuid_from = junction_pbv_out.uuid;
+    tcv.node_uuid_to = junction_tcv_out.uuid;
     tcv.type = HydraulicLinkValveType::TCV;
     tcv.setting = 2.5;
     tcv.initial_status = HydraulicLinkValveInitialStatus::Open;
@@ -771,8 +771,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkValve gpv;
     gpv.uuid = QUuid::createUuid();
     gpv.id = "V_GPV";
-    gpv.node_id_from = junction_tcv_out.id;
-    gpv.node_id_to = junction_gpv_out.id;
+    gpv.node_uuid_from = junction_tcv_out.uuid;
+    gpv.node_uuid_to = junction_gpv_out.uuid;
     gpv.type = HydraulicLinkValveType::GPV;
     gpv.setting_curve_id = gpv_headloss_curve.id;
     gpv.initial_status = HydraulicLinkValveInitialStatus::Active;
@@ -782,8 +782,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkValve pcv;
     pcv.uuid = QUuid::createUuid();
     pcv.id = "V_PCV";
-    pcv.node_id_from = junction_gpv_out.id;
-    pcv.node_id_to = junction_pcv_out.id;
+    pcv.node_uuid_from = junction_gpv_out.uuid;
+    pcv.node_uuid_to = junction_pcv_out.uuid;
     pcv.type = HydraulicLinkValveType::PCV;
     pcv.setting = 65.0;
     pcv.initial_status = HydraulicLinkValveInitialStatus::Closed;
@@ -802,8 +802,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkPipe loop_pipe_1;
     loop_pipe_1.uuid = QUuid::createUuid();
     loop_pipe_1.id = "P_LOOP_1";
-    loop_pipe_1.node_id_from = junction_pcv_out.id;
-    loop_pipe_1.node_id_to = junction_loop.id;
+    loop_pipe_1.node_uuid_from = junction_pcv_out.uuid;
+    loop_pipe_1.node_uuid_to = junction_loop.uuid;
     loop_pipe_1.length_calculated_m = 420.0;
     loop_pipe_1.length_measured_m = 418.6;
     loop_pipe_1.initial_status = HydraulicLinkPipeInitialStatus::Open;
@@ -820,8 +820,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkPipe loop_pipe_2;
     loop_pipe_2.uuid = QUuid::createUuid();
     loop_pipe_2.id = "P_LOOP_2";
-    loop_pipe_2.node_id_from = junction_loop.id;
-    loop_pipe_2.node_id_to = junction_pump_out.id;
+    loop_pipe_2.node_uuid_from = junction_loop.uuid;
+    loop_pipe_2.node_uuid_to = junction_pump_out.uuid;
     loop_pipe_2.length_calculated_m = 650.0;
     loop_pipe_2.initial_status = HydraulicLinkPipeInitialStatus::Open;
     loop_pipe_2.diameter_mm = 250.0;
@@ -833,8 +833,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkPipe check_pipe;
     check_pipe.uuid = QUuid::createUuid();
     check_pipe.id = "P_CHECK";
-    check_pipe.node_id_from = junction_fcv_out.id;
-    check_pipe.node_id_to = junction_loop.id;
+    check_pipe.node_uuid_from = junction_fcv_out.uuid;
+    check_pipe.node_uuid_to = junction_loop.uuid;
     check_pipe.length_calculated_m = 280.0;
     check_pipe.initial_status = HydraulicLinkPipeInitialStatus::CheckValve;
     check_pipe.diameter_mm = 150.0;
@@ -846,8 +846,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkPipe closed_pipe;
     closed_pipe.uuid = QUuid::createUuid();
     closed_pipe.id = "P_CLOSED";
-    closed_pipe.node_id_from = junction_pbv_out.id;
-    closed_pipe.node_id_to = junction_loop.id;
+    closed_pipe.node_uuid_from = junction_pbv_out.uuid;
+    closed_pipe.node_uuid_to = junction_loop.uuid;
     closed_pipe.length_calculated_m = 210.0;
     closed_pipe.initial_status = HydraulicLinkPipeInitialStatus::Closed;
     closed_pipe.diameter_mm = 125.0;
@@ -858,8 +858,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     HydraulicLinkPipe tank_pipe;
     tank_pipe.uuid = QUuid::createUuid();
     tank_pipe.id = "P_TANK";
-    tank_pipe.node_id_from = junction_psv_out.id;
-    tank_pipe.node_id_to = tank.id;
+    tank_pipe.node_uuid_from = junction_psv_out.uuid;
+    tank_pipe.node_uuid_to = tank.uuid;
     tank_pipe.length_calculated_m = 360.0;
     tank_pipe.initial_status = HydraulicLinkPipeInitialStatus::Open;
     tank_pipe.diameter_mm = 200.0;
