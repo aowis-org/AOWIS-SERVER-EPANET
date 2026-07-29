@@ -5,8 +5,8 @@
 #include <QThreadPool>
 #include <QUuid>
 #include <atomic>
-#include <aowis/model/hydraulic/network.h>
-#include <aowis/model/hydraulic/simulation_result.h>
+#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/epanet_results.h>
 #include <aowis/model/hydraulic/epanet_status.h>
 
 class EpanetSimulationManager : public QObject
@@ -24,8 +24,8 @@ public:
 signals:
     void signalSimulationQueued(QUuid simulation_id);
     void signalSimulationStarted(QUuid simulation_id);
-    void signalSimulationFinished(QUuid simulation_id, SimulationResultTimeline timeline, QStringList report);
-    void signalSimulationFailed(QUuid simulation_id, EpanetStatus status, QStringList report);
+    void signalSimulationFinished(QUuid simulation_id, EpanetResultTimeline result_timeline, QStringList report_lines);
+    void signalSimulationFailed(QUuid simulation_id, EpanetStatus status, QStringList report_lines);
 
 private:
     QThreadPool thread_pool;

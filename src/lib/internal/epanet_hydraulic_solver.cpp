@@ -10,25 +10,25 @@ EpanetHydraulicSolver::EpanetHydraulicSolver(EpanetProject &project, const Epane
 {
 }
 
-EpanetStatus EpanetHydraulicSolver::run(SimulationResultTimeline &timeline)
+EpanetStatus EpanetHydraulicSolver::run(EpanetResultTimeline &timeline)
 {
     constexpr std::array<const char *, 4> report_commands = {"STATUS YES", "SUMMARY YES", "NODES ALL", "LINKS ALL"};
     for (const char *command : report_commands)
     {
         const int report_error = EN_setreport(this->project.handle(), command);
         if (report_error != 0)
-            return makeEpanetError(this->project, report_error, EpanetStage::RunHydraulics, EpanetOperation::EN_setreport, EpanetEntityType::Report, QString(), "Failed to configure the EPANET report");
+            return makeEpanetError(this->project, report_error, EpanetStatusStage::RunHydraulics, EpanetStatusOperation::EN_setreport, EpanetStatusEntityType::Report, QString(), "Failed to configure the EPANET report");
     }
 
     int error = EN_openH(this->project.handle());
     if (error != 0)
-        return makeEpanetError(this->project, error, EpanetStage::RunHydraulics, EpanetOperation::EN_openH, EpanetEntityType::HydraulicSolver, QString(), "Failed to open EPANET hydraulics");
+        return makeEpanetError(this->project, error, EpanetStatusStage::RunHydraulics, EpanetStatusOperation::EN_openH, EpanetStatusEntityType::HydraulicSolver, QString(), "Failed to open EPANET hydraulics");
 
     error = EN_initH(this->project.handle(), EN_SAVE_AND_INIT);
     if (error != 0)
     {
         EN_closeH(this->project.handle());
-        return makeEpanetError(this->project, error, EpanetStage::RunHydraulics, EpanetOperation::EN_initH, EpanetEntityType::HydraulicSolver, QString(), "Failed to initialize EPANET hydraulics");
+        return makeEpanetError(this->project, error, EpanetStatusStage::RunHydraulics, EpanetStatusOperation::EN_initH, EpanetStatusEntityType::HydraulicSolver, QString(), "Failed to initialize EPANET hydraulics");
     }
 
     long current_time_s = 0;
@@ -39,11 +39,11 @@ EpanetStatus EpanetHydraulicSolver::run(SimulationResultTimeline &timeline)
         if (error != 0)
         {
             EN_closeH(this->project.handle());
-            return makeEpanetError(this->project, error, EpanetStage::RunHydraulics, EpanetOperation::EN_runH, EpanetEntityType::HydraulicSolver, QString(), "Failed to run EPANET hydraulics");
+            return makeEpanetError(this->project, error, EpanetStatusStage::RunHydraulics, EpanetStatusOperation::EN_runH, EpanetStatusEntityType::HydraulicSolver, QString(), "Failed to run EPANET hydraulics");
         }
 
-        SimulationResult result;
-        result.elapsed_time_s = current_time_s;
+        EpanetResult result;
+        result.time_elapsed_s = current_time_s;
         EpanetStatus status = this->result_reader.read(result);
         if (!status.success)
         {
@@ -58,14 +58,14 @@ EpanetStatus EpanetHydraulicSolver::run(SimulationResultTimeline &timeline)
         if (error != 0)
         {
             EN_closeH(this->project.handle());
-            return makeEpanetError(this->project, error, EpanetStage::RunHydraulics, EpanetOperation::EN_nextH, EpanetEntityType::HydraulicSolver, QString(), "Failed to advance EPANET hydraulics");
+            return makeEpanetError(this->project, error, EpanetStatusStage::RunHydraulics, EpanetStatusOperation::EN_nextH, EpanetStatusEntityType::HydraulicSolver, QString(), "Failed to advance EPANET hydraulics");
         }
     }
     while (next_step_s > 0);
 
     error = EN_closeH(this->project.handle());
     if (error != 0)
-        return makeEpanetError(this->project, error, EpanetStage::CloseHydraulics, EpanetOperation::EN_closeH, EpanetEntityType::HydraulicSolver, QString(), "Failed to close EPANET hydraulics");
+        return makeEpanetError(this->project, error, EpanetStatusStage::CloseHydraulics, EpanetStatusOperation::EN_closeH, EpanetStatusEntityType::HydraulicSolver, QString(), "Failed to close EPANET hydraulics");
 
     return makeEpanetSuccess();
 }

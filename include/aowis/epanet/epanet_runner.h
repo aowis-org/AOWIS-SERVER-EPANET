@@ -1,13 +1,13 @@
 #ifndef AOWIS_EPANET_RUNNER_H
 #define AOWIS_EPANET_RUNNER_H
 
-#include <aowis/epanet/epanet_run_result.h>
-#include <aowis/model/hydraulic/network.h>
+#include <aowis/epanet/epanet_result_run.h>
+#include <aowis/model/hydraulic/network_hydraulic.h>
 
 class EpanetRunner
 {
 public:
-    EpanetRunResult run(const NetworkHydraulic &request) const;
+    EpanetResultRun run(const NetworkHydraulic &request) const;
 };
 
 #endif

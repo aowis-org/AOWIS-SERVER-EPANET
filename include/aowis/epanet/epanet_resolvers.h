@@ -1,13 +1,13 @@
 #ifndef AOWIS_EPANET_RESOLVERS_H
 #define AOWIS_EPANET_RESOLVERS_H
 
-#include <aowis/model/hydraulic/network.h>
+#include <aowis/model/hydraulic/network_hydraulic.h>
 
 class EpanetResolvers
 {
 public:
-    static double resolveTankBottomElevation(const Tank &tank);
-    static double resolveTankDiameter(const Tank &tank);
+    static double resolveNodeTankBottomElevation(const EpanetNodeTank &tank);
+    static double resolveNodeTankDiameter(const EpanetNodeTank &tank);
 };
 
 #endif

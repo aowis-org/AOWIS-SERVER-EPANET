@@ -13,18 +13,18 @@
 
 namespace
 {
-EpanetRunResult finishRun(EpanetRunResult result, const EpanetStatus &status, const EpanetReportCollector &report_collector)
+EpanetResultRun finishRun(EpanetResultRun result, const EpanetStatus &status, const EpanetReportCollector &report_collector)
 {
-    result.timeline.status = status;
-    result.report = report_collector.lines();
+    result.result_timeline.status = status;
+    result.report_lines = report_collector.lines();
     return result;
 }
 }
 
-EpanetRunResult EpanetRunner::run(const NetworkHydraulic &request) const
+EpanetResultRun EpanetRunner::run(const NetworkHydraulic &request) const
 {
-    EpanetRunResult result;
-    result.timeline.simulation_start_utc = QDateTime::currentDateTimeUtc();
+    EpanetResultRun result;
+    result.result_timeline.simulation_start_utc = QDateTime::currentDateTimeUtc();
 
     EpanetReportCollector report_collector;
     EpanetProject project;
@@ -45,21 +45,21 @@ EpanetRunResult EpanetRunner::run(const NetworkHydraulic &request) const
 
     EpanetResultReader result_reader(project, request, indices);
     EpanetHydraulicSolver hydraulic_solver(project, result_reader);
-    status = hydraulic_solver.run(result.timeline);
+    status = hydraulic_solver.run(result.result_timeline);
     if (!status.success)
         return finishRun(std::move(result), status, report_collector);
 
     int error = EN_saveH(project.handle());
     if (error != 0)
     {
-        status = makeEpanetError(project, error, EpanetStage::SaveHydraulics, EpanetOperation::EN_saveH, EpanetEntityType::HydraulicSolver, QString(), "Failed to save EPANET hydraulic results");
+        status = makeEpanetError(project, error, EpanetStatusStage::SaveHydraulics, EpanetStatusOperation::EN_saveH, EpanetStatusEntityType::HydraulicSolver, QString(), "Failed to save EPANET hydraulic results");
         return finishRun(std::move(result), status, report_collector);
     }
 
     error = EN_report(project.handle());
     if (error != 0)
     {
-        status = makeEpanetError(project, error, EpanetStage::GenerateReport, EpanetOperation::EN_report, EpanetEntityType::Report, QString(), "Failed to generate EPANET report");
+        status = makeEpanetError(project, error, EpanetStatusStage::GenerateReport, EpanetStatusOperation::EN_report, EpanetStatusEntityType::Report, QString(), "Failed to generate EPANET report");
         return finishRun(std::move(result), status, report_collector);
     }
 

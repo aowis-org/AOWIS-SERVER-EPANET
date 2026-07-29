@@ -18,7 +18,7 @@ The EPANET integration is split into focused components:
 
 ```cpp
 EpanetRunner runner;
-const EpanetRunResult result = runner.run(network);
+const EpanetResultRun result = runner.run(network);
 
-if (!result.timeline.status.success)
-    SimulationStatusPrinter::print(result.timeline.status);
+if (!result.result_timeline.status.success)
+    EpanetStatusPrinter::print(result.result_timeline.status);

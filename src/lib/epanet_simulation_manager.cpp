@@ -11,7 +11,7 @@
 EpanetSimulationManager::EpanetSimulationManager(QObject *parent)
     : QObject(parent)
 {
-    qRegisterMetaType<SimulationResultTimeline>();
+    qRegisterMetaType<EpanetResultTimeline>();
     qRegisterMetaType<EpanetStatus>();
     qRegisterMetaType<QStringList>();
     qRegisterMetaType<QUuid>();
@@ -42,17 +42,17 @@ QUuid EpanetSimulationManager::submit(const NetworkHydraulic &request)
         }, Qt::QueuedConnection);
 
         EpanetRunner runner;
-        EpanetRunResult run_result = runner.run(request);
+        EpanetResultRun run_result = runner.run(request);
 
         QMetaObject::invokeMethod(this, [this, simulation_id, run_result = std::move(run_result)]() mutable
         {
             if (this->shutting_down.load())
                 return;
 
-            if (run_result.timeline.status.success)
-                emit signalSimulationFinished(simulation_id, std::move(run_result.timeline), std::move(run_result.report));
+            if (run_result.result_timeline.status.success)
+                emit signalSimulationFinished(simulation_id, std::move(run_result.result_timeline), std::move(run_result.report_lines));
             else
-                emit signalSimulationFailed(simulation_id, std::move(run_result.timeline.status), std::move(run_result.report));
+                emit signalSimulationFailed(simulation_id, std::move(run_result.result_timeline.status), std::move(run_result.report_lines));
         }, Qt::QueuedConnection);
     });
 

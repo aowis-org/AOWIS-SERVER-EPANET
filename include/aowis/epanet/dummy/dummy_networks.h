@@ -4,7 +4,7 @@
 #include <QDateTime>
 #include <QUuid>
 
-#include <aowis/model/hydraulic/network.h>
+#include <aowis/model/hydraulic/network_hydraulic.h>
 
 class DummyNetworks
 {

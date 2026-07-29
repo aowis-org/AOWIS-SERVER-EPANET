@@ -3,8 +3,8 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/epanet_runner.cpp
     src/lib/epanet_simulation_manager.cpp
     src/lib/dummy/dummy_networks.cpp
-    src/lib/utility/simulation_result_printer.cpp
-    src/lib/utility/simulation_status_printer.cpp
+    src/lib/utility/epanet_result_printer.cpp
+    src/lib/utility/epanet_status_printer.cpp
     src/lib/internal/epanet_hydraulic_solver.cpp
     src/lib/internal/epanet_network_builder.cpp
     src/lib/internal/epanet_project.cpp
@@ -17,12 +17,12 @@ set(AOWIS_SERVER_EPANET_PUBLIC_HEADERS
     include/aowis/epanet/epanet.h
     include/aowis/epanet/epanet_api.h
     include/aowis/epanet/epanet_resolvers.h
-    include/aowis/epanet/epanet_run_result.h
+    include/aowis/epanet/epanet_result_run.h
     include/aowis/epanet/epanet_runner.h
     include/aowis/epanet/epanet_simulation_manager.h
     include/aowis/epanet/dummy/dummy_networks.h
-    include/aowis/epanet/utility/simulation_result_printer.h
-    include/aowis/epanet/utility/simulation_status_printer.h
+    include/aowis/epanet/utility/epanet_result_printer.h
+    include/aowis/epanet/utility/epanet_status_printer.h
 )
 
 set(AOWIS_SERVER_EPANET_INTERNAL_HEADERS

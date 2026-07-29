@@ -6,8 +6,8 @@
 
 #include <aowis/epanet/dummy/dummy_networks.h>
 #include <aowis/epanet/epanet_runner.h>
-#include <aowis/epanet/utility/simulation_result_printer.h>
-#include <aowis/epanet/utility/simulation_status_printer.h>
+#include <aowis/epanet/utility/epanet_result_printer.h>
+#include <aowis/epanet/utility/epanet_status_printer.h>
 
 Server::Server(QCoreApplication *app, QObject *parent)
     : QObject(parent), app(app)
@@ -20,11 +20,11 @@ void Server::setupRoutes()
     const NetworkHydraulic network = DummyNetworks::networkTanks();
 
     EpanetRunner runner;
-    const EpanetRunResult run_result = runner.run(network);
+    const EpanetResultRun run_result = runner.run(network);
 
-    SimulationStatusPrinter::print(run_result.timeline.status);
-    SimulationResultPrinter::print(run_result.timeline);
-    qDebug().noquote() << run_result.report.join('\n');
+    EpanetStatusPrinter::print(run_result.result_timeline.status);
+    EpanetResultPrinter::print(run_result.result_timeline);
+    qDebug().noquote() << run_result.report_lines.join('\n');
 
     this->http.route("/status", []()
     {

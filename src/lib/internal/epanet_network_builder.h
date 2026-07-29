@@ -1,7 +1,7 @@
 #ifndef AOWIS_EPANET_NETWORK_BUILDER_H
 #define AOWIS_EPANET_NETWORK_BUILDER_H
 
-#include <aowis/model/hydraulic/network.h>
+#include <aowis/model/hydraulic/network_hydraulic.h>
 #include <aowis/model/hydraulic/epanet_status.h>
 
 class EpanetProject;
@@ -15,11 +15,11 @@ public:
     EpanetStatus build(const NetworkHydraulic &request);
 
 private:
-    EpanetStatus addTankVolumeCurve(const TankVolumeCurve &curve);
-    EpanetStatus addReservoir(const Reservoir &reservoir);
-    EpanetStatus addJunction(const Junction &junction);
-    EpanetStatus addTank(const Tank &tank);
-    EpanetStatus addPipe(const Pipe &pipe);
+    EpanetStatus addCurveTankVolume(const EpanetCurveTankVolume &curve);
+    EpanetStatus addNodeReservoir(const EpanetNodeReservoir &reservoir);
+    EpanetStatus addNodeJunction(const EpanetNodeJunction &junction);
+    EpanetStatus addNodeTank(const EpanetNodeTank &tank);
+    EpanetStatus addLinkPipe(const EpanetLinkPipe &pipe);
 
     EpanetProject &project;
     EpanetIndexRegistry &indices;

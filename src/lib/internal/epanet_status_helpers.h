@@ -6,8 +6,8 @@
 
 class EpanetProject;
 
-EpanetStatus makeEpanetStatus(EpanetStage stage, EpanetOperation operation, EpanetEntityType entity_type, const QString &entity_id, const QString &message);
-EpanetStatus makeEpanetError(const EpanetProject &project, int error_code, EpanetStage stage, EpanetOperation operation, EpanetEntityType entity_type, const QString &entity_id, const QString &message);
+EpanetStatus makeEpanetStatus(EpanetStatusStage stage, EpanetStatusOperation operation, EpanetStatusEntityType entity_type, const QString &entity_id, const QString &message);
+EpanetStatus makeEpanetError(const EpanetProject &project, int error_code, EpanetStatusStage stage, EpanetStatusOperation operation, EpanetStatusEntityType entity_type, const QString &entity_id, const QString &message);
 EpanetStatus makeEpanetSuccess();
 
 #endif

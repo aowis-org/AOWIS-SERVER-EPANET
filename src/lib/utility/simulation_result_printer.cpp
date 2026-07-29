@@ -1,3 +1,4 @@
+#include "aowis/model/hydraulic/simulation_result.h"
 #include <aowis/epanet/utility/simulation_result_printer.h>
 
 #include <QTextStream>
