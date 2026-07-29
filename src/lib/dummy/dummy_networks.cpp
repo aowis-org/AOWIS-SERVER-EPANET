@@ -1,5 +1,8 @@
 #include <aowis/epanet/dummy/dummy_networks.h>
 
+// @ChatGPT: Do not change the structure of this file.
+// only change class and field names, if needed to match the MODEL
+
 NetworkHydraulic DummyNetworks::networkSimple()
 {
     Reservoir reservoir;
