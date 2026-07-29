@@ -1,24 +1,39 @@
 # AOWIS-SERVER-EPANET
 
-RESTful EPANET server and C++ integration for the AOWIS infrastructure.
+EPANET simulation backend and REST server for AOWIS.
+
+The shared AOWIS hydraulic model is solver-neutral. This repository is the EPANET adapter, so EPANET names remain only where they identify the backend implementation, its native API, or backend-specific output.
 
 ## Architecture
 
-The EPANET integration is split into focused components:
-
-- `EpanetRunner`: synchronous public entry point returning the simulation timeline and EPANET report together.
-- `EpanetSimulationManager`: asynchronous Qt interface for queued simulations.
-- `EpanetProject`: RAII ownership of `EN_Project`.
-- `EpanetNetworkBuilder`: construction of curves, reservoirs, junctions, tanks, and pipes.
-- `EpanetIndexRegistry`: stores EPANET indices while the network is built.
-- `EpanetHydraulicSolver`: owns the complete hydraulic-session lifecycle.
-- `EpanetResultReader`: extracts timestep results without repeated ID lookups.
-- `EpanetReportCollector`: owns callback state.
-- Status helper functions: centralize repeated error construction.
+- `EpanetRunner`: synchronous EPANET adapter entry point. It accepts `NetworkHydraulic` and returns a generic `HydraulicSimulationResultTimeline` together with the native EPANET report.
+- `EpanetSimulationManager`: asynchronous Qt queue around `EpanetRunner`.
+- `EpanetProject`: RAII ownership and configuration of the native `EN_Project` handle.
+- `EpanetNetworkBuilder`: converts generic hydraulic model entities into EPANET nodes, links, and curves.
+- `EpanetIndexRegistry`: stores native EPANET indices while the network is built.
+- `EpanetHydraulicSolver`: owns the native hydraulic-session lifecycle and report configuration.
+- `EpanetResultReader`: converts native EPANET result values into generic hydraulic result structures.
+- `EpanetReportCollector`: owns the EPANET report callback state.
+- `HydraulicSimulationResultPrinter` and `HydraulicSimulationStatusPrinter`: print the solver-neutral model result and status types.
 
 ```cpp
 EpanetRunner runner;
 const EpanetResultRun result = runner.run(network);
 
 if (!result.result_timeline.status.success)
-    EpanetStatusPrinter::print(result.result_timeline.status);
+    HydraulicSimulationStatusPrinter::print(result.result_timeline.status);
+else
+    HydraulicSimulationResultPrinter::print(result.result_timeline);
+```
+
+## Backend diagnostics
+
+The adapter maps native errors into `HydraulicSimulationStatus`:
+
+- `backend_name` is `EPANET`.
+- `backend_error_code` contains the native numeric error code.
+- `backend_operation` contains the exact native call, such as `EN_runH`.
+- `message_backend` contains the native EPANET error message.
+- `operation`, `stage`, `property`, and `entity` remain generic AOWIS concepts.
+
+See `EPANET_SPECIFIC_BOUNDARY.md` for the names deliberately retained as EPANET-specific.

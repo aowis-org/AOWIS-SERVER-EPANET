@@ -1,8 +1,9 @@
 #ifndef AOWIS_EPANET_HYDRAULIC_SOLVER_H
 #define AOWIS_EPANET_HYDRAULIC_SOLVER_H
 
-#include <aowis/model/hydraulic/epanet_results.h>
-#include <aowis/model/hydraulic/epanet_status.h>
+#include <aowis/model/hydraulic/hydraulic_simulation_results.h>
+#include <aowis/model/hydraulic/hydraulic_simulation_status.h>
+#include <aowis/model/hydraulic/network_hydraulic.h>
 
 class EpanetProject;
 class EpanetResultReader;
@@ -10,13 +11,16 @@ class EpanetResultReader;
 class EpanetHydraulicSolver
 {
 public:
-    EpanetHydraulicSolver(EpanetProject &project, const EpanetResultReader &result_reader);
+    EpanetHydraulicSolver(EpanetProject &project, const NetworkHydraulic &network, const EpanetResultReader &result_reader);
 
-    EpanetStatus run(EpanetResultTimeline &timeline);
+    HydraulicSimulationStatus run(HydraulicSimulationResultTimeline &timeline);
 
 private:
+    HydraulicSimulationStatus configureReport() const;
+
     EpanetProject &project;
+    const NetworkHydraulic &network;
     const EpanetResultReader &result_reader;
 };
 
-#endif
+#endif // AOWIS_EPANET_HYDRAULIC_SOLVER_H

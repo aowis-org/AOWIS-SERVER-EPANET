@@ -1,18 +1,19 @@
 #include <aowis/epanet/epanet_simulation_manager.h>
 #include <aowis/epanet/epanet_runner.h>
 
+#include <algorithm>
+#include <utility>
+
 #include <QMetaObject>
 #include <QMetaType>
 #include <QRunnable>
 #include <QThread>
-#include <algorithm>
-#include <utility>
 
 EpanetSimulationManager::EpanetSimulationManager(QObject *parent)
     : QObject(parent)
 {
-    qRegisterMetaType<EpanetResultTimeline>();
-    qRegisterMetaType<EpanetStatus>();
+    qRegisterMetaType<HydraulicSimulationResultTimeline>();
+    qRegisterMetaType<HydraulicSimulationStatus>();
     qRegisterMetaType<QStringList>();
     qRegisterMetaType<QUuid>();
     this->thread_pool.setMaxThreadCount(std::max(1, QThread::idealThreadCount()));

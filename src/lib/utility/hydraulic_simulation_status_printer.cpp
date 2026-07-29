@@ -1,9 +1,10 @@
-#include <aowis/epanet/utility/simulation_status_printer.h>
+#include <aowis/epanet/utility/hydraulic_simulation_status_printer.h>
+
+#include <cstdio>
 
 #include <QMetaEnum>
 #include <QRegularExpression>
 #include <QTextStream>
-#include <cstdio>
 
 namespace
 {
@@ -33,25 +34,29 @@ QString enumLabel(EnumType value)
 }
 }
 
-QString SimulationStatusPrinter::toString(const EpanetStatus &status)
+QString HydraulicSimulationStatusPrinter::toString(const HydraulicSimulationStatus &status)
 {
     QString output;
     QTextStream stream(&output);
     stream << "--------------------------------------------------\n";
-    stream << "EPANET STATUS: " << (status.success ? "SUCCESS" : "ERROR") << '\n';
+    stream << "SIMULATION STATUS: " << (status.success ? "SUCCESS" : "ERROR") << '\n';
+    if (!status.backend_name.isEmpty())
+        stream << "Backend:       " << status.backend_name << '\n';
     if (!status.message.isEmpty())
         stream << "Message:       " << status.message << '\n';
-    if (!status.message_epanet.isEmpty())
-        stream << "EPANET:        " << status.message_epanet << '\n';
-    if (status.epanet_error_code != 0)
-        stream << "Error code:    " << status.epanet_error_code << '\n';
-    if (status.stage != EpanetStage::None)
+    if (!status.message_backend.isEmpty())
+        stream << "Backend error: " << status.message_backend << '\n';
+    if (status.backend_error_code != 0)
+        stream << "Error code:    " << status.backend_error_code << '\n';
+    if (!status.backend_operation.isEmpty())
+        stream << "Backend call:  " << status.backend_operation << '\n';
+    if (status.stage != HydraulicSimulationStatusStage::None)
         stream << "Stage:         " << enumLabel(status.stage) << '\n';
-    if (status.operation != EpanetOperation::None)
-        stream << "Operation:     " << enumKey(status.operation) << '\n';
-    if (status.property != EpanetProperty::None)
+    if (status.operation != HydraulicSimulationStatusOperation::None)
+        stream << "Operation:     " << enumLabel(status.operation) << '\n';
+    if (status.property != HydraulicSimulationStatusProperty::None)
         stream << "Property:      " << enumLabel(status.property) << '\n';
-    if (status.entity.type != EpanetEntityType::None)
+    if (status.entity.type != HydraulicSimulationStatusEntityType::None)
     {
         stream << "Entity type:   " << enumLabel(status.entity.type) << '\n';
         if (!status.entity.id.isEmpty())
@@ -69,7 +74,7 @@ QString SimulationStatusPrinter::toString(const EpanetStatus &status)
     return output;
 }
 
-void SimulationStatusPrinter::print(const EpanetStatus &status)
+void HydraulicSimulationStatusPrinter::print(const HydraulicSimulationStatus &status)
 {
     FILE *output_file = status.success ? stdout : stderr;
     QTextStream stream(output_file);

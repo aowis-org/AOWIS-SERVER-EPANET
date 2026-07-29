@@ -8,12 +8,13 @@
 #include "internal/epanet_result_reader.h"
 #include "internal/epanet_status_helpers.h"
 
-#include <QDateTime>
 #include <utility>
+
+#include <QDateTime>
 
 namespace
 {
-EpanetResultRun finishRun(EpanetResultRun result, const EpanetStatus &status, const EpanetReportCollector &report_collector)
+EpanetResultRun finishRun(EpanetResultRun result, const HydraulicSimulationStatus &status, const EpanetReportCollector &report_collector)
 {
     result.result_timeline.status = status;
     result.report_lines = report_collector.lines();
@@ -29,7 +30,7 @@ EpanetResultRun EpanetRunner::run(const NetworkHydraulic &request) const
     EpanetReportCollector report_collector;
     EpanetProject project;
 
-    EpanetStatus status = project.create();
+    HydraulicSimulationStatus status = project.create();
     if (!status.success)
         return finishRun(std::move(result), status, report_collector);
 
@@ -44,7 +45,7 @@ EpanetResultRun EpanetRunner::run(const NetworkHydraulic &request) const
         return finishRun(std::move(result), status, report_collector);
 
     EpanetResultReader result_reader(project, request, indices);
-    EpanetHydraulicSolver hydraulic_solver(project, result_reader);
+    EpanetHydraulicSolver hydraulic_solver(project, request, result_reader);
     status = hydraulic_solver.run(result.result_timeline);
     if (!status.success)
         return finishRun(std::move(result), status, report_collector);
@@ -52,14 +53,14 @@ EpanetResultRun EpanetRunner::run(const NetworkHydraulic &request) const
     int error = EN_saveH(project.handle());
     if (error != 0)
     {
-        status = makeEpanetError(project, error, EpanetStatusStage::SaveHydraulics, EpanetStatusOperation::EN_saveH, EpanetStatusEntityType::HydraulicSolver, QString(), "Failed to save EPANET hydraulic results");
+        status = makeEpanetError(project, error, HydraulicSimulationStatusStage::SaveHydraulics, HydraulicSimulationStatusOperation::SaveHydraulics, QStringLiteral("EN_saveH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to save EPANET hydraulic results"));
         return finishRun(std::move(result), status, report_collector);
     }
 
     error = EN_report(project.handle());
     if (error != 0)
     {
-        status = makeEpanetError(project, error, EpanetStatusStage::GenerateReport, EpanetStatusOperation::EN_report, EpanetStatusEntityType::Report, QString(), "Failed to generate EPANET report");
+        status = makeEpanetError(project, error, HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, QStringLiteral("EN_report"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to generate EPANET report"));
         return finishRun(std::move(result), status, report_collector);
     }
 

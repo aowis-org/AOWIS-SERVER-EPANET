@@ -2,28 +2,28 @@
 
 #include <QtMath>
 
-double EpanetResolvers::resolveNodeTankBottomElevation(const EpanetNodeTank &tank)
+double EpanetResolvers::resolveNodeTankBottomElevation(const HydraulicNodeTank &tank)
 {
     switch (tank.elevation_input_type)
     {
-    case EpanetNodeTankElevationInputType::BottomElevation:
+    case HydraulicNodeTankElevationInputType::BottomElevation:
         return tank.bottom_elevation_m;
-    case EpanetNodeTankElevationInputType::TerrainElevationAndOffset:
+    case HydraulicNodeTankElevationInputType::TerrainElevationAndOffset:
         return tank.terrain_elevation_m + tank.bottom_offset_m;
     }
 
     return 0.0;
 }
 
-double EpanetResolvers::resolveNodeTankDiameter(const EpanetNodeTank &tank)
+double EpanetResolvers::resolveNodeTankDiameter(const HydraulicNodeTank &tank)
 {
     switch (tank.geometry_input_type)
     {
-    case EpanetNodeTankGeometryInputType::Cylindrical:
+    case HydraulicNodeTankGeometryInputType::Cylindrical:
         return tank.diameter_m;
-    case EpanetNodeTankGeometryInputType::UniformArea:
+    case HydraulicNodeTankGeometryInputType::UniformArea:
         return qSqrt(4.0 * tank.cross_section_area_m2 / M_PI);
-    case EpanetNodeTankGeometryInputType::VolumeAtMaximumLevel:
+    case HydraulicNodeTankGeometryInputType::VolumeAtMaximumLevel:
     {
         const double usable_height_m = tank.water_level_maximum_m - tank.water_level_minimum_m;
         const double usable_volume_m3 = tank.volume_at_maximum_level_m3 - tank.minimum_volume_m3;
@@ -32,7 +32,7 @@ double EpanetResolvers::resolveNodeTankDiameter(const EpanetNodeTank &tank)
 
         return qSqrt(4.0 * (usable_volume_m3 / usable_height_m) / M_PI);
     }
-    case EpanetNodeTankGeometryInputType::VolumeCurve:
+    case HydraulicNodeTankGeometryInputType::VolumeCurve:
         return 0.0;
     }
 

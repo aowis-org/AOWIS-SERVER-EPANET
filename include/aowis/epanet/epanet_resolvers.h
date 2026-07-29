@@ -6,8 +6,8 @@
 class EpanetResolvers
 {
 public:
-    static double resolveNodeTankBottomElevation(const EpanetNodeTank &tank);
-    static double resolveNodeTankDiameter(const EpanetNodeTank &tank);
+    static double resolveNodeTankBottomElevation(const HydraulicNodeTank &tank);
+    static double resolveNodeTankDiameter(const HydraulicNodeTank &tank);
 };
 
 #endif

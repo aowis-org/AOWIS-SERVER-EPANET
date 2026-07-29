@@ -2,12 +2,13 @@
 #define AOWIS_EPANET_STATUS_HELPERS_H
 
 #include <QString>
-#include <aowis/model/hydraulic/epanet_status.h>
+
+#include <aowis/model/hydraulic/hydraulic_simulation_status.h>
 
 class EpanetProject;
 
-EpanetStatus makeEpanetStatus(EpanetStatusStage stage, EpanetStatusOperation operation, EpanetStatusEntityType entity_type, const QString &entity_id, const QString &message);
-EpanetStatus makeEpanetError(const EpanetProject &project, int error_code, EpanetStatusStage stage, EpanetStatusOperation operation, EpanetStatusEntityType entity_type, const QString &entity_id, const QString &message);
-EpanetStatus makeEpanetSuccess();
+HydraulicSimulationStatus makeEpanetStatus(HydraulicSimulationStatusStage stage, HydraulicSimulationStatusOperation operation, HydraulicSimulationStatusEntityType entity_type, const QString &entity_id, const QString &message);
+HydraulicSimulationStatus makeEpanetError(const EpanetProject &project, int error_code, HydraulicSimulationStatusStage stage, HydraulicSimulationStatusOperation operation, const QString &backend_operation, HydraulicSimulationStatusEntityType entity_type, const QString &entity_id, const QString &message);
+HydraulicSimulationStatus makeEpanetSuccess();
 
-#endif
+#endif // AOWIS_EPANET_STATUS_HELPERS_H

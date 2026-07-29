@@ -16,10 +16,10 @@ set(AOWIS_SERVER_MODEL_SOURCE_DIR "" CACHE PATH "Optional local AOWIS-SERVER-MOD
 set(AOWIS_SERVER_MODEL_GIT_REPOSITORY "https://github.com/aowis-org/AOWIS-SERVER-MODEL.git" CACHE STRING "Git repository used to fetch AOWIS-SERVER-MODEL")
 set(AOWIS_SERVER_MODEL_GIT_TAG "main" CACHE STRING "Git branch, tag, or commit used to fetch AOWIS-SERVER-MODEL")
 
-find_package(Qt6 REQUIRED COMPONENTS Core Network)
+find_package(Qt6 REQUIRED COMPONENTS Core)
 
 if(AOWIS_SERVER_EPANET_BUILD_SERVER)
-    find_package(Qt6 REQUIRED COMPONENTS HttpServer)
+    find_package(Qt6 REQUIRED COMPONENTS Network HttpServer)
 endif()
 
 if(NOT TARGET AOWIS::ServerModel)

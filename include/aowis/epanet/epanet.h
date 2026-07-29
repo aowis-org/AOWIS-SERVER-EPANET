@@ -6,7 +6,7 @@
 #include <aowis/epanet/epanet_result_run.h>
 #include <aowis/epanet/epanet_runner.h>
 #include <aowis/epanet/epanet_simulation_manager.h>
-#include <aowis/epanet/utility/epanet_result_printer.h>
-#include <aowis/epanet/utility/epanet_status_printer.h>
+#include <aowis/epanet/utility/hydraulic_simulation_result_printer.h>
+#include <aowis/epanet/utility/hydraulic_simulation_status_printer.h>
 
-#endif
+#endif // AOWIS_EPANET_H
