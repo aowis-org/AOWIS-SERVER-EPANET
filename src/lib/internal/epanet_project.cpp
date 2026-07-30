@@ -5,6 +5,9 @@
 #include <array>
 #include <limits>
 
+#include <QFile>
+#include <QTemporaryDir>
+
 #include <aowis/model/hydraulic/network_hydraulic.h>
 
 namespace
@@ -226,6 +229,32 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
             return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setoption(%1)").arg(QString::fromLatin1(option.name)), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to configure an EPANET simulation option"));
     }
 
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus EpanetProject::retrieveInpText(QString &inp_text) const
+{
+    inp_text.clear();
+
+    QTemporaryDir temporary_directory;
+    if (!temporary_directory.isValid())
+        return makeEpanetStatus(HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("Failed to create a temporary directory for the EPANET INP export"));
+
+    const QString inp_path = temporary_directory.filePath(QStringLiteral("network.inp"));
+    const QByteArray inp_path_native = QFile::encodeName(inp_path);
+    const int error = EN_saveinpfile(this->project, inp_path_native.constData());
+    if (error != 0)
+        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, QStringLiteral("EN_saveinpfile"), HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("Failed to serialize the EPANET project as an INP file"));
+
+    QFile inp_file(inp_path);
+    if (!inp_file.open(QIODevice::ReadOnly))
+        return makeEpanetStatus(HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("Failed to read the EPANET INP export: %1").arg(inp_file.errorString()));
+
+    const QByteArray inp_data = inp_file.readAll();
+    if (inp_file.error() != QFileDevice::NoError)
+        return makeEpanetStatus(HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("Failed while reading the EPANET INP export: %1").arg(inp_file.errorString()));
+
+    inp_text = QString::fromUtf8(inp_data);
     return makeEpanetSuccess();
 }
 

@@ -17,6 +17,7 @@ set(AOWIS_SERVER_EPANET_PUBLIC_HEADERS
     include/aowis/epanet/epanet.h
     include/aowis/epanet/epanet_api.h
     include/aowis/epanet/epanet_resolvers.h
+    include/aowis/epanet/epanet_result_inp.h
     include/aowis/epanet/epanet_result_run.h
     include/aowis/epanet/epanet_runner.h
     include/aowis/epanet/epanet_simulation_manager.h

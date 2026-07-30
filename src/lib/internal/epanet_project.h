@@ -20,6 +20,7 @@ public:
 
     HydraulicSimulationStatus create();
     HydraulicSimulationStatus initialize(const NetworkHydraulic &request, EpanetReportCollector &report_collector);
+    HydraulicSimulationStatus retrieveInpText(QString &inp_text) const;
     EN_Project handle() const;
     QString errorMessage(int error_code) const;
 
