@@ -85,9 +85,9 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
     if (error != 0)
         return makeEpanetError(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreportcallback"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to set EPANET report callback"));
 
-    // The adapter uses L/s and meters internally so all model values cross the backend
-    // boundary through one fixed SI-oriented unit system.
-    error = EN_init(this->project, "", "", EN_LPS, headlossFormula(request.options_hydraulic.headloss_formula));
+    // Keep the native EPANET project in the canonical units encoded by the AOWIS field names:
+    // m3/h for flow, meters for length and head, and millimeters for pipe diameter.
+    error = EN_init(this->project, "", "", EN_CMH, headlossFormula(request.options_hydraulic.headloss_formula));
     if (error != 0)
         return makeEpanetError(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::Initialize, QStringLiteral("EN_init"), HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("EPANET project initialization failed"));
 
@@ -98,6 +98,24 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
     error = EN_setreportcallback(this->project, &EpanetReportCollector::callback);
     if (error != 0)
         return makeEpanetError(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreportcallback"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to restore EPANET report callback"));
+
+    error = EN_setoption(this->project, EN_PRESS_UNITS, static_cast<double>(EN_METERS));
+    if (error != 0)
+        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setoption(EN_PRESS_UNITS)"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to configure EPANET pressure-head units as meters"));
+
+    int configured_flow_unit = -1;
+    error = EN_getflowunits(this->project, &configured_flow_unit);
+    if (error != 0)
+        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_getflowunits"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to verify EPANET flow units"));
+    if (configured_flow_unit != EN_CMH)
+        return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("EPANET flow units do not match the required AOWIS m3/h backend contract"));
+
+    double configured_pressure_unit = -1.0;
+    error = EN_getoption(this->project, EN_PRESS_UNITS, &configured_pressure_unit);
+    if (error != 0)
+        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_getoption(EN_PRESS_UNITS)"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to verify EPANET pressure-head units"));
+    if (static_cast<int>(configured_pressure_unit) != EN_METERS)
+        return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("EPANET pressure units do not match the required AOWIS meter-head backend contract"));
 
     struct TimeParameter
     {
@@ -153,7 +171,7 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
         {EN_MAXCHECK, static_cast<double>(hydraulic.maximum_check), "EN_MAXCHECK"},
         {EN_DAMPLIMIT, hydraulic.damping_limit, "EN_DAMPLIMIT"},
         {EN_HEADERROR, hydraulic.maximum_head_error_m, "EN_HEADERROR"},
-        {EN_FLOWCHANGE, hydraulic.maximum_flow_change_m3_per_h / 3.6, "EN_FLOWCHANGE"},
+        {EN_FLOWCHANGE, hydraulic.maximum_flow_change_m3_per_h, "EN_FLOWCHANGE"},
         {EN_DEMANDMULT, hydraulic.demand_multiplier, "EN_DEMANDMULT"},
         {EN_EMITEXPON, hydraulic.emitter_exponent, "EN_EMITEXPON"},
         {EN_EMITBACKFLOW, static_cast<double>(hydraulic.emitters_can_backflow ? EN_TRUE : EN_FALSE), "EN_EMITBACKFLOW"},

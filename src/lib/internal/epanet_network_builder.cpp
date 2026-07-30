@@ -25,6 +25,33 @@ bool resolveBackendId(const QHash<QUuid, QString> &ids_by_uuid, const QUuid &uui
     backend_id = id.toUtf8();
     return true;
 }
+
+bool resolveBackendIndex(const QHash<QUuid, int> &indices_by_uuid, const QUuid &uuid, int &backend_index)
+{
+    if (uuid.isNull())
+    {
+        backend_index = 0;
+        return true;
+    }
+
+    backend_index = indices_by_uuid.value(uuid, 0);
+    return backend_index > 0;
+}
+
+double resolvePipeRoughness(const HydraulicLinkPipe &pipe, HydraulicHeadlossFormula headloss_formula)
+{
+    switch (headloss_formula)
+    {
+    case HydraulicHeadlossFormula::HazenWilliams:
+        return pipe.roughness_hw;
+    case HydraulicHeadlossFormula::DarcyWeisbach:
+        return pipe.roughness_dw_mm;
+    case HydraulicHeadlossFormula::ChezyManning:
+        return pipe.roughness_cm;
+    }
+
+    return pipe.roughness_hw;
+}
 }
 
 EpanetNetworkBuilder::EpanetNetworkBuilder(EpanetProject &project, EpanetIndexRegistry &indices)
@@ -37,6 +64,13 @@ HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulic &re
     this->node_ids_by_uuid.clear();
     this->pattern_ids_by_uuid.clear();
     this->tank_volume_curve_ids_by_uuid.clear();
+
+    this->indices.patterns_time.clear();
+    this->indices.curves_tank_volume.clear();
+    this->indices.nodes_reservoirs.clear();
+    this->indices.nodes_junctions.clear();
+    this->indices.nodes_tanks.clear();
+    this->indices.links_pipes.clear();
 
     for (const HydraulicNodeReservoir &reservoir : request.nodes_reservoirs)
         this->node_ids_by_uuid.insert(reservoir.uuid, reservoir.id);
@@ -53,40 +87,99 @@ HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulic &re
     for (const HydraulicCurveTankVolume &curve : request.curves_tank_volume)
         this->tank_volume_curve_ids_by_uuid.insert(curve.uuid, curve.id);
 
+    for (const HydraulicPatternTime &pattern : request.patterns_time)
+    {
+        const HydraulicSimulationStatus status = this->addPatternTime(pattern);
+        if (!status.success)
+            return status;
+    }
+
+    HydraulicSimulationStatus status = this->configureDefaultDemandPattern(request);
+    if (!status.success)
+        return status;
+
     for (const HydraulicCurveTankVolume &curve : request.curves_tank_volume)
     {
-        const HydraulicSimulationStatus status = this->addCurveTankVolume(curve);
+        status = this->addCurveTankVolume(curve);
         if (!status.success)
             return status;
     }
 
     for (const HydraulicNodeReservoir &reservoir : request.nodes_reservoirs)
     {
-        const HydraulicSimulationStatus status = this->addNodeReservoir(reservoir);
+        status = this->addNodeReservoir(reservoir);
         if (!status.success)
             return status;
     }
 
     for (const HydraulicNodeJunction &junction : request.nodes_junctions)
     {
-        const HydraulicSimulationStatus status = this->addNodeJunction(junction);
+        status = this->addNodeJunction(junction);
         if (!status.success)
             return status;
     }
 
     for (const HydraulicNodeTank &tank : request.nodes_tanks)
     {
-        const HydraulicSimulationStatus status = this->addNodeTank(tank);
+        status = this->addNodeTank(tank);
         if (!status.success)
             return status;
     }
 
     for (const HydraulicLinkPipe &pipe : request.links_pipes)
     {
-        const HydraulicSimulationStatus status = this->addLinkPipe(pipe);
+        status = this->addLinkPipe(pipe, request.options_hydraulic.headloss_formula);
         if (!status.success)
             return status;
     }
+
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus EpanetNetworkBuilder::addPatternTime(const HydraulicPatternTime &pattern)
+{
+    if (pattern.id.isEmpty())
+        return makeEpanetStatus(HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::None, HydraulicSimulationStatusEntityType::Pattern, QString(), pattern.uuid, QStringLiteral("Time pattern has no ID"));
+
+    if (pattern.factors.isEmpty())
+        return makeEpanetStatus(HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::None, HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Time pattern requires at least one factor"));
+
+    const QByteArray pattern_id = pattern.id.toUtf8();
+    int error = EN_addpattern(this->project.handle(), pattern_id.constData());
+    if (error != 0)
+        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::AddPattern, QStringLiteral("EN_addpattern"), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Failed to add time pattern"));
+
+    int pattern_index = 0;
+    error = EN_getpatternindex(this->project.handle(), pattern_id.constData(), &pattern_index);
+    if (error != 0)
+        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::ResolveEntity, QStringLiteral("EN_getpatternindex"), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Failed to get time pattern index"));
+
+    QList<double> factors = pattern.factors;
+    error = EN_setpattern(this->project.handle(), pattern_index, factors.data(), factors.length());
+    if (error != 0)
+    {
+        HydraulicSimulationStatus status = makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::AddPattern, QStringLiteral("EN_setpattern"), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Failed to set time pattern factors"));
+        status.entity.index = pattern_index;
+        return status;
+    }
+
+    this->indices.patterns_time.insert(pattern.uuid, pattern_index);
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus EpanetNetworkBuilder::configureDefaultDemandPattern(const NetworkHydraulic &request)
+{
+    const QUuid pattern_uuid = request.options_hydraulic.default_demand_pattern_uuid;
+    if (pattern_uuid.isNull())
+        return makeEpanetSuccess();
+
+    int pattern_index = 0;
+    if (!resolveBackendIndex(this->indices.patterns_time, pattern_uuid, pattern_index))
+        return makeEpanetStatus(HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Pattern, this->pattern_ids_by_uuid.value(pattern_uuid), pattern_uuid, QStringLiteral("Could not resolve default demand pattern UUID"));
+
+    const int error = EN_setoption(this->project.handle(), EN_DEMANDPATTERN, static_cast<double>(pattern_index));
+    if (error != 0)
+        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setoption(EN_DEMANDPATTERN)"), HydraulicSimulationStatusEntityType::Pattern, this->pattern_ids_by_uuid.value(pattern_uuid), pattern_uuid, QStringLiteral("Failed to configure the default demand pattern"));
 
     return makeEpanetSuccess();
 }
@@ -100,7 +193,6 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addCurveTankVolume(const Hydraul
         return makeEpanetStatus(HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::None, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("Tank volume curve requires at least two points"));
 
     const QByteArray curve_id = curve.id.toUtf8();
-
     int error = EN_addcurve(this->project.handle(), curve_id.constData());
     if (error != 0)
         return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::AddCurve, QStringLiteral("EN_addcurve"), HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("Failed to add tank volume curve"));
@@ -151,9 +243,24 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeReservoir(const Hydraulic
     if (error != 0)
         return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_addnode"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to add reservoir"));
 
-    error = EN_setnodevalue(this->project.handle(), reservoir_index, EN_ELEVATION, reservoir.head_m);
+    double reservoir_head_m = reservoir.head_m;
+    if (reservoir.head_input_type == HydraulicNodeElevationInputType::TerrainElevationAndOffset)
+        reservoir_head_m = reservoir.terrain_elevation_m + reservoir.head_offset_m;
+
+    error = EN_setnodevalue(this->project.handle(), reservoir_index, EN_ELEVATION, reservoir_head_m);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setnodevalue"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to set reservoir head"));
+        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setnodevalue(EN_ELEVATION)"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to set reservoir head"));
+
+    if (!reservoir.head_pattern_uuid.isNull())
+    {
+        int pattern_index = 0;
+        if (!resolveBackendIndex(this->indices.patterns_time, reservoir.head_pattern_uuid, pattern_index))
+            return makeEpanetStatus(HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Could not resolve reservoir head pattern UUID"));
+
+        error = EN_setnodevalue(this->project.handle(), reservoir_index, EN_PATTERN, static_cast<double>(pattern_index));
+        if (error != 0)
+            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setnodevalue(EN_PATTERN)"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to set reservoir head pattern"));
+    }
 
     error = EN_setcoord(this->project.handle(), reservoir_index, reservoir.coordinate_wgs84.longitude_deg, reservoir.coordinate_wgs84.latitude_deg);
     if (error != 0)
@@ -188,11 +295,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
         if (!resolveBackendId(this->pattern_ids_by_uuid, first_demand.pattern_uuid, first_pattern_id))
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Could not resolve primary demand pattern UUID"));
 
-        error = EN_setjuncdata(this->project.handle(), junction_index, elevation_m, first_demand.base_demand_m3_per_h / 3.6, first_pattern_id.constData());
+        error = EN_setjuncdata(this->project.handle(), junction_index, elevation_m, first_demand.base_demand_m3_per_h, first_pattern_id.constData());
         if (error != 0)
             return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_setjuncdata"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to set primary junction demand"));
 
-        const QByteArray first_demand_name = QByteArrayLiteral("Demand 1");
+        const QByteArray first_demand_name = first_demand.category_name.isEmpty() ? QByteArrayLiteral("Demand 1") : first_demand.category_name.toUtf8();
         error = EN_setdemandname(this->project.handle(), junction_index, 1, first_demand_name.constData());
         if (error != 0)
             return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddDemand, QStringLiteral("EN_setdemandname"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to name primary junction demand"));
@@ -204,8 +311,8 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
             if (!resolveBackendId(this->pattern_ids_by_uuid, demand.pattern_uuid, pattern_id))
                 return makeEpanetStatus(HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Could not resolve demand pattern UUID"));
 
-            const QByteArray demand_name = QStringLiteral("Demand %1").arg(index + 1).toUtf8();
-            error = EN_adddemand(this->project.handle(), junction_index, demand.base_demand_m3_per_h / 3.6, pattern_id.constData(), demand_name.constData());
+            const QByteArray demand_name = demand.category_name.isEmpty() ? QStringLiteral("Demand %1").arg(index + 1).toUtf8() : demand.category_name.toUtf8();
+            error = EN_adddemand(this->project.handle(), junction_index, demand.base_demand_m3_per_h, pattern_id.constData(), demand_name.constData());
             if (error != 0)
                 return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddDemand, QStringLiteral("EN_adddemand"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to add junction demand category"));
         }
@@ -255,7 +362,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeTank(const HydraulicNodeT
     return makeEpanetSuccess();
 }
 
-HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPipe(const HydraulicLinkPipe &pipe)
+HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPipe(const HydraulicLinkPipe &pipe, HydraulicHeadlossFormula headloss_formula)
 {
     const QString node_id_from_string = this->node_ids_by_uuid.value(pipe.node_uuid_from);
     if (node_id_from_string.isEmpty())
@@ -276,7 +383,8 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPipe(const HydraulicLinkP
         return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::AddLink, QStringLiteral("EN_addlink"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to add pipe"));
 
     const double length_m = pipe.length_measured_m.value_or(pipe.length_calculated_m);
-    error = EN_setpipedata(this->project.handle(), pipe_index, length_m, pipe.diameter_mm, pipe.roughness_hw, pipe.minor_loss);
+    const double roughness_for_selected_formula = resolvePipeRoughness(pipe, headloss_formula);
+    error = EN_setpipedata(this->project.handle(), pipe_index, length_m, pipe.diameter_mm, roughness_for_selected_formula, pipe.minor_loss);
     if (error != 0)
         return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::AddLink, QStringLiteral("EN_setpipedata"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to set pipe data"));
 

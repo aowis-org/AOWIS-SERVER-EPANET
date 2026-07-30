@@ -6,6 +6,7 @@
 
 struct EpanetIndexRegistry
 {
+    QHash<QUuid, int> patterns_time;
     QHash<QUuid, int> curves_tank_volume;
     QHash<QUuid, int> nodes_reservoirs;
     QHash<QUuid, int> nodes_junctions;

@@ -78,27 +78,22 @@ HydraulicSimulationStatus EpanetResultReader::readNodesJunctions(HydraulicSimula
         HydraulicSimulationStatus status = readNodeValue(this->project, junction_index, EN_FULLDEMAND, HydraulicSimulationStatusStage::ReadJunctionResults, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::Demand, QStringLiteral("Failed to get requested junction demand"), junction_result.demand_requested_m3_per_h);
         if (!status.success)
             return status;
-        junction_result.demand_requested_m3_per_h *= 3.6;
 
         status = readNodeValue(this->project, junction_index, EN_DEMANDFLOW, HydraulicSimulationStatusStage::ReadJunctionResults, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::Demand, QStringLiteral("Failed to get delivered junction demand"), junction_result.demand_delivered_m3_per_h);
         if (!status.success)
             return status;
-        junction_result.demand_delivered_m3_per_h *= 3.6;
 
         status = readNodeValue(this->project, junction_index, EN_DEMANDDEFICIT, HydraulicSimulationStatusStage::ReadJunctionResults, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::DemandDeficit, QStringLiteral("Failed to get junction demand deficit"), junction_result.demand_deficit_m3_per_h);
         if (!status.success)
             return status;
-        junction_result.demand_deficit_m3_per_h *= 3.6;
 
         status = readNodeValue(this->project, junction_index, EN_EMITTERFLOW, HydraulicSimulationStatusStage::ReadJunctionResults, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::Emitter, QStringLiteral("Failed to get junction emitter flow"), junction_result.emitter_flow_m3_per_h);
         if (!status.success)
             return status;
-        junction_result.emitter_flow_m3_per_h *= 3.6;
 
         status = readNodeValue(this->project, junction_index, EN_LEAKAGEFLOW, HydraulicSimulationStatusStage::ReadJunctionResults, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::Leakage, QStringLiteral("Failed to get junction leakage flow"), junction_result.leakage_flow_m3_per_h);
         if (!status.success)
             return status;
-        junction_result.leakage_flow_m3_per_h *= 3.6;
 
         status = readNodeValue(this->project, junction_index, EN_HEAD, HydraulicSimulationStatusStage::ReadJunctionResults, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::Head, QStringLiteral("Failed to get junction head"), junction_result.head_m);
         if (!status.success)
@@ -135,7 +130,6 @@ HydraulicSimulationStatus EpanetResultReader::readNodesReservoirs(HydraulicSimul
         HydraulicSimulationStatus status = readNodeValue(this->project, reservoir_index, EN_DEMAND, HydraulicSimulationStatusStage::ReadReservoirResults, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, HydraulicSimulationStatusProperty::Demand, QStringLiteral("Failed to get reservoir net demand"), reservoir_result.net_demand_m3_per_h);
         if (!status.success)
             return status;
-        reservoir_result.net_demand_m3_per_h *= 3.6;
 
         status = readNodeValue(this->project, reservoir_index, EN_HEAD, HydraulicSimulationStatusStage::ReadReservoirResults, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, HydraulicSimulationStatusProperty::Head, QStringLiteral("Failed to get reservoir head"), reservoir_result.head_m);
         if (!status.success)
@@ -172,7 +166,6 @@ HydraulicSimulationStatus EpanetResultReader::readNodesTanks(HydraulicSimulation
         HydraulicSimulationStatus status = readNodeValue(this->project, tank_index, EN_DEMAND, HydraulicSimulationStatusStage::ReadTankResults, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, HydraulicSimulationStatusProperty::Demand, QStringLiteral("Failed to get tank net demand"), tank_result.net_demand_m3_per_h);
         if (!status.success)
             return status;
-        tank_result.net_demand_m3_per_h *= 3.6;
 
         status = readNodeValue(this->project, tank_index, EN_HEAD, HydraulicSimulationStatusStage::ReadTankResults, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, HydraulicSimulationStatusProperty::Head, QStringLiteral("Failed to get tank head"), tank_result.head_m);
         if (!status.success)
@@ -221,12 +214,10 @@ HydraulicSimulationStatus EpanetResultReader::readLinksPipes(HydraulicSimulation
         HydraulicSimulationStatus status = readLinkValue(this->project, pipe_index, EN_FLOW, HydraulicSimulationStatusStage::ReadPipeResults, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, HydraulicSimulationStatusProperty::Flow, QStringLiteral("Failed to get pipe flow"), pipe_result.flow_m3_per_h);
         if (!status.success)
             return status;
-        pipe_result.flow_m3_per_h *= 3.6;
 
         status = readLinkValue(this->project, pipe_index, EN_LINK_LEAKAGE, HydraulicSimulationStatusStage::ReadPipeResults, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, HydraulicSimulationStatusProperty::Leakage, QStringLiteral("Failed to get pipe leakage flow"), pipe_result.leakage_flow_m3_per_h);
         if (!status.success)
             return status;
-        pipe_result.leakage_flow_m3_per_h *= 3.6;
 
         status = readLinkValue(this->project, pipe_index, EN_VELOCITY, HydraulicSimulationStatusStage::ReadPipeResults, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, HydraulicSimulationStatusProperty::Velocity, QStringLiteral("Failed to get pipe velocity"), pipe_result.velocity_m_per_s);
         if (!status.success)

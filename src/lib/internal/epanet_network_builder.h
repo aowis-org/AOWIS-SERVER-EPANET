@@ -19,11 +19,13 @@ public:
     HydraulicSimulationStatus build(const NetworkHydraulic &request);
 
 private:
+    HydraulicSimulationStatus addPatternTime(const HydraulicPatternTime &pattern);
+    HydraulicSimulationStatus configureDefaultDemandPattern(const NetworkHydraulic &request);
     HydraulicSimulationStatus addCurveTankVolume(const HydraulicCurveTankVolume &curve);
     HydraulicSimulationStatus addNodeReservoir(const HydraulicNodeReservoir &reservoir);
     HydraulicSimulationStatus addNodeJunction(const HydraulicNodeJunction &junction);
     HydraulicSimulationStatus addNodeTank(const HydraulicNodeTank &tank);
-    HydraulicSimulationStatus addLinkPipe(const HydraulicLinkPipe &pipe);
+    HydraulicSimulationStatus addLinkPipe(const HydraulicLinkPipe &pipe, HydraulicHeadlossFormula headloss_formula);
 
     EpanetProject &project;
     EpanetIndexRegistry &indices;
