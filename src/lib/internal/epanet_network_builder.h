@@ -26,12 +26,15 @@ private:
     HydraulicSimulationStatus addNodeJunction(const HydraulicNodeJunction &junction);
     HydraulicSimulationStatus addNodeTank(const HydraulicNodeTank &tank);
     HydraulicSimulationStatus addLinkPipe(const HydraulicLinkPipe &pipe, HydraulicHeadlossFormula headloss_formula);
+    HydraulicSimulationStatus refreshNodeIndices(const NetworkHydraulic &request);
+    HydraulicSimulationStatus refreshLinkIndices(const NetworkHydraulic &request);
 
     EpanetProject &project;
     EpanetIndexRegistry &indices;
     QHash<QUuid, QString> node_ids_by_uuid;
     QHash<QUuid, QString> pattern_ids_by_uuid;
     QHash<QUuid, QString> tank_volume_curve_ids_by_uuid;
+    QHash<QUuid, QString> pipe_ids_by_uuid;
 };
 
 #endif // AOWIS_EPANET_NETWORK_BUILDER_H

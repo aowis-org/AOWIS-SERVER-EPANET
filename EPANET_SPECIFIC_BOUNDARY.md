@@ -39,7 +39,7 @@ The adapter initializes every native EPANET project with `EN_CMH` and explicitly
 - Pump power and demand charge basis: `kw`.
 - Pump efficiency: `percent`.
 
-No m³/h-to-L/s conversion is performed by this adapter. The model's selectable flow and pressure units describe external input/output or display choices; they do not change the canonical AOWIS values or this fixed backend contract.
+No m³/h-to-L/s conversion is performed by this adapter. `HydraulicSolverOptions` does not expose selectable native flow or pressure units; conversion to presentation or interchange units belongs outside the hydraulic solver.
 
 Pipe roughness is selected according to `headloss_formula`: `roughness_hw` for Hazen-Williams, `roughness_dw_mm` for Darcy-Weisbach, and `roughness_cm` for Chezy-Manning.
 
@@ -49,7 +49,6 @@ The following model fields do not fully satisfy the canonical, self-describing u
 
 - `emitter_coefficient_lps_per_m_exponent` is explicitly based on L/s, while the fixed backend flow unit is m³/h. It requires a quantity-aware conversion or, preferably, a canonical model representation coupled to its exponent.
 - `leak_area_mm2_per_100m` uses EPANET's per-100-metre convention rather than the canonical AOWIS `mm2_per_m` representation. Pipe leakage is not currently written to EPANET.
-- `HydraulicSimulationResultLinkPipe::setting` is populated from EPANET's pipe setting, which is the formula-dependent roughness value. The generic field name does not communicate whether the value is dimensionless or millimetres. A quantity-specific roughness result is required for a fully self-describing model.
 - Generic valve and control `setting` values are context-dependent and do not carry a single unit in their names. They require discriminated quantity-specific representations before complete valve and control support can be unit-safe.
 
-Emitter, FAVAD leakage, valve, and control inputs are currently outside the implemented builder path, so the adapter does not silently misconvert those values. The pipe result `setting` field is already populated and remains an explicit model-level ambiguity until a quantity-specific roughness result replaces it.
+Emitter, FAVAD leakage, pump, valve, and control inputs are currently outside the implemented builder path. Networks containing these physical inputs are rejected explicitly instead of being simulated with omitted components. Pipe roughness results are exposed through `roughness_hw`, `roughness_dw_mm`, or `roughness_cm`, according to the selected headloss formula.

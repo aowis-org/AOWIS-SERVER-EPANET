@@ -28,6 +28,24 @@ HydraulicSimulationStatus readLinkValue(const EpanetProject &project, int link_i
     status.entity.index = link_index;
     return status;
 }
+
+bool assignPipeRoughness(HydraulicSimulationResultLinkPipe &result, HydraulicHeadlossFormula headloss_formula, double roughness_backend_value)
+{
+    switch (headloss_formula)
+    {
+    case HydraulicHeadlossFormula::HazenWilliams:
+        result.roughness_hw = roughness_backend_value;
+        return true;
+    case HydraulicHeadlossFormula::DarcyWeisbach:
+        result.roughness_dw_mm = roughness_backend_value;
+        return true;
+    case HydraulicHeadlossFormula::ChezyManning:
+        result.roughness_cm = roughness_backend_value;
+        return true;
+    }
+
+    return false;
+}
 }
 
 EpanetResultReader::EpanetResultReader(const EpanetProject &project, const NetworkHydraulic &network, const EpanetIndexRegistry &indices)
@@ -37,28 +55,28 @@ EpanetResultReader::EpanetResultReader(const EpanetProject &project, const Netwo
 
 HydraulicSimulationStatus EpanetResultReader::read(HydraulicSimulationResult &result) const
 {
-    HydraulicSimulationStatus status = this->readNodesJunctions(result);
+    HydraulicSimulationStatus status = readNodesJunctions(result);
     if (!status.success)
     {
         result.status = status;
         return status;
     }
 
-    status = this->readNodesReservoirs(result);
+    status = readNodesReservoirs(result);
     if (!status.success)
     {
         result.status = status;
         return status;
     }
 
-    status = this->readNodesTanks(result);
+    status = readNodesTanks(result);
     if (!status.success)
     {
         result.status = status;
         return status;
     }
 
-    status = this->readLinksPipes(result);
+    status = readLinksPipes(result);
     result.status = status;
     return status;
 }
@@ -233,9 +251,12 @@ HydraulicSimulationStatus EpanetResultReader::readLinksPipes(HydraulicSimulation
             return status;
         pipe_result.open = static_cast<int>(link_status) != EN_CLOSED;
 
-        status = readLinkValue(this->project, pipe_index, EN_SETTING, HydraulicSimulationStatusStage::ReadPipeResults, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, HydraulicSimulationStatusProperty::Setting, QStringLiteral("Failed to get pipe setting"), pipe_result.setting);
+        double roughness_backend_value = 0.0;
+        status = readLinkValue(this->project, pipe_index, EN_SETTING, HydraulicSimulationStatusStage::ReadPipeResults, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, HydraulicSimulationStatusProperty::Setting, QStringLiteral("Failed to get pipe roughness"), roughness_backend_value);
         if (!status.success)
             return status;
+        if (!assignPipeRoughness(pipe_result, this->network.options_hydraulic.headloss_formula, roughness_backend_value))
+            return makeEpanetStatus(HydraulicSimulationStatusStage::ReadPipeResults, HydraulicSimulationStatusOperation::ReadLinkResult, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Unsupported hydraulic headloss formula while reading pipe roughness"));
 
         double appears_in_control = 0.0;
         status = readLinkValue(this->project, pipe_index, EN_LINK_INCONTROL, HydraulicSimulationStatusStage::ReadPipeResults, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, HydraulicSimulationStatusProperty::None, QStringLiteral("Failed to read pipe control membership"), appears_in_control);

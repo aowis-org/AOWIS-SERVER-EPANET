@@ -9,51 +9,61 @@
 
 namespace
 {
-int headlossFormula(HydraulicHeadlossFormula formula)
+bool resolveHeadlossFormula(HydraulicHeadlossFormula formula, int &backend_formula)
 {
     switch (formula)
     {
     case HydraulicHeadlossFormula::HazenWilliams:
-        return EN_HW;
+        backend_formula = EN_HW;
+        return true;
     case HydraulicHeadlossFormula::DarcyWeisbach:
-        return EN_DW;
+        backend_formula = EN_DW;
+        return true;
     case HydraulicHeadlossFormula::ChezyManning:
-        return EN_CM;
+        backend_formula = EN_CM;
+        return true;
     }
 
-    return EN_HW;
+    return false;
 }
 
-int demandModel(HydraulicDemandModel model)
+bool resolveDemandModel(HydraulicDemandModel model, int &backend_model)
 {
     switch (model)
     {
     case HydraulicDemandModel::DemandDriven:
-        return EN_DDA;
+        backend_model = EN_DDA;
+        return true;
     case HydraulicDemandModel::PressureDriven:
-        return EN_PDA;
+        backend_model = EN_PDA;
+        return true;
     }
 
-    return EN_DDA;
+    return false;
 }
 
-int reportStatistic(HydraulicSimulationReportStatistic statistic)
+bool resolveReportStatistic(HydraulicSimulationReportStatistic statistic, int &backend_statistic)
 {
     switch (statistic)
     {
     case HydraulicSimulationReportStatistic::Series:
-        return EN_SERIES;
+        backend_statistic = EN_SERIES;
+        return true;
     case HydraulicSimulationReportStatistic::Average:
-        return EN_AVERAGE;
+        backend_statistic = EN_AVERAGE;
+        return true;
     case HydraulicSimulationReportStatistic::Minimum:
-        return EN_MINIMUM;
+        backend_statistic = EN_MINIMUM;
+        return true;
     case HydraulicSimulationReportStatistic::Maximum:
-        return EN_MAXIMUM;
+        backend_statistic = EN_MAXIMUM;
+        return true;
     case HydraulicSimulationReportStatistic::Range:
-        return EN_RANGE;
+        backend_statistic = EN_RANGE;
+        return true;
     }
 
-    return EN_SERIES;
+    return false;
 }
 }
 
@@ -85,9 +95,13 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
     if (error != 0)
         return makeEpanetError(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreportcallback"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to set EPANET report callback"));
 
+    int backend_headloss_formula = 0;
+    if (!resolveHeadlossFormula(request.options_hydraulic.headloss_formula, backend_headloss_formula))
+        return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Unsupported hydraulic headloss formula"));
+
     // Keep the native EPANET project in the canonical units encoded by the AOWIS field names:
     // m3/h for flow, meters for length and head, and millimeters for pipe diameter.
-    error = EN_init(this->project, "", "", EN_CMH, headlossFormula(request.options_hydraulic.headloss_formula));
+    error = EN_init(this->project, "", "", EN_CMH, backend_headloss_formula);
     if (error != 0)
         return makeEpanetError(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::Initialize, QStringLiteral("EN_init"), HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("EPANET project initialization failed"));
 
@@ -146,12 +160,20 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
             return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureTime, QStringLiteral("EN_settimeparam(%1)").arg(QString::fromLatin1(time_parameter.name)), HydraulicSimulationStatusEntityType::Network, request.id, request.uuid, QStringLiteral("Failed to configure an EPANET time parameter"));
     }
 
-    error = EN_settimeparam(this->project, EN_STATISTIC, reportStatistic(request.report_statistic));
+    int backend_report_statistic = 0;
+    if (!resolveReportStatistic(request.report_statistic, backend_report_statistic))
+        return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureReport, HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Unsupported hydraulic report statistic"));
+
+    error = EN_settimeparam(this->project, EN_STATISTIC, backend_report_statistic);
     if (error != 0)
         return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_settimeparam(EN_STATISTIC)"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to configure the report statistic"));
 
     const HydraulicSolverOptions &hydraulic = request.options_hydraulic;
-    error = EN_setdemandmodel(this->project, demandModel(hydraulic.demand_model), hydraulic.minimum_pressure_head_m, hydraulic.required_pressure_head_m, hydraulic.pressure_exponent);
+    int backend_demand_model = 0;
+    if (!resolveDemandModel(hydraulic.demand_model, backend_demand_model))
+        return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Unsupported hydraulic demand model"));
+
+    error = EN_setdemandmodel(this->project, backend_demand_model, hydraulic.minimum_pressure_head_m, hydraulic.required_pressure_head_m, hydraulic.pressure_exponent);
     if (error != 0)
         return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setdemandmodel"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to configure the hydraulic demand model"));
 
@@ -162,7 +184,20 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
         const char *name;
     };
 
-    const double unbalanced_trials = hydraulic.unbalanced_action == HydraulicUnbalancedAction::Continue ? hydraulic.unbalanced_extra_trials : 0.0;
+    double unbalanced_trials = 0.0;
+    switch (hydraulic.unbalanced_action)
+    {
+    case HydraulicUnbalancedAction::Stop:
+        unbalanced_trials = -1.0;
+        break;
+    case HydraulicUnbalancedAction::Continue:
+        if (hydraulic.unbalanced_extra_trials < 0)
+            return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Unbalanced continuation trials cannot be negative"));
+        unbalanced_trials = static_cast<double>(hydraulic.unbalanced_extra_trials);
+        break;
+    default:
+        return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Unsupported unbalanced-action value"));
+    }
     const std::array<NumericOption, 18> options = {{
         {EN_TRIALS, static_cast<double>(hydraulic.maximum_trials), "EN_TRIALS"},
         {EN_ACCURACY, hydraulic.accuracy, "EN_ACCURACY"},
