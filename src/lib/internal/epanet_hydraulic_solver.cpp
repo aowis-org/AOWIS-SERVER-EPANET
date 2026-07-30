@@ -4,7 +4,9 @@
 #include "epanet_status_helpers.h"
 
 #include <QByteArray>
+#include <QHash>
 #include <QStringList>
+#include <QUuid>
 
 namespace
 {
@@ -23,19 +25,56 @@ QString reportStatusCommand(HydraulicSimulationReportStatus status)
     return QStringLiteral("STATUS YES");
 }
 
-QString reportSelectionCommand(const QString &entity_name, const HydraulicSimulationReportSelection &selection)
+QHash<QUuid, QString> reportNodeIdsByUuid(const NetworkHydraulic &network)
+{
+    QHash<QUuid, QString> ids_by_uuid;
+    for (const HydraulicNodeJunction &junction : network.nodes_junctions)
+        ids_by_uuid.insert(junction.uuid, junction.id);
+    for (const HydraulicNodeReservoir &reservoir : network.nodes_reservoirs)
+        ids_by_uuid.insert(reservoir.uuid, reservoir.id);
+    for (const HydraulicNodeTank &tank : network.nodes_tanks)
+        ids_by_uuid.insert(tank.uuid, tank.id);
+    return ids_by_uuid;
+}
+
+QHash<QUuid, QString> reportLinkIdsByUuid(const NetworkHydraulic &network)
+{
+    QHash<QUuid, QString> ids_by_uuid;
+    for (const HydraulicLinkPipe &pipe : network.links_pipes)
+        ids_by_uuid.insert(pipe.uuid, pipe.id);
+    for (const HydraulicLinkPump &pump : network.links_pumps)
+        ids_by_uuid.insert(pump.uuid, pump.id);
+    for (const HydraulicLinkValve &valve : network.links_valves)
+        ids_by_uuid.insert(valve.uuid, valve.id);
+    return ids_by_uuid;
+}
+
+HydraulicSimulationStatus reportSelectionCommand(const QString &entity_name, HydraulicSimulationStatusEntityType entity_type, const HydraulicSimulationReportSelection &selection, const QHash<QUuid, QString> &ids_by_uuid, QString &command)
 {
     switch (selection.mode)
     {
     case HydraulicSimulationReportSelectionMode::None:
-        return entity_name + QStringLiteral(" NONE");
+        command = entity_name + QStringLiteral(" NONE");
+        return makeEpanetSuccess();
     case HydraulicSimulationReportSelectionMode::All:
-        return entity_name + QStringLiteral(" ALL");
+        command = entity_name + QStringLiteral(" ALL");
+        return makeEpanetSuccess();
     case HydraulicSimulationReportSelectionMode::Selected:
-        return entity_name + QLatin1Char(' ') + selection.ids.join(QLatin1Char(' '));
+        break;
     }
 
-    return entity_name + QStringLiteral(" ALL");
+    QStringList selected_ids;
+    selected_ids.reserve(selection.uuids.length());
+    for (const QUuid &uuid : selection.uuids)
+    {
+        const QString id = ids_by_uuid.value(uuid);
+        if (id.isEmpty())
+            return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ResolveEntity, entity_type, QString(), uuid, QStringLiteral("Could not resolve a selected report entity UUID"));
+        selected_ids.append(id);
+    }
+
+    command = entity_name + QLatin1Char(' ') + selected_ids.join(QLatin1Char(' '));
+    return makeEpanetSuccess();
 }
 }
 
@@ -47,12 +86,25 @@ EpanetHydraulicSolver::EpanetHydraulicSolver(EpanetProject &project, const Netwo
 HydraulicSimulationStatus EpanetHydraulicSolver::configureReport() const
 {
     const HydraulicSimulationReportOptions &options = this->network.options_report;
+    const QHash<QUuid, QString> node_ids_by_uuid = reportNodeIdsByUuid(this->network);
+    const QHash<QUuid, QString> link_ids_by_uuid = reportLinkIdsByUuid(this->network);
+
+    QString nodes_command;
+    HydraulicSimulationStatus status = reportSelectionCommand(QStringLiteral("NODES"), HydraulicSimulationStatusEntityType::Node, options.selection_nodes, node_ids_by_uuid, nodes_command);
+    if (!status.success)
+        return status;
+
+    QString links_command;
+    status = reportSelectionCommand(QStringLiteral("LINKS"), HydraulicSimulationStatusEntityType::Link, options.selection_links, link_ids_by_uuid, links_command);
+    if (!status.success)
+        return status;
+
     QStringList commands;
     commands << reportStatusCommand(options.status)
              << QStringLiteral("SUMMARY %1").arg(options.summary ? QStringLiteral("YES") : QStringLiteral("NO"))
              << QStringLiteral("ENERGY %1").arg(options.energy ? QStringLiteral("YES") : QStringLiteral("NO"))
-             << reportSelectionCommand(QStringLiteral("NODES"), options.selection_nodes)
-             << reportSelectionCommand(QStringLiteral("LINKS"), options.selection_links);
+             << nodes_command
+             << links_command;
     commands.append(options.backend_commands);
 
     for (const QString &command : commands)
@@ -97,8 +149,14 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
             return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::RunHydraulics, QStringLiteral("EN_runH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to run EPANET hydraulics"));
         }
 
+        if (current_time_s < 0)
+        {
+            EN_closeH(this->project.handle());
+            return makeEpanetStatus(HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::RunHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("EPANET returned a negative elapsed simulation time"));
+        }
+
         HydraulicSimulationResult result;
-        result.time_elapsed_s = current_time_s;
+        result.time_elapsed_s = static_cast<quint64>(current_time_s);
         status = this->result_reader.read(result);
         if (!status.success)
         {

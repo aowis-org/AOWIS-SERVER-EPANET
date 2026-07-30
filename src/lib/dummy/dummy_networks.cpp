@@ -316,7 +316,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     
     tank_4.geometry_input_type = HydraulicNodeTankGeometryInputType::VolumeCurve;
     
-    tank_4.volume_curve_id = tank_4_curve.id;
+    tank_4.volume_curve_uuid = tank_4_curve.uuid;
     
     // Keep this consistent with the curve volume at the minimum level.
     tank_4.minimum_volume_m3 = 25.0;
@@ -697,7 +697,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     tank.water_level_maximum_m = 14.0;
     tank.geometry_input_type = HydraulicNodeTankGeometryInputType::VolumeCurve;
     tank.minimum_volume_m3 = 80.0;
-    tank.volume_curve_id = tank_volume_curve.id;
+    tank.volume_curve_uuid = tank_volume_curve.uuid;
     tank.can_overflow = true;
     tank.quality_source.type = HydraulicNodeQualitySourceType::MassBooster;
     tank.mixing_model = HydraulicNodeTankMixingModel::FirstInFirstOut;
@@ -710,7 +710,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     curve_pump.node_uuid_from = reservoir.uuid;
     curve_pump.node_uuid_to = junction_pump_out.uuid;
     curve_pump.definition_type = HydraulicLinkPumpDefinitionType::ThreePointCurve;
-    curve_pump.head_curve_id = pump_head_curve.id;
+    curve_pump.head_curve_uuid = pump_head_curve.uuid;
     curve_pump.initial_speed = 1.0;
     curve_pump.initial_status = HydraulicLinkPumpInitialStatus::On;
     curve_pump.control_type = HydraulicLinkPumpControlType::LevelBased;
@@ -794,7 +794,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     gpv.node_uuid_from = junction_tcv_out.uuid;
     gpv.node_uuid_to = junction_gpv_out.uuid;
     gpv.type = HydraulicLinkValveType::GPV;
-    gpv.setting_curve_id = gpv_headloss_curve.id;
+    gpv.setting_curve_uuid = gpv_headloss_curve.uuid;
     gpv.initial_status = HydraulicLinkValveInitialStatus::Active;
     gpv.diameter_mm = 160.0;
     gpv.minor_loss = 0.0;

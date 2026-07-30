@@ -5,6 +5,7 @@
 #include <aowis/model/hydraulic/network_hydraulic.h>
 
 #include <QHash>
+#include <QString>
 #include <QUuid>
 
 class EpanetProject;
@@ -27,6 +28,8 @@ private:
     EpanetProject &project;
     EpanetIndexRegistry &indices;
     QHash<QUuid, QString> node_ids_by_uuid;
+    QHash<QUuid, QString> pattern_ids_by_uuid;
+    QHash<QUuid, QString> tank_volume_curve_ids_by_uuid;
 };
 
 #endif // AOWIS_EPANET_NETWORK_BUILDER_H

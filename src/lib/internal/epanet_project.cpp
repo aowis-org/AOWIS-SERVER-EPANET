@@ -3,6 +3,7 @@
 #include "epanet_status_helpers.h"
 
 #include <array>
+#include <limits>
 
 #include <aowis/model/hydraulic/network_hydraulic.h>
 
@@ -101,7 +102,7 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
     struct TimeParameter
     {
         int parameter;
-        long value;
+        quint64 value;
         const char *name;
     };
 
@@ -119,9 +120,12 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
 
     for (const TimeParameter &time_parameter : time_parameters)
     {
-        error = EN_settimeparam(this->project, time_parameter.parameter, time_parameter.value);
+        if (time_parameter.value > static_cast<quint64>(std::numeric_limits<long>::max()))
+            return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureTime, HydraulicSimulationStatusEntityType::Network, request.id, request.uuid, QStringLiteral("A simulation time value exceeds the range supported by EPANET on this platform: %1").arg(QString::fromLatin1(time_parameter.name)));
+
+        error = EN_settimeparam(this->project, time_parameter.parameter, static_cast<long>(time_parameter.value));
         if (error != 0)
-            return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureTime, QStringLiteral("EN_settimeparam(%1)").arg(QString::fromLatin1(time_parameter.name)), HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("Failed to configure an EPANET time parameter"));
+            return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureTime, QStringLiteral("EN_settimeparam(%1)").arg(QString::fromLatin1(time_parameter.name)), HydraulicSimulationStatusEntityType::Network, request.id, request.uuid, QStringLiteral("Failed to configure an EPANET time parameter"));
     }
 
     error = EN_settimeparam(this->project, EN_STATISTIC, reportStatistic(request.report_statistic));

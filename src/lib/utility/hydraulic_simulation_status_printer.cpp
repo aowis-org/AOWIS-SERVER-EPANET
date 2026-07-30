@@ -61,6 +61,8 @@ QString HydraulicSimulationStatusPrinter::toString(const HydraulicSimulationStat
         stream << "Entity type:   " << enumLabel(status.entity.type) << '\n';
         if (!status.entity.id.isEmpty())
             stream << "Entity ID:     " << status.entity.id << '\n';
+        if (!status.entity.uuid.isNull())
+            stream << "Entity UUID:   " << status.entity.uuid.toString(QUuid::WithoutBraces) << '\n';
         if (status.entity.index > 0)
             stream << "Entity index:  " << status.entity.index << '\n';
     }

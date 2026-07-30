@@ -2,15 +2,15 @@
 #define AOWIS_EPANET_INDEX_REGISTRY_H
 
 #include <QHash>
-#include <QString>
+#include <QUuid>
 
 struct EpanetIndexRegistry
 {
-    QHash<QString, int> curves_tank_volume;
-    QHash<QString, int> nodes_reservoirs;
-    QHash<QString, int> nodes_junctions;
-    QHash<QString, int> nodes_tanks;
-    QHash<QString, int> links_pipes;
+    QHash<QUuid, int> curves_tank_volume;
+    QHash<QUuid, int> nodes_reservoirs;
+    QHash<QUuid, int> nodes_junctions;
+    QHash<QUuid, int> nodes_tanks;
+    QHash<QUuid, int> links_pipes;
 };
 
 #endif

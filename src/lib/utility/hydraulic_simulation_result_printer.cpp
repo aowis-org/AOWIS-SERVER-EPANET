@@ -1,6 +1,7 @@
 #include <aowis/epanet/utility/hydraulic_simulation_result_printer.h>
 
 #include <cstdio>
+#include <limits>
 
 #include <QTextStream>
 
@@ -22,13 +23,13 @@ QString HydraulicSimulationResultPrinter::toString(const HydraulicSimulationResu
         stream << "  " << tank.id << ": head=" << tank.head_m << " m, level=" << tank.water_level_m << " m, volume=" << tank.volume_m3 << " m3\n";
     stream << "Pipes:\n";
     for (const HydraulicSimulationResultLinkPipe &pipe : result.links_pipes)
-        stream << "  " << pipe.id << ": flow=" << pipe.flow_m3_per_h << " m3/h, velocity=" << pipe.velocity_m_per_s << " m/s, headloss=" << pipe.headloss << '\n';
+        stream << "  " << pipe.id << ": flow=" << pipe.flow_m3_per_h << " m3/h, velocity=" << pipe.velocity_m_per_s << " m/s, head_loss=" << pipe.head_loss_m << " m" << '\n';
     stream << "Pumps:\n";
     for (const HydraulicSimulationResultLinkPump &pump : result.links_pumps)
-        stream << "  " << pump.id << ": flow=" << pump.flow_m3_per_h << " m3/h, power=" << pump.power_kw << " kW, efficiency=" << pump.efficiency_percent << "%\n";
+        stream << "  " << pump.id << ": flow=" << pump.flow_m3_per_h << " m3/h, head_gain=" << pump.head_gain_m << " m, power=" << pump.power_kw << " kW, efficiency=" << pump.efficiency_percent << "%\n";
     stream << "Valves:\n";
     for (const HydraulicSimulationResultLinkValve &valve : result.links_valves)
-        stream << "  " << valve.id << ": flow=" << valve.flow_m3_per_h << " m3/h, setting=" << valve.setting << '\n';
+        stream << "  " << valve.id << ": flow=" << valve.flow_m3_per_h << " m3/h, head_loss=" << valve.head_loss_m << " m, setting=" << valve.setting << '\n';
     stream << "--------------------------------------------------\n";
     return output;
 }
@@ -46,7 +47,12 @@ QString HydraulicSimulationResultPrinter::toString(const HydraulicSimulationResu
     for (const HydraulicSimulationResult &result : timeline.results)
     {
         if (timeline.simulation_start_utc.isValid())
-            stream << "Timestamp UTC: " << timeline.simulation_start_utc.addSecs(result.time_elapsed_s).toString(Qt::ISODate) << '\n';
+        {
+            if (result.time_elapsed_s <= static_cast<quint64>(std::numeric_limits<qint64>::max()))
+                stream << "Timestamp UTC: " << timeline.simulation_start_utc.addSecs(static_cast<qint64>(result.time_elapsed_s)).toString(Qt::ISODate) << '\n';
+            else
+                stream << "Timestamp UTC: unavailable (elapsed time exceeds QDateTime range)\n";
+        }
         stream << toString(result);
     }
     return output;
