@@ -102,8 +102,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicNodeReservoir reservoir;
     reservoir.uuid = QUuid::createUuid();
     reservoir.id = "R1";
-    reservoir.coordinate_wgs84.latitude_deg = 18.207754;
-    reservoir.coordinate_wgs84.longitude_deg = 11.981415;
+    reservoir.coordinate_wgs84.latitude_deg = 11.98119;
+    reservoir.coordinate_wgs84.longitude_deg = 18.19080;
     reservoir.head_m = 75.0;
     
     
@@ -114,8 +114,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicNodeJunction junction_1;
     junction_1.uuid = QUuid::createUuid();
     junction_1.id = "J1";
-    junction_1.coordinate_wgs84.latitude_deg = 18.210000;
-    junction_1.coordinate_wgs84.longitude_deg = 11.981415;
+    junction_1.coordinate_wgs84.latitude_deg = 11.98119;
+    junction_1.coordinate_wgs84.longitude_deg = 18.19200;
     junction_1.elevation_m = 45.0;
     HydraulicNodeJunctionDemand junction_1_demand;
     junction_1_demand.base_demand_m3_per_h = 5.4;
@@ -124,8 +124,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicNodeJunction junction_2;
     junction_2.uuid = QUuid::createUuid();
     junction_2.id = "J2";
-    junction_2.coordinate_wgs84.latitude_deg = 18.211782;
-    junction_2.coordinate_wgs84.longitude_deg = 11.979287;
+    junction_2.coordinate_wgs84.latitude_deg = 11.98200;
+    junction_2.coordinate_wgs84.longitude_deg = 18.19320;
     junction_2.elevation_m = 50.0;
     HydraulicNodeJunctionDemand junction_2_demand;
     junction_2_demand.base_demand_m3_per_h = 7.2;
@@ -134,8 +134,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicNodeJunction junction_3;
     junction_3.uuid = QUuid::createUuid();
     junction_3.id = "J3";
-    junction_3.coordinate_wgs84.latitude_deg = 18.212408;
-    junction_3.coordinate_wgs84.longitude_deg = 11.983543;
+    junction_3.coordinate_wgs84.latitude_deg = 11.98038;
+    junction_3.coordinate_wgs84.longitude_deg = 18.19320;
     junction_3.elevation_m = 60.0;
     HydraulicNodeJunctionDemand junction_3_demand;
     junction_3_demand.base_demand_m3_per_h = 3.6;
@@ -144,8 +144,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicNodeJunction junction_4;
     junction_4.uuid = QUuid::createUuid();
     junction_4.id = "J4";
-    junction_4.coordinate_wgs84.latitude_deg = 18.215372;
-    junction_4.coordinate_wgs84.longitude_deg = 11.979051;
+    junction_4.coordinate_wgs84.latitude_deg = 11.98200;
+    junction_4.coordinate_wgs84.longitude_deg = 18.19500;
     junction_4.elevation_m = 35.0;
     HydraulicNodeJunctionDemand junction_4_demand;
     junction_4_demand.base_demand_m3_per_h = 5.4;
@@ -154,8 +154,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicNodeJunction junction_5;
     junction_5.uuid = QUuid::createUuid();
     junction_5.id = "J5";
-    junction_5.coordinate_wgs84.latitude_deg = 18.215776;
-    junction_5.coordinate_wgs84.longitude_deg = 11.983779;
+    junction_5.coordinate_wgs84.latitude_deg = 11.98038;
+    junction_5.coordinate_wgs84.longitude_deg = 18.19500;
     junction_5.elevation_m = 55.0;
     HydraulicNodeJunctionDemand junction_5_demand;
     junction_5_demand.base_demand_m3_per_h = 3.6;
@@ -175,8 +175,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicNodeTank tank_1;
     tank_1.uuid = QUuid::createUuid();
     tank_1.id = "T1";
-    tank_1.coordinate_wgs84.latitude_deg = 18.211782;
-    tank_1.coordinate_wgs84.longitude_deg = 11.978531;
+    tank_1.coordinate_wgs84.latitude_deg = 11.98280;
+    tank_1.coordinate_wgs84.longitude_deg = 18.19320;
     
     tank_1.bottom_elevation_m = 58.0;
     
@@ -204,8 +204,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicNodeTank tank_2;
     tank_2.uuid = QUuid::createUuid();
     tank_2.id = "T2";
-    tank_2.coordinate_wgs84.latitude_deg = 18.212408;
-    tank_2.coordinate_wgs84.longitude_deg = 11.984488;
+    tank_2.coordinate_wgs84.latitude_deg = 11.97958;
+    tank_2.coordinate_wgs84.longitude_deg = 18.19320;
     
     tank_2.bottom_elevation_m = 68.0;
     
@@ -242,8 +242,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicNodeTank tank_3;
     tank_3.uuid = QUuid::createUuid();
     tank_3.id = "T3";
-    tank_3.coordinate_wgs84.latitude_deg = 18.215372;
-    tank_3.coordinate_wgs84.longitude_deg = 11.977916;
+    tank_3.coordinate_wgs84.latitude_deg = 11.98280;
+    tank_3.coordinate_wgs84.longitude_deg = 18.19500;
     
     tank_3.bottom_elevation_m = 45.0;
     
@@ -305,8 +305,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     HydraulicNodeTank tank_4;
     tank_4.uuid = QUuid::createUuid();
     tank_4.id = "T4";
-    tank_4.coordinate_wgs84.latitude_deg = 18.215776;
-    tank_4.coordinate_wgs84.longitude_deg = 11.984630;
+    tank_4.coordinate_wgs84.latitude_deg = 11.97958;
+    tank_4.coordinate_wgs84.longitude_deg = 18.19500;
     
     tank_4.bottom_elevation_m = 70.0;
     
