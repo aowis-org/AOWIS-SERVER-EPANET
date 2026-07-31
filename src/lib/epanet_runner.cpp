@@ -54,6 +54,10 @@ EpanetResultInp EpanetRunner::retrieveInp(const NetworkHydraulic &request) const
     if (!status.success)
         return finishInp(std::move(result), status, report_collector);
 
+    status = project.configureReport(request);
+    if (!status.success)
+        return finishInp(std::move(result), status, report_collector);
+
     status = project.retrieveInpText(result.inp_text);
     return finishInp(std::move(result), status, report_collector);
 }
