@@ -38,6 +38,7 @@ The adapter initializes every native EPANET project with `EN_CMH` and explicitly
 - Simulation time values: `s`.
 - Pump power and demand charge basis: `kw`.
 - Pump efficiency: `percent`.
+- Junction emitter coefficient: `m3_per_h_per_m_exponent`.
 
 No m³/h-to-L/s conversion is performed by this adapter. `HydraulicSolverOptions` does not expose selectable native flow or pressure units; conversion to presentation or interchange units belongs outside the hydraulic solver.
 
@@ -47,7 +48,6 @@ Pipe roughness is selected according to `headloss_formula`: `roughness_hw` for H
 
 The following model fields do not fully satisfy the canonical, self-describing unit contract:
 
-- `emitter_coefficient_lps_per_m_exponent` is explicitly based on L/s, while the fixed backend flow unit is m³/h. It requires a quantity-aware conversion or, preferably, a canonical model representation coupled to its exponent.
 - `leak_area_mm2_per_100m` uses EPANET's per-100-metre convention rather than the canonical AOWIS `mm2_per_m` representation. Pipe leakage is not currently written to EPANET.
 - Generic valve and control `setting` values are context-dependent and do not carry a single unit in their names. They require discriminated quantity-specific representations before complete valve and control support can be unit-safe.
 

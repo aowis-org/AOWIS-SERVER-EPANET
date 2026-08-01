@@ -77,7 +77,7 @@ HydraulicSimulationStatus validateSupportedFeatures(const NetworkHydraulic &requ
 
     for (const HydraulicNodeJunction &junction : request.nodes_junctions)
     {
-        if (junction.emitter_coefficient_lps_per_m_exponent != 0.0)
+        if (junction.emitter_coefficient_m3_per_h_per_m_exponent != 0.0)
             details.append(QStringLiteral("Junction emitter coefficient is unsupported: %1").arg(junction.id));
     }
 
