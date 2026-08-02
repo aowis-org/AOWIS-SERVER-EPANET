@@ -391,8 +391,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeReservoir(const Hydraulic
     if (error != 0)
         return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setnodevalue(EN_ELEVATION)"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to set reservoir head"));
 
-    if (!reservoir.head_pattern_uuid.isNull())
+    if (reservoir.head_pattern_mode == HydraulicTimePatternMode::TimePattern)
     {
+        if (reservoir.head_pattern_uuid.isNull())
+            return makeEpanetStatus(HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Reservoir head pattern mode is TimePattern, but no pattern UUID is set"));
+
         int pattern_index = 0;
         if (!resolveBackendIndex(this->indices.patterns_time, reservoir.head_pattern_uuid, pattern_index))
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Could not resolve reservoir head pattern UUID"));
