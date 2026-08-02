@@ -3,6 +3,7 @@
 #include "internal/epanet_hydraulic_solver.h"
 #include "internal/epanet_index_registry.h"
 #include "internal/epanet_network_builder.h"
+#include "internal/epanet_network_preparer.h"
 #include "internal/epanet_project.h"
 #include "internal/epanet_report_collector.h"
 #include "internal/epanet_result_reader.h"
@@ -28,18 +29,22 @@ EpanetResultRun finishRun(EpanetResultRun result, const HydraulicSimulationStatu
     return result;
 }
 
-HydraulicSimulationStatus prepareProject(const NetworkHydraulic &request, EpanetProject &project, EpanetReportCollector &report_collector, EpanetIndexRegistry &indices)
+HydraulicSimulationStatus prepareProject(const NetworkHydraulic &request, NetworkHydraulic &prepared_request, EpanetProject &project, EpanetReportCollector &report_collector, EpanetIndexRegistry &indices)
 {
-    HydraulicSimulationStatus status = project.create();
+    HydraulicSimulationStatus status = prepareEpanetNetwork(request, prepared_request);
     if (!status.success)
         return status;
 
-    status = project.initialize(request, report_collector);
+    status = project.create();
+    if (!status.success)
+        return status;
+
+    status = project.initialize(prepared_request, report_collector);
     if (!status.success)
         return status;
 
     EpanetNetworkBuilder network_builder(project, indices);
-    return network_builder.build(request);
+    return network_builder.build(prepared_request);
 }
 }
 
@@ -49,12 +54,13 @@ EpanetResultInp EpanetRunner::retrieveInp(const NetworkHydraulic &request) const
     EpanetReportCollector report_collector;
     EpanetProject project;
     EpanetIndexRegistry indices;
+    NetworkHydraulic prepared_request;
 
-    HydraulicSimulationStatus status = prepareProject(request, project, report_collector, indices);
+    HydraulicSimulationStatus status = prepareProject(request, prepared_request, project, report_collector, indices);
     if (!status.success)
         return finishInp(std::move(result), status, report_collector);
 
-    status = project.configureReport(request);
+    status = project.configureReport(prepared_request);
     if (!status.success)
         return finishInp(std::move(result), status, report_collector);
 
@@ -70,13 +76,14 @@ EpanetResultRun EpanetRunner::run(const NetworkHydraulic &request) const
     EpanetReportCollector report_collector;
     EpanetProject project;
     EpanetIndexRegistry indices;
+    NetworkHydraulic prepared_request;
 
-    HydraulicSimulationStatus status = prepareProject(request, project, report_collector, indices);
+    HydraulicSimulationStatus status = prepareProject(request, prepared_request, project, report_collector, indices);
     if (!status.success)
         return finishRun(std::move(result), status, report_collector);
 
-    EpanetResultReader result_reader(project, request, indices);
-    EpanetHydraulicSolver hydraulic_solver(project, request, result_reader);
+    EpanetResultReader result_reader(project, prepared_request, indices);
+    EpanetHydraulicSolver hydraulic_solver(project, prepared_request, result_reader);
     status = hydraulic_solver.run(result.result_timeline);
     if (!status.success)
         return finishRun(std::move(result), status, report_collector);

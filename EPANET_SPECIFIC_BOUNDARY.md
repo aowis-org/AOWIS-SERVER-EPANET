@@ -51,4 +51,8 @@ The following model fields do not fully satisfy the canonical, self-describing u
 - `leak_area_mm2_per_100m` uses EPANET's per-100-metre convention rather than the canonical AOWIS `mm2_per_m` representation. Pipe leakage is not currently written to EPANET.
 - Generic valve and control `setting` values are context-dependent and do not carry a single unit in their names. They require discriminated quantity-specific representations before complete valve and control support can be unit-safe.
 
-Emitter, FAVAD leakage, pump, valve, and control inputs are currently outside the implemented builder path. Networks containing these physical inputs are rejected explicitly instead of being simulated with omitted components. Pipe roughness results are exposed through `roughness_hw`, `roughness_dw_mm`, or `roughness_cm`, according to the selected headloss formula.
+FAVAD leakage, pump, valve, and control inputs are currently outside the implemented builder path. Networks containing enabled instances of these physical inputs are rejected explicitly instead of being simulated with omitted components. Junction emitters are written directly to EPANET using the canonical m³/h and meter-head backend units. Pipe roughness results are exposed through `roughness_hw`, `roughness_dw_mm`, or `roughness_cm`, according to the selected headloss formula.
+
+## Enabled-state preparation
+
+Before an EPANET project is created, the adapter builds a simulation snapshot containing only enabled nodes, links, simple controls, and rules. Disabled entities remain in the editable AOWIS model but are omitted from the backend project and from simulation results. An enabled link that references a disabled or unknown node is rejected explicitly. Selected report lists are reduced by disabled entities while unresolved non-disabled UUIDs still produce an error.

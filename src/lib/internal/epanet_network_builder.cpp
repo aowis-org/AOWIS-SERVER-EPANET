@@ -56,16 +56,6 @@ HydraulicSimulationStatus validateSupportedFeatures(const NetworkHydraulic &requ
 {
     QStringList details;
 
-    if (!request.curves_pump_head.isEmpty())
-        details.append(QStringLiteral("Pump head curves: %1").arg(request.curves_pump_head.size()));
-    if (!request.curves_pump_efficiency.isEmpty())
-        details.append(QStringLiteral("Pump efficiency curves: %1").arg(request.curves_pump_efficiency.size()));
-    if (!request.curves_valve_headloss.isEmpty())
-        details.append(QStringLiteral("Valve headloss curves: %1").arg(request.curves_valve_headloss.size()));
-    if (!request.curves_valve_characteristic.isEmpty())
-        details.append(QStringLiteral("Valve characteristic curves: %1").arg(request.curves_valve_characteristic.size()));
-    if (!request.curves_generic.isEmpty())
-        details.append(QStringLiteral("Generic curves: %1").arg(request.curves_generic.size()));
     if (!request.links_pumps.isEmpty())
         details.append(QStringLiteral("Pumps: %1").arg(request.links_pumps.size()));
     if (!request.links_valves.isEmpty())
@@ -74,12 +64,6 @@ HydraulicSimulationStatus validateSupportedFeatures(const NetworkHydraulic &requ
         details.append(QStringLiteral("Simple controls: %1").arg(request.controls_simple.size()));
     if (!request.controls_rules.isEmpty())
         details.append(QStringLiteral("Rule-based controls: %1").arg(request.controls_rules.size()));
-
-    for (const HydraulicNodeJunction &junction : request.nodes_junctions)
-    {
-        if (junction.emitter_coefficient_m3_per_h_per_m_exponent != 0.0)
-            details.append(QStringLiteral("Junction emitter coefficient is unsupported: %1").arg(junction.id));
-    }
 
     for (const HydraulicLinkPipe &pipe : request.links_pipes)
     {
@@ -460,6 +444,14 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
                 return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddDemand, QStringLiteral("EN_adddemand"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to add junction demand category"));
         }
     }
+
+    error = EN_setnodevalue(
+        this->project.handle(),
+        junction_index,
+        EN_EMITTER,
+        junction.emitter_coefficient_m3_per_h_per_m_exponent);
+    if (error != 0)
+        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setnodevalue(EN_EMITTER)"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to set junction emitter coefficient"));
 
     error = EN_setcoord(this->project.handle(), junction_index, junction.coordinate_wgs84.longitude_deg, junction.coordinate_wgs84.latitude_deg);
     if (error != 0)
