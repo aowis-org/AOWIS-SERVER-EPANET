@@ -25,12 +25,24 @@ double EpanetResolvers::resolveNodeTankDiameter(const HydraulicNodeTank &tank)
         return qSqrt(4.0 * tank.cross_section_area_m2 / M_PI);
     case HydraulicNodeTankGeometryInputType::VolumeAtMaximumLevel:
     {
-        const double usable_height_m = tank.water_level_maximum_m - tank.water_level_minimum_m;
-        const double usable_volume_m3 = tank.volume_at_maximum_level_m3 - tank.minimum_volume_m3;
-        if (usable_height_m <= 0.0 || usable_volume_m3 <= 0.0)
+        double reference_height_m = 0.0;
+        double reference_volume_m3 = 0.0;
+        if (tank.minimum_volume_m3 > 0.0)
+        {
+            reference_height_m = tank.water_level_maximum_m - tank.water_level_minimum_m;
+            reference_volume_m3 =
+                tank.volume_at_maximum_level_m3 - tank.minimum_volume_m3;
+        }
+        else if (tank.minimum_volume_m3 == 0.0)
+        {
+            reference_height_m = tank.water_level_maximum_m;
+            reference_volume_m3 = tank.volume_at_maximum_level_m3;
+        }
+
+        if (reference_height_m <= 0.0 || reference_volume_m3 <= 0.0)
             return 0.0;
 
-        return qSqrt(4.0 * (usable_volume_m3 / usable_height_m) / M_PI);
+        return qSqrt(4.0 * (reference_volume_m3 / reference_height_m) / M_PI);
     }
     case HydraulicNodeTankGeometryInputType::VolumeCurve:
         return 0.0;
