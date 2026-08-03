@@ -3,6 +3,7 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/epanet_runner.cpp
     src/lib/epanet_simulation_manager.cpp
     src/lib/dummy/dummy_networks.cpp
+    src/lib/dummy/dummy_marburg_network_generator.cpp
     src/lib/utility/hydraulic_simulation_result_printer.cpp
     src/lib/utility/hydraulic_simulation_status_printer.cpp
     src/lib/internal/epanet_hydraulic_solver.cpp
@@ -22,6 +23,7 @@ set(AOWIS_SERVER_EPANET_PUBLIC_HEADERS
     include/aowis/epanet/epanet_result_run.h
     include/aowis/epanet/epanet_runner.h
     include/aowis/epanet/epanet_simulation_manager.h
+    include/aowis/epanet/dummy/dummy_marburg_network_generator.h
     include/aowis/epanet/dummy/dummy_networks.h
     include/aowis/epanet/utility/hydraulic_simulation_result_printer.h
     include/aowis/epanet/utility/hydraulic_simulation_status_printer.h
