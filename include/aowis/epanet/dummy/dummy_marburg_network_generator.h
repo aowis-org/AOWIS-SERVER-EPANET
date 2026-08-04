@@ -1,15 +1,9 @@
 #ifndef DUMMY_MARBURG_NETWORK_GENERATOR_H
 #define DUMMY_MARBURG_NETWORK_GENERATOR_H
 
-#include <QtGlobal>
+#include <aowis/epanet/dummy/random_hydraulic_network_generator.h>
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
-
-class DummyMarburgNetworkGenerator
-{
-public:
-    static NetworkHydraulic generate();
-    static NetworkHydraulic generate(quint64 seed);
-};
+// Compatibility alias for code using the original Marburg-specific class name.
+using DummyMarburgNetworkGenerator = RandomHydraulicNetworkGenerator;
 
 #endif // DUMMY_MARBURG_NETWORK_GENERATOR_H
