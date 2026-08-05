@@ -516,14 +516,20 @@ double blendAngles(double from_rad, double to_rad, double amount)
     return normalizeAngle(from_rad + normalizeAngle(to_rad - from_rad) * amount);
 }
 
-double nearestStreetAxis(double angle_rad, double primary_axis_rad)
+double nearestDirectionalAxis(double angle_rad, double primary_axis_rad, double secondary_axis_rad)
 {
-    double nearest_axis_rad = primary_axis_rad;
-    double nearest_difference_rad = std::numeric_limits<double>::max();
+    const std::array<double, 4> axes = {
+        primary_axis_rad,
+        primary_axis_rad + pi,
+        secondary_axis_rad,
+        secondary_axis_rad + pi
+    };
 
-    for (int axis_index = -4; axis_index <= 4; axis_index++)
+    double nearest_axis_rad = axes[0];
+    double nearest_difference_rad = std::numeric_limits<double>::max();
+    for (int axis_index = 0; axis_index < static_cast<int>(axes.size()); axis_index++)
     {
-        const double axis_rad = primary_axis_rad + static_cast<double>(axis_index) * pi / 2.0;
+        const double axis_rad = axes.at(static_cast<std::size_t>(axis_index));
         const double difference_rad = std::abs(normalizeAngle(angle_rad - axis_rad));
         if (difference_rad < nearest_difference_rad)
         {
@@ -533,6 +539,27 @@ double nearestStreetAxis(double angle_rad, double primary_axis_rad)
     }
 
     return normalizeAngle(nearest_axis_rad);
+}
+
+double directionalFieldAngle(double angle_rad, double primary_axis_rad, double secondary_axis_rad, double x_m, double y_m, const DistrictDefinition &district, double phase_rad, double alignment_amount)
+{
+    const double local_x_m = x_m - district.center_x_m;
+    const double local_y_m = y_m - district.center_y_m;
+    const double drift_rad = 0.18 * std::sin(local_x_m / 780.0 + phase_rad) + 0.14 * std::cos(local_y_m / 960.0 - phase_rad);
+    const double nearest_axis_rad = nearestDirectionalAxis(angle_rad, primary_axis_rad + drift_rad, secondary_axis_rad - 0.65 * drift_rad);
+    return blendAngles(angle_rad, nearest_axis_rad, alignment_amount);
+}
+
+double randomDirectionalAxis(double primary_axis_rad, double secondary_axis_rad, std::mt19937_64 &generator)
+{
+    const int axis_index = randomInt(generator, 0, 3);
+    if (axis_index == 0)
+        return primary_axis_rad;
+    if (axis_index == 1)
+        return primary_axis_rad + pi;
+    if (axis_index == 2)
+        return secondary_axis_rad;
+    return secondary_axis_rad + pi;
 }
 
 double minimumDistanceSquaredToDistrict(const QVector<GeneratedJunction> &junctions, const QVector<int> &district_indices, double x_m, double y_m)
@@ -559,6 +586,9 @@ void appendHybridDistrictJunctions(QVector<GeneratedJunction> &junctions, QVecto
 
     const double primary_axis_rad = (district.sigma_y_m >= district.sigma_x_m ? pi / 2.0 : 0.0)
         + 0.18 * std::sin((district.center_x_m + district.center_y_m) / 2400.0);
+    const double secondary_axis_offset_rad = randomReal(generator, 0.56, 1.16) * (randomChance(generator, 0.5) ? -1.0 : 1.0);
+    const double secondary_axis_rad = primary_axis_rad + secondary_axis_offset_rad;
+    const double directional_phase_rad = randomReal(generator, -pi, pi);
     const double extent_x_m = std::max(450.0, district.sigma_x_m * district_spread_factor * 2.25);
     const double extent_y_m = std::max(450.0, district.sigma_y_m * district_spread_factor * 2.25);
     const double average_extent_m = 0.5 * (extent_x_m + extent_y_m);
@@ -566,14 +596,20 @@ void appendHybridDistrictJunctions(QVector<GeneratedJunction> &junctions, QVecto
     QVector<GrowthBranch> branches;
     branches.reserve(target_count / 2);
 
-    for (int root_index = 0; root_index < 4; root_index++)
+    const int root_count = randomInt(generator, 2, 3);
+    for (int root_index = 0; root_index < root_count; root_index++)
     {
         GrowthBranch root;
         root.parent_index = gateway_index;
         root.x_m = gateway_x_m;
         root.y_m = gateway_y_m;
-        root.angle_rad = primary_axis_rad + static_cast<double>(root_index) * pi / 2.0 + randomNormal(generator, 0.0, 0.10);
-        root.length_m = randomReal(generator, 0.62, 0.92) * average_extent_m;
+        if (root_index == 0)
+            root.angle_rad = primary_axis_rad + randomNormal(generator, 0.0, 0.14);
+        else if (root_index == 1)
+            root.angle_rad = primary_axis_rad + pi + randomNormal(generator, 0.0, 0.18);
+        else
+            root.angle_rad = secondary_axis_rad + (randomChance(generator, 0.5) ? 0.0 : pi) + randomNormal(generator, 0.0, 0.16);
+        root.length_m = randomReal(generator, 0.58, 0.96) * average_extent_m;
         root.depth = 0;
         root.demand_factor = district.demand_factor;
         branches.append(root);
@@ -592,7 +628,7 @@ void appendHybridDistrictJunctions(QVector<GeneratedJunction> &junctions, QVecto
             continuation.parent_index = anchor_index;
             continuation.x_m = anchor.x_m;
             continuation.y_m = anchor.y_m;
-            continuation.angle_rad = primary_axis_rad + static_cast<double>(randomInt(generator, 0, 3)) * pi / 2.0 + randomNormal(generator, 0.0, 0.18);
+            continuation.angle_rad = randomDirectionalAxis(primary_axis_rad, secondary_axis_rad, generator) + randomNormal(generator, 0.0, 0.24);
             continuation.length_m = randomReal(generator, 280.0, 620.0);
             continuation.depth = 5;
             continuation.demand_factor = district.demand_factor * randomReal(generator, 0.72, 1.00);
@@ -611,8 +647,8 @@ void appendHybridDistrictJunctions(QVector<GeneratedJunction> &junctions, QVecto
 
         for (int segment_index = 0; segment_index < segment_count && district_indices.length() < target_count; segment_index++)
         {
-            angle_rad += randomNormal(generator, 0.0, 0.075);
-            angle_rad = blendAngles(angle_rad, nearestStreetAxis(angle_rad, primary_axis_rad), randomReal(generator, 0.42, 0.72));
+            angle_rad += randomNormal(generator, 0.0, 0.11);
+            angle_rad = directionalFieldAngle(angle_rad, primary_axis_rad, secondary_axis_rad, x_m, y_m, district, directional_phase_rad, randomReal(generator, 0.22, 0.52));
 
             const double segment_length_m = clamp(base_segment_length_m * randomReal(generator, 0.80, 1.22), 55.0, 220.0);
             const double minimum_x_m = district.center_x_m - extent_x_m;
@@ -638,8 +674,9 @@ void appendHybridDistrictJunctions(QVector<GeneratedJunction> &junctions, QVecto
                 if (minimumDistanceSquaredToDistrict(junctions, district_indices, candidate_x_m, candidate_y_m) >= 32.0 * 32.0)
                     break;
 
-                const double turn_rad = placement_attempt % 2 == 0 ? pi / 2.0 : -pi / 2.0;
-                angle_rad = nearestStreetAxis(angle_rad + turn_rad + randomNormal(generator, 0.0, 0.12), primary_axis_rad);
+                const double turn_direction = placement_attempt % 2 == 0 ? 1.0 : -1.0;
+                const double turn_rad = turn_direction * randomReal(generator, 0.44, 1.08);
+                angle_rad = directionalFieldAngle(angle_rad + turn_rad + randomNormal(generator, 0.0, 0.16), primary_axis_rad, secondary_axis_rad, candidate_x_m, candidate_y_m, district, directional_phase_rad, randomReal(generator, 0.14, 0.34));
             }
 
             const double depth_factor = clamp(1.12 - 0.065 * static_cast<double>(branch.depth), 0.58, 1.12);
@@ -656,9 +693,9 @@ void appendHybridDistrictJunctions(QVector<GeneratedJunction> &junctions, QVecto
         if (district_indices.length() >= target_count || branch.depth >= 8)
             continue;
 
-        const int child_count = branch.depth < 3 && randomChance(generator, 0.24) ? 3 : 2;
-        const double spread_rad = randomReal(generator, 0.38, 0.70);
-        const double child_length_m = branch.length_m * randomReal(generator, 0.62, 0.76);
+        const int child_count = branch.depth < 3 && randomChance(generator, 0.16) ? 3 : 2;
+        const int continuation_child_index = randomInt(generator, 0, child_count - 1);
+        const double child_length_m = branch.length_m * randomReal(generator, 0.60, 0.78);
 
         for (int child_index = 0; child_index < child_count; child_index++)
         {
@@ -666,20 +703,22 @@ void appendHybridDistrictJunctions(QVector<GeneratedJunction> &junctions, QVecto
             child.parent_index = parent_index;
             child.x_m = x_m;
             child.y_m = y_m;
-            child.length_m = std::max(180.0, child_length_m * randomReal(generator, 0.86, 1.14));
+            child.length_m = std::max(180.0, child_length_m * randomReal(generator, 0.84, 1.16));
             child.depth = branch.depth + 1;
             child.demand_factor = branch.demand_factor * randomReal(generator, 0.88, 1.08);
 
-            if (child_count == 2)
-                child.angle_rad = angle_rad + (child_index == 0 ? -spread_rad : spread_rad) + randomNormal(generator, 0.0, 0.10);
-            else if (child_index == 0)
-                child.angle_rad = angle_rad - spread_rad + randomNormal(generator, 0.0, 0.08);
-            else if (child_index == 1)
-                child.angle_rad = angle_rad + randomNormal(generator, 0.0, 0.08);
+            if (child_index == continuation_child_index)
+            {
+                child.angle_rad = angle_rad + randomNormal(generator, 0.0, 0.19);
+            }
             else
-                child.angle_rad = angle_rad + spread_rad + randomNormal(generator, 0.0, 0.08);
+            {
+                const double side_direction = randomChance(generator, 0.5) ? -1.0 : 1.0;
+                const double side_turn_rad = randomReal(generator, 0.34, 0.98);
+                child.angle_rad = angle_rad + side_direction * side_turn_rad + randomNormal(generator, 0.0, 0.14);
+            }
 
-            child.angle_rad = blendAngles(child.angle_rad, nearestStreetAxis(child.angle_rad, primary_axis_rad), 0.48);
+            child.angle_rad = directionalFieldAngle(child.angle_rad, primary_axis_rad, secondary_axis_rad, x_m, y_m, district, directional_phase_rad, randomReal(generator, 0.18, 0.42));
             branches.append(child);
         }
     }
