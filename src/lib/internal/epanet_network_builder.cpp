@@ -517,6 +517,24 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPipe(const HydraulicLinkP
     if (error != 0)
         return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::AddLink, QStringLiteral("EN_addlink"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to add pipe"));
 
+    if (!pipe.vertices.isEmpty())
+    {
+        QList<double> vertex_x_coordinates;
+        QList<double> vertex_y_coordinates;
+        vertex_x_coordinates.reserve(pipe.vertices.size());
+        vertex_y_coordinates.reserve(pipe.vertices.size());
+
+        for (const HydraulicLinkVertex &vertex : pipe.vertices)
+        {
+            vertex_x_coordinates.append(vertex.coordinate_wgs84.longitude_deg);
+            vertex_y_coordinates.append(vertex.coordinate_wgs84.latitude_deg);
+        }
+
+        error = EN_setvertices(this->project.handle(), pipe_index, vertex_x_coordinates.data(), vertex_y_coordinates.data(), static_cast<int>(pipe.vertices.size()));
+        if (error != 0)
+            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setvertices"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to set pipe vertices"));
+    }
+
     const double length_m = pipe.length_measured_m.value_or(pipe.length_calculated_m);
     double roughness_for_selected_formula = 0.0;
     if (!resolvePipeRoughness(pipe, headloss_formula, roughness_for_selected_formula))
