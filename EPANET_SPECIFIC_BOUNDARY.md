@@ -38,6 +38,11 @@ The adapter initializes every native EPANET project with `EN_CMH` and explicitly
 - Simulation time values: `s`.
 - Pump power and demand charge basis: `kw`.
 - Pump efficiency: `percent`.
+- Pump and valve curves use the canonical units encoded by their point fields.
+- PRV, PSV, and PBV settings: pressure head in `m`.
+- FCV settings: `m3_per_h`.
+- TCV settings: dimensionless loss coefficient.
+- PCV settings: `percent` open.
 - Junction emitter coefficient: `m3_per_h_per_m_exponent`.
 
 No m³/h-to-L/s conversion is performed by this adapter. `HydraulicSolverOptions` does not expose selectable native flow or pressure units; conversion to presentation or interchange units belongs outside the hydraulic solver.
@@ -49,9 +54,11 @@ Pipe roughness is selected according to `headloss_formula`: `roughness_hw` for H
 The following model fields do not fully satisfy the canonical, self-describing unit contract:
 
 - `leak_area_mm2_per_100m` uses EPANET's per-100-metre convention rather than the canonical AOWIS `mm2_per_m` representation. Pipe leakage is not currently written to EPANET.
-- Generic valve and control `setting` values are context-dependent and do not carry a single unit in their names. They require discriminated quantity-specific representations before complete valve and control support can be unit-safe.
+- Generic control `setting` values are context-dependent and do not carry a single unit in their names. They require discriminated quantity-specific representations before complete control support can be unit-safe.
 
-FAVAD leakage, pump, valve, and control inputs are currently outside the implemented builder path. Networks containing enabled instances of these physical inputs are rejected explicitly instead of being simulated with omitted components. Junction emitters are written directly to EPANET using the canonical m³/h and meter-head backend units. Pipe roughness results are exposed through `roughness_hw`, `roughness_dw_mm`, or `roughness_cm`, according to the selected headloss formula.
+Pumps and all seven EPANET 2.3 valve types are implemented, including their curves, patterns, energy inputs, geometry, hydraulic results, states, and pump energy summaries. EPANET has no pump-specific numeric constant-efficiency field, so the adapter represents that model option with a private one-point efficiency curve. EPANET also treats a pump-specific energy price of zero as inheritance from the global price; the adapter rejects that unrepresentable override explicitly.
+
+FAVAD leakage and control inputs remain outside the implemented builder path. Networks containing enabled instances of these physical inputs are rejected explicitly instead of being simulated with omitted components. Junction emitters are written directly to EPANET using the canonical m³/h and meter-head backend units. Pipe roughness results are exposed through `roughness_hw`, `roughness_dw_mm`, or `roughness_cm`, according to the selected headloss formula.
 
 ## Enabled-state preparation
 

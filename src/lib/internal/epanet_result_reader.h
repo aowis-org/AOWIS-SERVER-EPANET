@@ -20,6 +20,8 @@ private:
     HydraulicSimulationStatus readNodesReservoirs(HydraulicSimulationResult &result) const;
     HydraulicSimulationStatus readNodesTanks(HydraulicSimulationResult &result) const;
     HydraulicSimulationStatus readLinksPipes(HydraulicSimulationResult &result) const;
+    HydraulicSimulationStatus readLinksPumps(HydraulicSimulationResult &result) const;
+    HydraulicSimulationStatus readLinksValves(HydraulicSimulationResult &result) const;
 
     const EpanetProject &project;
     const NetworkHydraulic &network;

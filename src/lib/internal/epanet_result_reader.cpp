@@ -46,6 +46,27 @@ bool assignPipeRoughness(HydraulicSimulationResultLinkPipe &result, HydraulicHea
 
     return false;
 }
+
+bool resolvePumpState(double backend_state, HydraulicSimulationPumpState &state)
+{
+    switch (static_cast<int>(backend_state))
+    {
+    case EN_PUMP_XHEAD:
+        state = HydraulicSimulationPumpState::CannotSupplyHead;
+        return true;
+    case EN_PUMP_CLOSED:
+        state = HydraulicSimulationPumpState::Closed;
+        return true;
+    case EN_PUMP_OPEN:
+        state = HydraulicSimulationPumpState::Open;
+        return true;
+    case EN_PUMP_XFLOW:
+        state = HydraulicSimulationPumpState::CannotSupplyFlow;
+        return true;
+    }
+
+    return false;
+}
 }
 
 EpanetResultReader::EpanetResultReader(const EpanetProject &project, const NetworkHydraulic &network, const EpanetIndexRegistry &indices)
@@ -77,6 +98,20 @@ HydraulicSimulationStatus EpanetResultReader::read(HydraulicSimulationResult &re
     }
 
     status = readLinksPipes(result);
+    if (!status.success)
+    {
+        result.status = status;
+        return status;
+    }
+
+    status = readLinksPumps(result);
+    if (!status.success)
+    {
+        result.status = status;
+        return status;
+    }
+
+    status = readLinksValves(result);
     result.status = status;
     return status;
 }
@@ -265,6 +300,118 @@ HydraulicSimulationStatus EpanetResultReader::readLinksPipes(HydraulicSimulation
         pipe_result.appears_in_control = appears_in_control != 0.0;
 
         result.links_pipes.append(pipe_result);
+    }
+
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus EpanetResultReader::readLinksPumps(HydraulicSimulationResult &result) const
+{
+    for (const HydraulicLinkPump &pump : this->network.links_pumps)
+    {
+        const int pump_index = this->indices.links_pumps.value(pump.uuid, 0);
+        if (pump_index == 0)
+            return makeEpanetStatus(HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Pump index is missing from the EPANET registry"));
+
+        HydraulicSimulationResultLinkPump pump_result;
+        pump_result.id = pump.id;
+        pump_result.uuid = pump.uuid;
+
+        HydraulicSimulationStatus status = readLinkValue(this->project, pump_index, EN_FLOW, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Flow, QStringLiteral("Failed to get pump flow"), pump_result.flow_m3_per_h);
+        if (!status.success)
+            return status;
+        status = readLinkValue(this->project, pump_index, EN_VELOCITY, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Velocity, QStringLiteral("Failed to get pump velocity"), pump_result.velocity_m_per_s);
+        if (!status.success)
+            return status;
+
+        double signed_head_loss_m = 0.0;
+        status = readLinkValue(this->project, pump_index, EN_HEADLOSS, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Headloss, QStringLiteral("Failed to get pump head gain"), signed_head_loss_m);
+        if (!status.success)
+            return status;
+        pump_result.head_gain_m = -signed_head_loss_m;
+
+        double backend_status = 0.0;
+        status = readLinkValue(this->project, pump_index, EN_STATUS, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Status, QStringLiteral("Failed to get pump status"), backend_status);
+        if (!status.success)
+            return status;
+        pump_result.open = static_cast<int>(backend_status) != EN_CLOSED;
+
+        double backend_state = 0.0;
+        status = readLinkValue(this->project, pump_index, EN_PUMP_STATE, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Status, QStringLiteral("Failed to get pump operating state"), backend_state);
+        if (!status.success)
+            return status;
+        if (!resolvePumpState(backend_state, pump_result.state))
+            return makeEpanetStatus(HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusOperation::ReadLinkResult, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("EPANET returned an unknown pump operating state"));
+
+        status = readLinkValue(this->project, pump_index, EN_SETTING, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Setting, QStringLiteral("Failed to get pump speed"), pump_result.speed);
+        if (!status.success)
+            return status;
+        status = readLinkValue(this->project, pump_index, EN_PUMP_EFFIC, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Efficiency, QStringLiteral("Failed to get pump efficiency"), pump_result.efficiency_percent);
+        if (!status.success)
+            return status;
+        pump_result.efficiency_percent *= 100.0;
+        status = readLinkValue(this->project, pump_index, EN_ENERGY, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Energy, QStringLiteral("Failed to get pump power"), pump_result.power_kw);
+        if (!status.success)
+            return status;
+        status = readLinkValue(this->project, pump_index, EN_LINKQUAL, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Quality, QStringLiteral("Failed to get pump quality"), pump_result.quality);
+        if (!status.success)
+            return status;
+
+        double appears_in_control = 0.0;
+        status = readLinkValue(this->project, pump_index, EN_LINK_INCONTROL, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::None, QStringLiteral("Failed to read pump control membership"), appears_in_control);
+        if (!status.success)
+            return status;
+        pump_result.appears_in_control = appears_in_control != 0.0;
+
+        result.links_pumps.append(pump_result);
+    }
+
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus EpanetResultReader::readLinksValves(HydraulicSimulationResult &result) const
+{
+    for (const HydraulicLinkValve &valve : this->network.links_valves)
+    {
+        const int valve_index = this->indices.links_valves.value(valve.uuid, 0);
+        if (valve_index == 0)
+            return makeEpanetStatus(HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Valve index is missing from the EPANET registry"));
+
+        HydraulicSimulationResultLinkValve valve_result;
+        valve_result.id = valve.id;
+        valve_result.uuid = valve.uuid;
+
+        HydraulicSimulationStatus status = readLinkValue(this->project, valve_index, EN_FLOW, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::Flow, QStringLiteral("Failed to get valve flow"), valve_result.flow_m3_per_h);
+        if (!status.success)
+            return status;
+        status = readLinkValue(this->project, valve_index, EN_VELOCITY, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::Velocity, QStringLiteral("Failed to get valve velocity"), valve_result.velocity_m_per_s);
+        if (!status.success)
+            return status;
+        status = readLinkValue(this->project, valve_index, EN_HEADLOSS, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::Headloss, QStringLiteral("Failed to get valve head loss"), valve_result.head_loss_m);
+        if (!status.success)
+            return status;
+
+        double backend_status = 0.0;
+        status = readLinkValue(this->project, valve_index, EN_STATUS, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::Status, QStringLiteral("Failed to get valve status"), backend_status);
+        if (!status.success)
+            return status;
+        valve_result.open = static_cast<int>(backend_status) != EN_CLOSED;
+        valve_result.active = static_cast<int>(backend_status) > EN_OPEN;
+
+        status = readLinkValue(this->project, valve_index, EN_SETTING, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::Setting, QStringLiteral("Failed to get valve setting"), valve_result.setting);
+        if (!status.success)
+            return status;
+        status = readLinkValue(this->project, valve_index, EN_LINKQUAL, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::Quality, QStringLiteral("Failed to get valve quality"), valve_result.quality);
+        if (!status.success)
+            return status;
+
+        double appears_in_control = 0.0;
+        status = readLinkValue(this->project, valve_index, EN_LINK_INCONTROL, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::None, QStringLiteral("Failed to read valve control membership"), appears_in_control);
+        if (!status.success)
+            return status;
+        valve_result.appears_in_control = appears_in_control != 0.0;
+
+        result.links_valves.append(valve_result);
     }
 
     return makeEpanetSuccess();
