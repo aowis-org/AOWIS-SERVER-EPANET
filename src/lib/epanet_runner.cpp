@@ -36,11 +36,14 @@ HydraulicSimulationDiagnostic diagnosticFromStatus(const HydraulicSimulationStat
 
 bool diagnosticsEquivalent(const HydraulicSimulationDiagnostic &left, const HydraulicSimulationDiagnostic &right)
 {
-    return left.severity == right.severity
+    return left.stage == right.stage
+        && left.operation == right.operation
         && left.entity.uuid == right.entity.uuid
         && left.entity.type == right.entity.type
         && left.backend_error_code == right.backend_error_code
+        && left.backend_operation == right.backend_operation
         && left.message == right.message
+        && left.details == right.details
         && left.message_backend == right.message_backend;
 }
 
