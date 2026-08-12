@@ -29,6 +29,15 @@ HydraulicSimulationStatus readLinkValue(const EpanetProject &project, int link_i
     return status;
 }
 
+HydraulicSimulationStatus readStatistic(const EpanetProject &project, int backend_statistic, const QString &message, double &value)
+{
+    const int error = EN_getstatistic(project.handle(), backend_statistic, &value);
+    if (error == 0)
+        return makeEpanetSuccess();
+
+    return makeEpanetError(project, error, HydraulicSimulationStatusStage::ReadStatistics, HydraulicSimulationStatusOperation::ReadStatistic, QStringLiteral("EN_getstatistic"), HydraulicSimulationStatusEntityType::Result, QString(), message);
+}
+
 bool assignPipeRoughness(HydraulicSimulationResultLinkPipe &result, HydraulicHeadlossFormula headloss_formula, double roughness_backend_value)
 {
     switch (headloss_formula)
@@ -112,6 +121,13 @@ HydraulicSimulationStatus EpanetResultReader::read(HydraulicSimulationResult &re
     }
 
     status = readLinksValves(result);
+    if (!status.success)
+    {
+        result.status = status;
+        return status;
+    }
+
+    status = readStatistics(result);
     result.status = status;
     return status;
 }
@@ -413,6 +429,47 @@ HydraulicSimulationStatus EpanetResultReader::readLinksValves(HydraulicSimulatio
 
         result.links_valves.append(valve_result);
     }
+
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus EpanetResultReader::readStatistics(HydraulicSimulationResult &result) const
+{
+    double hydraulic_iterations = 0.0;
+    HydraulicSimulationStatus status = readStatistic(this->project, EN_ITERATIONS, QStringLiteral("Failed to get hydraulic iteration count"), hydraulic_iterations);
+    if (!status.success)
+        return status;
+    result.statistics.hydraulic_iterations = static_cast<qint64>(hydraulic_iterations);
+
+    status = readStatistic(this->project, EN_RELATIVEERROR, QStringLiteral("Failed to get hydraulic relative error"), result.statistics.relative_error);
+    if (!status.success)
+        return status;
+
+    status = readStatistic(this->project, EN_MAXHEADERROR, QStringLiteral("Failed to get maximum hydraulic head error"), result.statistics.maximum_head_error_m);
+    if (!status.success)
+        return status;
+
+    status = readStatistic(this->project, EN_MAXFLOWCHANGE, QStringLiteral("Failed to get maximum hydraulic flow change"), result.statistics.maximum_flow_change_m3_per_h);
+    if (!status.success)
+        return status;
+
+    status = readStatistic(this->project, EN_MASSBALANCE, QStringLiteral("Failed to get water-quality mass balance ratio"), result.statistics.quality_mass_balance_ratio);
+    if (!status.success)
+        return status;
+
+    double deficient_nodes = 0.0;
+    status = readStatistic(this->project, EN_DEFICIENTNODES, QStringLiteral("Failed to get pressure-deficient node count"), deficient_nodes);
+    if (!status.success)
+        return status;
+    result.statistics.deficient_nodes = static_cast<qint64>(deficient_nodes);
+
+    status = readStatistic(this->project, EN_DEMANDREDUCTION, QStringLiteral("Failed to get demand reduction percentage"), result.statistics.demand_reduction_percent);
+    if (!status.success)
+        return status;
+
+    status = readStatistic(this->project, EN_LEAKAGELOSS, QStringLiteral("Failed to get leakage loss percentage"), result.statistics.leakage_loss_percent);
+    if (!status.success)
+        return status;
 
     return makeEpanetSuccess();
 }
