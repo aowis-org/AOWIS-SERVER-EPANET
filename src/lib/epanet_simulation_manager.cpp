@@ -53,7 +53,10 @@ QUuid EpanetSimulationManager::submit(const NetworkHydraulic &request)
             if (run_result.result_timeline.status.success)
                 emit signalSimulationFinished(simulation_id, std::move(run_result.result_timeline), std::move(run_result.report_lines));
             else
-                emit signalSimulationFailed(simulation_id, std::move(run_result.result_timeline.status), std::move(run_result.report_lines));
+            {
+                emit signalSimulationFailed(simulation_id, run_result.result_timeline.status, run_result.report_lines);
+                emit signalSimulationFailedWithResults(simulation_id, std::move(run_result.result_timeline), std::move(run_result.report_lines));
+            }
         }, Qt::QueuedConnection);
     });
 

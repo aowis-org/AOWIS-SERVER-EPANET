@@ -28,6 +28,7 @@ signals:
     void signalSimulationStarted(QUuid simulation_id);
     void signalSimulationFinished(QUuid simulation_id, HydraulicSimulationResultTimeline result_timeline, QStringList report_lines);
     void signalSimulationFailed(QUuid simulation_id, HydraulicSimulationStatus status, QStringList report_lines);
+    void signalSimulationFailedWithResults(QUuid simulation_id, HydraulicSimulationResultTimeline result_timeline, QStringList report_lines);
 
 private:
     QThreadPool thread_pool;

@@ -58,6 +58,52 @@ void appendDiagnosticIfUnique(QList<HydraulicSimulationDiagnostic> &diagnostics,
     diagnostics.append(diagnostic);
 }
 
+bool diagnosticInvalidatesResults(const HydraulicSimulationDiagnostic &diagnostic)
+{
+    if (diagnostic.severity != HydraulicSimulationDiagnosticSeverity::Error
+        && diagnostic.severity != HydraulicSimulationDiagnosticSeverity::Fatal)
+    {
+        return false;
+    }
+
+    switch (diagnostic.stage)
+    {
+    case HydraulicSimulationStatusStage::CloseHydraulics:
+    case HydraulicSimulationStatusStage::CloseQuality:
+    case HydraulicSimulationStatusStage::SaveHydraulics:
+    case HydraulicSimulationStatusStage::GenerateReport:
+    case HydraulicSimulationStatusStage::Cleanup:
+        return false;
+    default:
+        return true;
+    }
+}
+
+void finalizeResultValidity(HydraulicSimulationResultTimeline &timeline)
+{
+    bool has_invalidating_diagnostic = false;
+    for (const HydraulicSimulationDiagnostic &diagnostic : timeline.diagnostics)
+    {
+        if (diagnosticInvalidatesResults(diagnostic))
+        {
+            has_invalidating_diagnostic = true;
+            break;
+        }
+    }
+
+    if (has_invalidating_diagnostic)
+    {
+        timeline.validity = timeline.results.isEmpty()
+            ? HydraulicSimulationResultValidity::Invalid
+            : HydraulicSimulationResultValidity::Partial;
+        return;
+    }
+
+    timeline.validity = timeline.results.isEmpty()
+        ? HydraulicSimulationResultValidity::Invalid
+        : HydraulicSimulationResultValidity::Valid;
+}
+
 void appendReportDiagnostics(QList<HydraulicSimulationDiagnostic> &diagnostics, const QStringList &report_lines)
 {
     for (const QString &line : report_lines)
@@ -103,6 +149,7 @@ EpanetResultRun finishRun(EpanetResultRun result, const HydraulicSimulationStatu
         appendDiagnosticIfUnique(result.result_timeline.diagnostics, diagnosticFromStatus(status));
 
     appendReportDiagnostics(result.result_timeline.diagnostics, result.report_lines);
+    finalizeResultValidity(result.result_timeline);
     return result;
 }
 

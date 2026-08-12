@@ -34,12 +34,31 @@ QString HydraulicSimulationResultPrinter::toString(const HydraulicSimulationResu
     return output;
 }
 
+namespace
+{
+QString resultValidityText(HydraulicSimulationResultValidity validity)
+{
+    switch (validity)
+    {
+    case HydraulicSimulationResultValidity::Valid:
+        return QStringLiteral("Valid");
+    case HydraulicSimulationResultValidity::Partial:
+        return QStringLiteral("Partial");
+    case HydraulicSimulationResultValidity::Invalid:
+        return QStringLiteral("Invalid");
+    }
+
+    return QStringLiteral("Invalid");
+}
+}
+
 QString HydraulicSimulationResultPrinter::toString(const HydraulicSimulationResultTimeline &timeline)
 {
     QString output;
     QTextStream stream(&output);
     stream << "==================================================\n";
     stream << "SIMULATION RESULT TIMELINE\n";
+    stream << "Validity: " << resultValidityText(timeline.validity) << '\n';
     if (timeline.simulation_start_utc.isValid())
         stream << "Start UTC: " << timeline.simulation_start_utc.toString(Qt::ISODate) << '\n';
     stream << "Results: " << timeline.results.size() << '\n';
