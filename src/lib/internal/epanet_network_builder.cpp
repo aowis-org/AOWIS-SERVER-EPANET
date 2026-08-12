@@ -81,6 +81,34 @@ HydraulicSimulationStatus validateSupportedFeatures(const NetworkHydraulic &requ
     return status;
 }
 
+
+HydraulicSimulationDiagnostic diagnosticFromBuildStatus(const HydraulicSimulationStatus &status)
+{
+    HydraulicSimulationDiagnostic diagnostic;
+    diagnostic.severity = HydraulicSimulationDiagnosticSeverity::Error;
+    diagnostic.stage = status.stage;
+    diagnostic.operation = status.operation;
+    diagnostic.property = status.property;
+    diagnostic.entity = status.entity;
+    diagnostic.message = status.message;
+    diagnostic.details = status.details;
+    diagnostic.backend_name = status.backend_name;
+    diagnostic.backend_error_code = status.backend_error_code;
+    diagnostic.backend_operation = status.backend_operation;
+    diagnostic.message_backend = status.message_backend;
+    return diagnostic;
+}
+
+void collectBuildFailure(EpanetProject &project, const HydraulicSimulationStatus &status, HydraulicSimulationStatus &first_failure)
+{
+    if (status.success)
+        return;
+
+    project.appendDiagnostic(diagnosticFromBuildStatus(status));
+    if (first_failure.success)
+        first_failure = status;
+}
+
 bool resolvePipeRoughness(const HydraulicLinkPipe &pipe, HydraulicHeadlossFormula headloss_formula, double &roughness)
 {
     switch (headloss_formula)
@@ -147,7 +175,11 @@ HydraulicSimulationStatus setLinkVertices(EpanetProject &project, int link_index
 
     const int error = EN_setvertices(project.handle(), link_index, x_coordinates.data(), y_coordinates.data(), static_cast<int>(vertices.size()));
     if (error != 0)
-        return makeEpanetError(project, error, stage, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setvertices"), entity_type, entity_id, entity_uuid, QStringLiteral("Failed to set %1 vertices").arg(entity_name));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(project, error, stage, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setvertices"), entity_type, entity_id, entity_uuid, QStringLiteral("Failed to set %1 vertices").arg(entity_name));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     return makeEpanetSuccess();
 }
@@ -157,29 +189,43 @@ HydraulicSimulationStatus addCurveData(EpanetProject &project, const QString &cu
     const QByteArray curve_id = curve_id_string.toUtf8();
     int error = EN_addcurve(project.handle(), curve_id.constData());
     if (error != 0)
-        return makeEpanetError(project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::AddCurve, QStringLiteral("EN_addcurve"), HydraulicSimulationStatusEntityType::Curve, curve_id_string, curve_uuid, QStringLiteral("Failed to add %1").arg(curve_name));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::AddCurve, QStringLiteral("EN_addcurve"), HydraulicSimulationStatusEntityType::Curve, curve_id_string, curve_uuid, QStringLiteral("Failed to add %1").arg(curve_name));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     int curve_index = 0;
     error = EN_getcurveindex(project.handle(), curve_id.constData(), &curve_index);
     if (error != 0)
-        return makeEpanetError(project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::ResolveEntity, QStringLiteral("EN_getcurveindex"), HydraulicSimulationStatusEntityType::Curve, curve_id_string, curve_uuid, QStringLiteral("Failed to get %1 index").arg(curve_name));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::ResolveEntity, QStringLiteral("EN_getcurveindex"), HydraulicSimulationStatusEntityType::Curve, curve_id_string, curve_uuid, QStringLiteral("Failed to get %1 index").arg(curve_name));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     QList<double> writable_x_values = x_values;
     QList<double> writable_y_values = y_values;
     error = EN_setcurve(project.handle(), curve_index, writable_x_values.data(), writable_y_values.data(), static_cast<int>(writable_x_values.size()));
     if (error != 0)
     {
-        HydraulicSimulationStatus status = makeEpanetError(project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::AddCurve, QStringLiteral("EN_setcurve"), HydraulicSimulationStatusEntityType::Curve, curve_id_string, curve_uuid, QStringLiteral("Failed to set %1 data").arg(curve_name));
-        status.entity.index = curve_index;
-        return status;
+        HydraulicSimulationStatus status = processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::AddCurve, QStringLiteral("EN_setcurve"), HydraulicSimulationStatusEntityType::Curve, curve_id_string, curve_uuid, QStringLiteral("Failed to set %1 data").arg(curve_name));
+        if (!status.success)
+        {
+            status.entity.index = curve_index;
+            return status;
+        }
     }
 
     error = EN_setcurvetype(project.handle(), curve_index, backend_curve_type);
     if (error != 0)
     {
-        HydraulicSimulationStatus status = makeEpanetError(project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setcurvetype"), HydraulicSimulationStatusEntityType::Curve, curve_id_string, curve_uuid, QStringLiteral("Failed to set %1 type").arg(curve_name));
-        status.entity.index = curve_index;
-        return status;
+        HydraulicSimulationStatus status = processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setcurvetype"), HydraulicSimulationStatusEntityType::Curve, curve_id_string, curve_uuid, QStringLiteral("Failed to set %1 type").arg(curve_name));
+        if (!status.success)
+        {
+            status.entity.index = curve_index;
+            return status;
+        }
     }
 
     indices.insert(curve_uuid, curve_index);
@@ -190,6 +236,7 @@ template<typename Entity>
 HydraulicSimulationStatus rebuildNodeIndices(EpanetProject &project, const QList<Entity> &entities, QHash<QUuid, int> &indices, HydraulicSimulationStatusStage stage, HydraulicSimulationStatusEntityType entity_type, const QString &entity_name)
 {
     indices.clear();
+    HydraulicSimulationStatus first_failure = makeEpanetSuccess();
 
     for (const Entity &entity : entities)
     {
@@ -197,18 +244,26 @@ HydraulicSimulationStatus rebuildNodeIndices(EpanetProject &project, const QList
         int entity_index = 0;
         const int error = EN_getnodeindex(project.handle(), entity_id.constData(), &entity_index);
         if (error != 0)
-            return makeEpanetError(project, error, stage, HydraulicSimulationStatusOperation::ResolveEntity, QStringLiteral("EN_getnodeindex"), entity_type, entity.id, entity.uuid, QStringLiteral("Failed to rebuild %1 index after EPANET node reindexing").arg(entity_name));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(project, error, stage, HydraulicSimulationStatusOperation::ResolveEntity, QStringLiteral("EN_getnodeindex"), entity_type, entity.id, entity.uuid, QStringLiteral("Failed to rebuild %1 index after EPANET node reindexing").arg(entity_name));
+            if (!epanet_status.success)
+            {
+                collectBuildFailure(project, epanet_status, first_failure);
+                continue;
+            }
+        }
 
         indices.insert(entity.uuid, entity_index);
     }
 
-    return makeEpanetSuccess();
+    return first_failure;
 }
 
 template<typename Entity>
 HydraulicSimulationStatus rebuildLinkIndices(EpanetProject &project, const QList<Entity> &entities, QHash<QUuid, int> &indices, HydraulicSimulationStatusStage stage, HydraulicSimulationStatusEntityType entity_type, const QString &entity_name)
 {
     indices.clear();
+    HydraulicSimulationStatus first_failure = makeEpanetSuccess();
 
     for (const Entity &entity : entities)
     {
@@ -216,12 +271,19 @@ HydraulicSimulationStatus rebuildLinkIndices(EpanetProject &project, const QList
         int entity_index = 0;
         const int error = EN_getlinkindex(project.handle(), entity_id.constData(), &entity_index);
         if (error != 0)
-            return makeEpanetError(project, error, stage, HydraulicSimulationStatusOperation::ResolveEntity, QStringLiteral("EN_getlinkindex"), entity_type, entity.id, entity.uuid, QStringLiteral("Failed to rebuild %1 index after EPANET link reindexing").arg(entity_name));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(project, error, stage, HydraulicSimulationStatusOperation::ResolveEntity, QStringLiteral("EN_getlinkindex"), entity_type, entity.id, entity.uuid, QStringLiteral("Failed to rebuild %1 index after EPANET link reindexing").arg(entity_name));
+            if (!epanet_status.success)
+            {
+                collectBuildFailure(project, epanet_status, first_failure);
+                continue;
+            }
+        }
 
         indices.insert(entity.uuid, entity_index);
     }
 
-    return makeEpanetSuccess();
+    return first_failure;
 }
 }
 
@@ -232,9 +294,9 @@ EpanetNetworkBuilder::EpanetNetworkBuilder(EpanetProject &project, EpanetIndexRe
 
 HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulic &request)
 {
+    HydraulicSimulationStatus first_failure = makeEpanetSuccess();
     HydraulicSimulationStatus status = validateSupportedFeatures(request);
-    if (!status.success)
-        return status;
+    collectBuildFailure(this->project, status, first_failure);
 
     this->node_ids_by_uuid.clear();
     this->pattern_ids_by_uuid.clear();
@@ -264,136 +326,117 @@ HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulic &re
     for (const HydraulicNodeJunction &junction : request.nodes_junctions)
     {
         status = registerBackendId(this->node_ids_by_uuid, junction.uuid, junction.id, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusEntityType::Junction, QStringLiteral("Junction"));
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicNodeReservoir &reservoir : request.nodes_reservoirs)
     {
         status = registerBackendId(this->node_ids_by_uuid, reservoir.uuid, reservoir.id, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusEntityType::Reservoir, QStringLiteral("Reservoir"));
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicNodeTank &tank : request.nodes_tanks)
     {
         status = registerBackendId(this->node_ids_by_uuid, tank.uuid, tank.id, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusEntityType::Tank, QStringLiteral("Tank"));
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicPatternTime &pattern : request.patterns_time)
     {
         status = registerBackendId(this->pattern_ids_by_uuid, pattern.uuid, pattern.id, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusEntityType::Pattern, QStringLiteral("Time pattern"));
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicCurveTankVolume &curve : request.curves_tank_volume)
     {
         status = registerBackendId(this->tank_volume_curve_ids_by_uuid, curve.uuid, curve.id, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusEntityType::Curve, QStringLiteral("Tank volume curve"));
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicCurvePumpHead &curve : request.curves_pump_head)
     {
         status = registerBackendId(this->pump_head_curve_ids_by_uuid, curve.uuid, curve.id, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusEntityType::Curve, QStringLiteral("Pump head curve"));
-        if (!status.success)
-            return status;
-        this->pump_head_curve_point_counts_by_uuid.insert(curve.uuid, static_cast<int>(curve.points.size()));
+        collectBuildFailure(this->project, status, first_failure);
+        if (status.success)
+            this->pump_head_curve_point_counts_by_uuid.insert(curve.uuid, static_cast<int>(curve.points.size()));
     }
 
     for (const HydraulicCurvePumpEfficiency &curve : request.curves_pump_efficiency)
     {
         status = registerBackendId(this->pump_efficiency_curve_ids_by_uuid, curve.uuid, curve.id, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusEntityType::Curve, QStringLiteral("Pump efficiency curve"));
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicCurveValveHeadloss &curve : request.curves_valve_headloss)
     {
         status = registerBackendId(this->valve_headloss_curve_ids_by_uuid, curve.uuid, curve.id, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusEntityType::Curve, QStringLiteral("Valve head-loss curve"));
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicCurveValveCharacteristic &curve : request.curves_valve_characteristic)
     {
         status = registerBackendId(this->valve_characteristic_curve_ids_by_uuid, curve.uuid, curve.id, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusEntityType::Curve, QStringLiteral("Valve characteristic curve"));
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicLinkPipe &pipe : request.links_pipes)
     {
         status = registerBackendId(this->pipe_ids_by_uuid, pipe.uuid, pipe.id, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusEntityType::Pipe, QStringLiteral("Pipe"));
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicLinkPump &pump : request.links_pumps)
     {
         status = registerBackendId(this->pump_ids_by_uuid, pump.uuid, pump.id, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusEntityType::Pump, QStringLiteral("Pump"));
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicLinkValve &valve : request.links_valves)
     {
         status = registerBackendId(this->valve_ids_by_uuid, valve.uuid, valve.id, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusEntityType::Valve, QStringLiteral("Valve"));
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicPatternTime &pattern : request.patterns_time)
     {
         status = addPatternTime(pattern);
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     status = configureDefaultDemandPattern(request);
-    if (!status.success)
-        return status;
+    collectBuildFailure(this->project, status, first_failure);
 
     status = configureGlobalEnergyPattern(request);
-    if (!status.success)
-        return status;
+    collectBuildFailure(this->project, status, first_failure);
 
     for (const HydraulicCurveTankVolume &curve : request.curves_tank_volume)
     {
         status = addCurveTankVolume(curve);
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicCurvePumpHead &curve : request.curves_pump_head)
     {
         status = addCurvePumpHead(curve);
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicCurvePumpEfficiency &curve : request.curves_pump_efficiency)
     {
         status = addCurvePumpEfficiency(curve);
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicCurveValveHeadloss &curve : request.curves_valve_headloss)
     {
         status = addCurveValveHeadloss(curve);
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicCurveValveCharacteristic &curve : request.curves_valve_characteristic)
     {
         status = addCurveValveCharacteristic(curve);
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     // EPANET keeps all junctions before tanks and reservoirs. Adding a junction after
@@ -401,54 +444,48 @@ HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulic &re
     for (const HydraulicNodeJunction &junction : request.nodes_junctions)
     {
         status = addNodeJunction(junction);
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicNodeReservoir &reservoir : request.nodes_reservoirs)
     {
         status = addNodeReservoir(reservoir);
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicNodeTank &tank : request.nodes_tanks)
     {
         status = addNodeTank(tank);
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     status = refreshNodeIndices(request);
-    if (!status.success)
-        return status;
+    if (!status.success && first_failure.success)
+        first_failure = status;
 
     for (const HydraulicLinkPipe &pipe : request.links_pipes)
     {
         status = addLinkPipe(pipe, request.options_hydraulic.headloss_formula);
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicLinkPump &pump : request.links_pumps)
     {
         status = addLinkPump(pump);
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     for (const HydraulicLinkValve &valve : request.links_valves)
     {
         status = addLinkValve(valve);
-        if (!status.success)
-            return status;
+        collectBuildFailure(this->project, status, first_failure);
     }
 
     status = refreshLinkIndices(request);
-    if (!status.success)
-        return status;
+    if (!status.success && first_failure.success)
+        first_failure = status;
 
-    return makeEpanetSuccess();
+    return first_failure;
 }
 
 HydraulicSimulationStatus EpanetNetworkBuilder::addPatternTime(const HydraulicPatternTime &pattern)
@@ -462,20 +499,31 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addPatternTime(const HydraulicPa
     const QByteArray pattern_id = pattern.id.toUtf8();
     int error = EN_addpattern(this->project.handle(), pattern_id.constData());
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::AddPattern, QStringLiteral("EN_addpattern"), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Failed to add time pattern"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::AddPattern, QStringLiteral("EN_addpattern"), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Failed to add time pattern"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     int pattern_index = 0;
     error = EN_getpatternindex(this->project.handle(), pattern_id.constData(), &pattern_index);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::ResolveEntity, QStringLiteral("EN_getpatternindex"), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Failed to get time pattern index"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::ResolveEntity, QStringLiteral("EN_getpatternindex"), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Failed to get time pattern index"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     QList<double> factors = pattern.factors;
     error = EN_setpattern(this->project.handle(), pattern_index, factors.data(), factors.length());
     if (error != 0)
     {
-        HydraulicSimulationStatus status = makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::AddPattern, QStringLiteral("EN_setpattern"), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Failed to set time pattern factors"));
-        status.entity.index = pattern_index;
-        return status;
+        HydraulicSimulationStatus status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::AddPattern, QStringLiteral("EN_setpattern"), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Failed to set time pattern factors"));
+        if (!status.success)
+        {
+            status.entity.index = pattern_index;
+            return status;
+        }
     }
 
     this->indices.patterns_time.insert(pattern.uuid, pattern_index);
@@ -494,7 +542,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::configureDefaultDemandPattern(co
 
     const int error = EN_setoption(this->project.handle(), EN_DEMANDPATTERN, static_cast<double>(pattern_index));
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setoption(EN_DEMANDPATTERN)"), HydraulicSimulationStatusEntityType::Pattern, this->pattern_ids_by_uuid.value(pattern_uuid), pattern_uuid, QStringLiteral("Failed to configure the default demand pattern"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setoption(EN_DEMANDPATTERN)"), HydraulicSimulationStatusEntityType::Pattern, this->pattern_ids_by_uuid.value(pattern_uuid), pattern_uuid, QStringLiteral("Failed to configure the default demand pattern"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     return makeEpanetSuccess();
 }
@@ -511,7 +563,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::configureGlobalEnergyPattern(con
 
     const int error = EN_setoption(this->project.handle(), EN_GLOBALPATTERN, static_cast<double>(pattern_index));
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setoption(EN_GLOBALPATTERN)"), HydraulicSimulationStatusEntityType::Pattern, this->pattern_ids_by_uuid.value(pattern_uuid), pattern_uuid, QStringLiteral("Failed to configure the global energy-price pattern"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setoption(EN_GLOBALPATTERN)"), HydraulicSimulationStatusEntityType::Pattern, this->pattern_ids_by_uuid.value(pattern_uuid), pattern_uuid, QStringLiteral("Failed to configure the global energy-price pattern"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     return makeEpanetSuccess();
 }
@@ -527,12 +583,20 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addCurveTankVolume(const Hydraul
     const QByteArray curve_id = curve.id.toUtf8();
     int error = EN_addcurve(this->project.handle(), curve_id.constData());
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::AddCurve, QStringLiteral("EN_addcurve"), HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("Failed to add tank volume curve"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::AddCurve, QStringLiteral("EN_addcurve"), HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("Failed to add tank volume curve"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     int curve_index = 0;
     error = EN_getcurveindex(this->project.handle(), curve_id.constData(), &curve_index);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::ResolveEntity, QStringLiteral("EN_getcurveindex"), HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("Failed to get tank volume curve index"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::ResolveEntity, QStringLiteral("EN_getcurveindex"), HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("Failed to get tank volume curve index"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     QList<double> levels_m;
     QList<double> volumes_m3;
@@ -558,9 +622,12 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addCurveTankVolume(const Hydraul
     error = EN_setcurve(this->project.handle(), curve_index, levels_m.data(), volumes_m3.data(), levels_m.length());
     if (error != 0)
     {
-        HydraulicSimulationStatus status = makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::AddCurve, QStringLiteral("EN_setcurve"), HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("Failed to set tank volume curve data"));
-        status.entity.index = curve_index;
-        return status;
+        HydraulicSimulationStatus status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::AddCurve, QStringLiteral("EN_setcurve"), HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("Failed to set tank volume curve data"));
+        if (!status.success)
+        {
+            status.entity.index = curve_index;
+            return status;
+        }
     }
 
     this->indices.curves_tank_volume.insert(curve.uuid, curve_index);
@@ -671,7 +738,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeReservoir(const Hydraulic
     int reservoir_index = 0;
     int error = EN_addnode(this->project.handle(), reservoir_id.constData(), EN_RESERVOIR, &reservoir_index);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_addnode"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to add reservoir"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_addnode"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to add reservoir"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     double reservoir_head_m = reservoir.head_m;
     if (reservoir.head_input_type == HydraulicNodeElevationInputType::TerrainElevationAndOffset)
@@ -679,7 +750,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeReservoir(const Hydraulic
 
     error = EN_setnodevalue(this->project.handle(), reservoir_index, EN_ELEVATION, reservoir_head_m);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setnodevalue(EN_ELEVATION)"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to set reservoir head"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setnodevalue(EN_ELEVATION)"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to set reservoir head"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     if (reservoir.head_pattern_mode == HydraulicTimePatternMode::TimePattern)
     {
@@ -692,12 +767,20 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeReservoir(const Hydraulic
 
         error = EN_setnodevalue(this->project.handle(), reservoir_index, EN_PATTERN, static_cast<double>(pattern_index));
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setnodevalue(EN_PATTERN)"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to set reservoir head pattern"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setnodevalue(EN_PATTERN)"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to set reservoir head pattern"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
 
     error = EN_setcoord(this->project.handle(), reservoir_index, reservoir.coordinate_wgs84.longitude_deg, reservoir.coordinate_wgs84.latitude_deg);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setcoord"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to set reservoir coordinates"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setcoord"), HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("Failed to set reservoir coordinates"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     this->indices.nodes_reservoirs.insert(reservoir.uuid, reservoir_index);
     return makeEpanetSuccess();
@@ -709,7 +792,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
     int junction_index = 0;
     int error = EN_addnode(this->project.handle(), junction_id.constData(), EN_JUNCTION, &junction_index);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_addnode"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to add junction"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_addnode"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to add junction"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     double elevation_m = junction.elevation_m;
     if (junction.elevation_input_type == HydraulicNodeElevationInputType::TerrainElevationAndOffset)
@@ -719,7 +806,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
     {
         error = EN_setjuncdata(this->project.handle(), junction_index, elevation_m, 0.0, "");
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_setjuncdata"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to set junction data"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_setjuncdata"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to set junction data"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
     else
     {
@@ -730,12 +821,20 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
 
         error = EN_setjuncdata(this->project.handle(), junction_index, elevation_m, first_demand.base_demand_m3_per_h, first_pattern_id.constData());
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_setjuncdata"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to set primary junction demand"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_setjuncdata"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to set primary junction demand"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
 
         const QByteArray first_demand_name = first_demand.category_name.isEmpty() ? QByteArrayLiteral("Demand 1") : first_demand.category_name.toUtf8();
         error = EN_setdemandname(this->project.handle(), junction_index, 1, first_demand_name.constData());
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddDemand, QStringLiteral("EN_setdemandname"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to name primary junction demand"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddDemand, QStringLiteral("EN_setdemandname"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to name primary junction demand"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
 
         for (int index = 1; index < junction.demands.length(); index++)
         {
@@ -747,7 +846,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
             const QByteArray demand_name = demand.category_name.isEmpty() ? QStringLiteral("Demand %1").arg(index + 1).toUtf8() : demand.category_name.toUtf8();
             error = EN_adddemand(this->project.handle(), junction_index, demand.base_demand_m3_per_h, pattern_id.constData(), demand_name.constData());
             if (error != 0)
-                return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddDemand, QStringLiteral("EN_adddemand"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to add junction demand category"));
+            {
+                const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddDemand, QStringLiteral("EN_adddemand"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to add junction demand category"));
+                if (!epanet_status.success)
+                    return epanet_status;
+            }
         }
     }
 
@@ -757,11 +860,19 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
         EN_EMITTER,
         junction.emitter_coefficient_m3_per_h_per_m_exponent);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setnodevalue(EN_EMITTER)"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to set junction emitter coefficient"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setnodevalue(EN_EMITTER)"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to set junction emitter coefficient"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     error = EN_setcoord(this->project.handle(), junction_index, junction.coordinate_wgs84.longitude_deg, junction.coordinate_wgs84.latitude_deg);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setcoord"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to set junction coordinates"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setcoord"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to set junction coordinates"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     this->indices.nodes_junctions.insert(junction.uuid, junction_index);
     return makeEpanetSuccess();
@@ -773,7 +884,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeTank(const HydraulicNodeT
     int tank_index = 0;
     int error = EN_addnode(this->project.handle(), tank_id.constData(), EN_TANK, &tank_index);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_addnode"), HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("Failed to add tank"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_addnode"), HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("Failed to add tank"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     const double bottom_elevation_m = EpanetResolvers::resolveNodeTankBottomElevation(tank);
     const double diameter_m = EpanetResolvers::resolveNodeTankDiameter(tank);
@@ -789,15 +904,27 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeTank(const HydraulicNodeT
 
     error = EN_settankdata(this->project.handle(), tank_index, bottom_elevation_m, tank.water_level_initial_m, tank.water_level_minimum_m, tank.water_level_maximum_m, diameter_m, tank.minimum_volume_m3, volume_curve_id.constData());
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_settankdata"), HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("Failed to set tank data"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusOperation::AddNode, QStringLiteral("EN_settankdata"), HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("Failed to set tank data"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     error = EN_setnodevalue(this->project.handle(), tank_index, EN_CANOVERFLOW, tank.can_overflow ? 1.0 : 0.0);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setnodevalue"), HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("Failed to set tank overflow option"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setnodevalue"), HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("Failed to set tank overflow option"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     error = EN_setcoord(this->project.handle(), tank_index, tank.coordinate_wgs84.longitude_deg, tank.coordinate_wgs84.latitude_deg);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setcoord"), HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("Failed to set tank coordinates"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setcoord"), HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("Failed to set tank coordinates"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     this->indices.nodes_tanks.insert(tank.uuid, tank_index);
     return makeEpanetSuccess();
@@ -821,7 +948,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPipe(const HydraulicLinkP
 
     int error = EN_addlink(this->project.handle(), pipe_id.constData(), pipe_type, node_id_from.constData(), node_id_to.constData(), &pipe_index);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::AddLink, QStringLiteral("EN_addlink"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to add pipe"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::AddLink, QStringLiteral("EN_addlink"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to add pipe"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     HydraulicSimulationStatus status = setLinkVertices(this->project, pipe_index, pipe.vertices, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("pipe"));
     if (!status.success)
@@ -834,14 +965,22 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPipe(const HydraulicLinkP
 
     error = EN_setpipedata(this->project.handle(), pipe_index, length_m, pipe.diameter_mm, roughness_for_selected_formula, pipe.minor_loss);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::AddLink, QStringLiteral("EN_setpipedata"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to set pipe data"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::AddLink, QStringLiteral("EN_setpipedata"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to set pipe data"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     if (pipe.initial_status != HydraulicLinkPipeInitialStatus::CheckValve)
     {
         const double initial_status = pipe.initial_status == HydraulicLinkPipeInitialStatus::Open ? EN_OPEN : EN_CLOSED;
         error = EN_setlinkvalue(this->project.handle(), pipe_index, EN_INITSTATUS, initial_status);
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to set pipe status"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to set pipe status"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
 
     this->indices.links_pipes.insert(pipe.uuid, pipe_index);
@@ -864,7 +1003,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPump(const HydraulicLinkP
     int pump_index = 0;
     int error = EN_addlink(this->project.handle(), pump_id.constData(), EN_PUMP, node_id_from.constData(), node_id_to.constData(), &pump_index);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::AddLink, QStringLiteral("EN_addlink"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to add pump"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::AddLink, QStringLiteral("EN_addlink"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to add pump"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     HydraulicSimulationStatus status = setLinkVertices(this->project, pump_index, pump.vertices, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("pump"));
     if (!status.success)
@@ -877,7 +1020,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPump(const HydraulicLinkP
 
         error = EN_setlinkvalue(this->project.handle(), pump_index, EN_PUMP_POWER, pump.constant_power_kw);
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PUMP_POWER)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump constant power"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PUMP_POWER)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump constant power"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
     else
     {
@@ -897,19 +1044,31 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPump(const HydraulicLinkP
         const int head_curve_index = this->indices.curves_pump_head.value(pump.head_curve_uuid, 0);
         error = EN_setlinkvalue(this->project.handle(), pump_index, EN_PUMP_HCURVE, static_cast<double>(head_curve_index));
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PUMP_HCURVE)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump head curve"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PUMP_HCURVE)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump head curve"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
 
     if (pump.initial_speed < 0.0)
         return makeEpanetStatus(HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Pump initial speed cannot be negative"));
     error = EN_setlinkvalue(this->project.handle(), pump_index, EN_INITSETTING, pump.initial_speed);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_INITSETTING)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump initial speed"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_INITSETTING)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump initial speed"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     const double initial_status = pump.initial_status == HydraulicLinkPumpInitialStatus::On ? EN_OPEN : EN_CLOSED;
     error = EN_setlinkvalue(this->project.handle(), pump_index, EN_INITSTATUS, initial_status);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_INITSTATUS)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump initial status"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_INITSTATUS)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump initial status"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     if (!pump.speed_pattern_uuid.isNull())
     {
@@ -918,7 +1077,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPump(const HydraulicLinkP
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Could not resolve pump speed pattern UUID"));
         error = EN_setlinkvalue(this->project.handle(), pump_index, EN_LINKPATTERN, static_cast<double>(speed_pattern_index));
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_LINKPATTERN)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump speed pattern"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_LINKPATTERN)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump speed pattern"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
 
     if (pump.efficiency_input_type == HydraulicLinkPumpEfficiencyInputType::Constant)
@@ -935,7 +1098,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPump(const HydraulicLinkP
             return status;
         error = EN_setlinkvalue(this->project.handle(), pump_index, EN_PUMP_ECURVE, static_cast<double>(synthetic_indices.value(pump.uuid)));
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PUMP_ECURVE)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump constant efficiency"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PUMP_ECURVE)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump constant efficiency"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
     else if (pump.efficiency_input_type == HydraulicLinkPumpEfficiencyInputType::Curve)
     {
@@ -944,7 +1111,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPump(const HydraulicLinkP
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Could not resolve pump efficiency curve UUID"));
         error = EN_setlinkvalue(this->project.handle(), pump_index, EN_PUMP_ECURVE, static_cast<double>(efficiency_curve_index));
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PUMP_ECURVE)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump efficiency curve"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PUMP_ECURVE)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump efficiency curve"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
 
     if (pump.energy_price_input_type != HydraulicLinkPumpEnergyPriceInputType::Global)
@@ -955,7 +1126,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPump(const HydraulicLinkP
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("EPANET cannot represent a pump-specific zero energy price; zero selects the global price"));
         error = EN_setlinkvalue(this->project.handle(), pump_index, EN_PUMP_ECOST, pump.energy_price_per_kw_h);
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PUMP_ECOST)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump energy price"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PUMP_ECOST)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump energy price"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
 
     if (pump.energy_price_input_type == HydraulicLinkPumpEnergyPriceInputType::Pattern)
@@ -965,7 +1140,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPump(const HydraulicLinkP
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Could not resolve pump energy-price pattern UUID"));
         error = EN_setlinkvalue(this->project.handle(), pump_index, EN_PUMP_EPAT, static_cast<double>(price_pattern_index));
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PUMP_EPAT)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump energy-price pattern"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PUMP_EPAT)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump energy-price pattern"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
 
     this->indices.links_pumps.insert(pump.uuid, pump_index);
@@ -991,7 +1170,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkValve(const HydraulicLink
     int valve_index = 0;
     int error = EN_addlink(this->project.handle(), valve_id.constData(), backend_type, node_id_from.constData(), node_id_to.constData(), &valve_index);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::AddLink, QStringLiteral("EN_addlink"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to add valve"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::AddLink, QStringLiteral("EN_addlink"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to add valve"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     HydraulicSimulationStatus status = setLinkVertices(this->project, valve_index, valve.vertices, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("valve"));
     if (!status.success)
@@ -999,10 +1182,18 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkValve(const HydraulicLink
 
     error = EN_setlinkvalue(this->project.handle(), valve_index, EN_DIAMETER, valve.diameter_mm);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setlinkvalue(EN_DIAMETER)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set valve diameter"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityGeometry, QStringLiteral("EN_setlinkvalue(EN_DIAMETER)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set valve diameter"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
     error = EN_setlinkvalue(this->project.handle(), valve_index, EN_MINORLOSS, valve.minor_loss);
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_MINORLOSS)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set valve minor-loss coefficient"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_MINORLOSS)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set valve minor-loss coefficient"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     if (valve.type == HydraulicLinkValveType::GPV)
     {
@@ -1011,7 +1202,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkValve(const HydraulicLink
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Could not resolve GPV head-loss curve UUID"));
         error = EN_setlinkvalue(this->project.handle(), valve_index, EN_GPV_CURVE, static_cast<double>(curve_index));
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_GPV_CURVE)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set GPV head-loss curve"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_GPV_CURVE)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set GPV head-loss curve"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
     else
     {
@@ -1019,7 +1214,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkValve(const HydraulicLink
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("PCV position must be in [0, 100] percent"));
         error = EN_setlinkvalue(this->project.handle(), valve_index, EN_INITSETTING, valve.setting);
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_INITSETTING)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set valve setting"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_INITSETTING)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set valve setting"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
 
         if (valve.type == HydraulicLinkValveType::PCV && !valve.setting_curve_uuid.isNull())
         {
@@ -1028,7 +1227,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkValve(const HydraulicLink
                 return makeEpanetStatus(HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Could not resolve PCV characteristic curve UUID"));
             error = EN_setlinkvalue(this->project.handle(), valve_index, EN_PCV_CURVE, static_cast<double>(curve_index));
             if (error != 0)
-                return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PCV_CURVE)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set PCV characteristic curve"));
+            {
+                const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_PCV_CURVE)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set PCV characteristic curve"));
+                if (!epanet_status.success)
+                    return epanet_status;
+            }
         }
     }
 
@@ -1037,7 +1240,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkValve(const HydraulicLink
         const double initial_status = valve.initial_status == HydraulicLinkValveInitialStatus::Open ? EN_OPEN : EN_CLOSED;
         error = EN_setlinkvalue(this->project.handle(), valve_index, EN_INITSTATUS, initial_status);
         if (error != 0)
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_INITSTATUS)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set valve initial status"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_INITSTATUS)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set valve initial status"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
 
     this->indices.links_valves.insert(valve.uuid, valve_index);
@@ -1046,24 +1253,36 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkValve(const HydraulicLink
 
 HydraulicSimulationStatus EpanetNetworkBuilder::refreshNodeIndices(const NetworkHydraulic &request)
 {
+    HydraulicSimulationStatus first_failure = makeEpanetSuccess();
     HydraulicSimulationStatus status = rebuildNodeIndices(this->project, request.nodes_junctions, this->indices.nodes_junctions, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusEntityType::Junction, QStringLiteral("junction"));
-    if (!status.success)
-        return status;
+    if (!status.success && first_failure.success)
+        first_failure = status;
 
     status = rebuildNodeIndices(this->project, request.nodes_reservoirs, this->indices.nodes_reservoirs, HydraulicSimulationStatusStage::AddReservoir, HydraulicSimulationStatusEntityType::Reservoir, QStringLiteral("reservoir"));
-    if (!status.success)
-        return status;
+    if (!status.success && first_failure.success)
+        first_failure = status;
 
-    return rebuildNodeIndices(this->project, request.nodes_tanks, this->indices.nodes_tanks, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusEntityType::Tank, QStringLiteral("tank"));
+    status = rebuildNodeIndices(this->project, request.nodes_tanks, this->indices.nodes_tanks, HydraulicSimulationStatusStage::AddTank, HydraulicSimulationStatusEntityType::Tank, QStringLiteral("tank"));
+    if (!status.success && first_failure.success)
+        first_failure = status;
+
+    return first_failure;
 }
 
 HydraulicSimulationStatus EpanetNetworkBuilder::refreshLinkIndices(const NetworkHydraulic &request)
 {
+    HydraulicSimulationStatus first_failure = makeEpanetSuccess();
     HydraulicSimulationStatus status = rebuildLinkIndices(this->project, request.links_pipes, this->indices.links_pipes, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusEntityType::Pipe, QStringLiteral("pipe"));
-    if (!status.success)
-        return status;
+    if (!status.success && first_failure.success)
+        first_failure = status;
+
     status = rebuildLinkIndices(this->project, request.links_pumps, this->indices.links_pumps, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusEntityType::Pump, QStringLiteral("pump"));
-    if (!status.success)
-        return status;
-    return rebuildLinkIndices(this->project, request.links_valves, this->indices.links_valves, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusEntityType::Valve, QStringLiteral("valve"));
+    if (!status.success && first_failure.success)
+        first_failure = status;
+
+    status = rebuildLinkIndices(this->project, request.links_valves, this->indices.links_valves, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusEntityType::Valve, QStringLiteral("valve"));
+    if (!status.success && first_failure.success)
+        first_failure = status;
+
+    return first_failure;
 }

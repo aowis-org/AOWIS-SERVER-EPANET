@@ -115,13 +115,23 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
 
     int error = EN_openH(this->project.handle());
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::OpenHydraulics, QStringLiteral("EN_openH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to open EPANET hydraulics"));
+    {
+        status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::OpenHydraulics, QStringLiteral("EN_openH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to open EPANET hydraulics"));
+        if (!status.success)
+            return status;
+    }
 
     error = EN_initH(this->project.handle(), EN_SAVE_AND_INIT);
     if (error != 0)
     {
-        EN_closeH(this->project.handle());
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::InitializeHydraulics, QStringLiteral("EN_initH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to initialize EPANET hydraulics"));
+        status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::InitializeHydraulics, QStringLiteral("EN_initH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to initialize EPANET hydraulics"));
+        if (!status.success)
+        {
+            const int close_error = EN_closeH(this->project.handle());
+            if (close_error != 0)
+                processEpanetReturnCode(this->project, close_error, HydraulicSimulationStatusStage::CloseHydraulics, HydraulicSimulationStatusOperation::CloseHydraulics, QStringLiteral("EN_closeH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to close EPANET hydraulics after initialization failure"));
+            return status;
+        }
     }
 
     long current_time_s = 0;
@@ -133,14 +143,27 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
         error = EN_runH(this->project.handle(), &current_time_s);
         if (error != 0)
         {
-            EN_closeH(this->project.handle());
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::RunHydraulics, QStringLiteral("EN_runH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to run EPANET hydraulics"));
+            status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::RunHydraulics, QStringLiteral("EN_runH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("EPANET hydraulic analysis returned a diagnostic"));
+            if (!status.success)
+            {
+                const int close_error = EN_closeH(this->project.handle());
+                if (close_error != 0)
+                    processEpanetReturnCode(this->project, close_error, HydraulicSimulationStatusStage::CloseHydraulics, HydraulicSimulationStatusOperation::CloseHydraulics, QStringLiteral("EN_closeH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to close EPANET hydraulics after run failure"));
+                return status;
+            }
         }
 
         if (current_time_s < 0)
         {
-            EN_closeH(this->project.handle());
-            return makeEpanetStatus(HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::RunHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("EPANET returned a negative elapsed simulation time"));
+            status = makeEpanetStatus(HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::RunHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("EPANET returned a negative elapsed simulation time"));
+            const int close_error = EN_closeH(this->project.handle());
+            if (close_error != 0)
+            {
+                const HydraulicSimulationStatus close_status = processEpanetReturnCode(this->project, close_error, HydraulicSimulationStatusStage::CloseHydraulics, HydraulicSimulationStatusOperation::CloseHydraulics, QStringLiteral("EN_closeH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to close EPANET hydraulics after invalid simulation time"));
+                if (!close_status.success)
+                    status.details << QStringLiteral("Additionally, EN_closeH failed with error code %1: %2").arg(close_error).arg(this->project.errorMessage(close_error));
+            }
+            return status;
         }
 
         HydraulicSimulationResult result;
@@ -150,7 +173,11 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
         {
             const int close_error = EN_closeH(this->project.handle());
             if (close_error != 0)
-                status.details << QStringLiteral("Additionally, EN_closeH failed with error code %1: %2").arg(close_error).arg(this->project.errorMessage(close_error));
+            {
+                const HydraulicSimulationStatus close_status = processEpanetReturnCode(this->project, close_error, HydraulicSimulationStatusStage::CloseHydraulics, HydraulicSimulationStatusOperation::CloseHydraulics, QStringLiteral("EN_closeH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to close EPANET hydraulics after result-read failure"));
+                if (!close_status.success)
+                    status.details << QStringLiteral("Additionally, EN_closeH failed with error code %1: %2").arg(close_error).arg(this->project.errorMessage(close_error));
+            }
             return status;
         }
 
@@ -158,8 +185,14 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
         error = EN_nextH(this->project.handle(), &next_step_s);
         if (error != 0)
         {
-            EN_closeH(this->project.handle());
-            return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::AdvanceHydraulics, QStringLiteral("EN_nextH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to advance EPANET hydraulics"));
+            status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::AdvanceHydraulics, QStringLiteral("EN_nextH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("EPANET hydraulic timestep advance returned a diagnostic"));
+            if (!status.success)
+            {
+                const int close_error = EN_closeH(this->project.handle());
+                if (close_error != 0)
+                    processEpanetReturnCode(this->project, close_error, HydraulicSimulationStatusStage::CloseHydraulics, HydraulicSimulationStatusOperation::CloseHydraulics, QStringLiteral("EN_closeH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to close EPANET hydraulics after timestep-advance failure"));
+                return status;
+            }
         }
 
         if (next_step_s > 0)
@@ -169,7 +202,11 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
 
     error = EN_closeH(this->project.handle());
     if (error != 0)
-        return makeEpanetError(this->project, error, HydraulicSimulationStatusStage::CloseHydraulics, HydraulicSimulationStatusOperation::CloseHydraulics, QStringLiteral("EN_closeH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to close EPANET hydraulics"));
+    {
+        status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::CloseHydraulics, HydraulicSimulationStatusOperation::CloseHydraulics, QStringLiteral("EN_closeH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to close EPANET hydraulics"));
+        if (!status.success)
+            return status;
+    }
 
     if (!timeline.results.isEmpty())
     {

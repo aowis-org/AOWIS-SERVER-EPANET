@@ -154,7 +154,11 @@ HydraulicSimulationStatus EpanetProject::create()
 
     const int error = EN_createproject(&this->project);
     if (error != 0)
-        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::CreateBackendContext, HydraulicSimulationStatusOperation::CreateBackendContext, QStringLiteral("EN_createproject"), HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("EPANET project creation failed"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::CreateBackendContext, HydraulicSimulationStatusOperation::CreateBackendContext, QStringLiteral("EN_createproject"), HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("EPANET project creation failed"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     return makeEpanetSuccess();
 }
@@ -163,11 +167,19 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
 {
     int error = EN_setreportcallbackuserdata(this->project, &report_collector);
     if (error != 0)
-        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreportcallbackuserdata"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to set EPANET report callback data"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreportcallbackuserdata"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to set EPANET report callback data"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     error = EN_setreportcallback(this->project, &EpanetReportCollector::callback);
     if (error != 0)
-        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreportcallback"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to set EPANET report callback"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreportcallback"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to set EPANET report callback"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     int backend_headloss_formula = 0;
     if (!resolveHeadlossFormula(request.options_hydraulic.headloss_formula, backend_headloss_formula))
@@ -177,31 +189,55 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
     // m3/h for flow, meters for length and head, and millimeters for pipe diameter.
     error = EN_init(this->project, "", "", EN_CMH, backend_headloss_formula);
     if (error != 0)
-        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::Initialize, QStringLiteral("EN_init"), HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("EPANET project initialization failed"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::Initialize, QStringLiteral("EN_init"), HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("EPANET project initialization failed"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     error = EN_setreportcallbackuserdata(this->project, &report_collector);
     if (error != 0)
-        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreportcallbackuserdata"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to restore EPANET report callback data"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreportcallbackuserdata"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to restore EPANET report callback data"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     error = EN_setreportcallback(this->project, &EpanetReportCollector::callback);
     if (error != 0)
-        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreportcallback"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to restore EPANET report callback"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreportcallback"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to restore EPANET report callback"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     error = EN_setoption(this->project, EN_PRESS_UNITS, static_cast<double>(EN_METERS));
     if (error != 0)
-        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setoption(EN_PRESS_UNITS)"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to configure EPANET pressure-head units as meters"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setoption(EN_PRESS_UNITS)"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to configure EPANET pressure-head units as meters"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     int configured_flow_unit = -1;
     error = EN_getflowunits(this->project, &configured_flow_unit);
     if (error != 0)
-        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_getflowunits"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to verify EPANET flow units"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_getflowunits"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to verify EPANET flow units"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
     if (configured_flow_unit != EN_CMH)
         return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("EPANET flow units do not match the required AOWIS m3/h backend contract"));
 
     double configured_pressure_unit = -1.0;
     error = EN_getoption(this->project, EN_PRESS_UNITS, &configured_pressure_unit);
     if (error != 0)
-        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_getoption(EN_PRESS_UNITS)"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to verify EPANET pressure-head units"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_getoption(EN_PRESS_UNITS)"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to verify EPANET pressure-head units"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
     if (static_cast<int>(configured_pressure_unit) != EN_METERS)
         return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("EPANET pressure units do not match the required AOWIS meter-head backend contract"));
 
@@ -231,7 +267,11 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
 
         error = EN_settimeparam(this->project, time_parameter.parameter, static_cast<long>(time_parameter.value));
         if (error != 0)
-            return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureTime, QStringLiteral("EN_settimeparam(%1)").arg(QString::fromLatin1(time_parameter.name)), HydraulicSimulationStatusEntityType::Network, request.id, request.uuid, QStringLiteral("Failed to configure an EPANET time parameter"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureTime, QStringLiteral("EN_settimeparam(%1)").arg(QString::fromLatin1(time_parameter.name)), HydraulicSimulationStatusEntityType::Network, request.id, request.uuid, QStringLiteral("Failed to configure an EPANET time parameter"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
 
     int backend_report_statistic = 0;
@@ -240,7 +280,11 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
 
     error = EN_settimeparam(this->project, EN_STATISTIC, backend_report_statistic);
     if (error != 0)
-        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_settimeparam(EN_STATISTIC)"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to configure the report statistic"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_settimeparam(EN_STATISTIC)"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to configure the report statistic"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     const HydraulicSolverOptions &hydraulic = request.options_hydraulic;
     int backend_demand_model = 0;
@@ -249,7 +293,11 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
 
     error = EN_setdemandmodel(this->project, backend_demand_model, hydraulic.minimum_pressure_head_m, hydraulic.required_pressure_head_m, hydraulic.pressure_exponent);
     if (error != 0)
-        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setdemandmodel"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to configure the hydraulic demand model"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setdemandmodel"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to configure the hydraulic demand model"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     struct NumericOption
     {
@@ -297,7 +345,11 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
     {
         error = EN_setoption(this->project, option.option, option.value);
         if (error != 0)
-            return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setoption(%1)").arg(QString::fromLatin1(option.name)), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to configure an EPANET simulation option"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_setoption(%1)").arg(QString::fromLatin1(option.name)), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to configure an EPANET simulation option"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
 
     return makeEpanetSuccess();
@@ -337,7 +389,11 @@ HydraulicSimulationStatus EpanetProject::configureReport(const NetworkHydraulic 
         const QByteArray command_utf8 = command.toUtf8();
         const int error = EN_setreport(this->project, command_utf8.constData());
         if (error != 0)
-            return makeEpanetError(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreport"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to configure the EPANET report"));
+        {
+            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureReport, QStringLiteral("EN_setreport"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to configure the EPANET report"));
+            if (!epanet_status.success)
+                return epanet_status;
+        }
     }
 
     return makeEpanetSuccess();
@@ -355,7 +411,11 @@ HydraulicSimulationStatus EpanetProject::retrieveInpText(QString &inp_text) cons
     const QByteArray inp_path_native = QFile::encodeName(inp_path);
     const int error = EN_saveinpfile(this->project, inp_path_native.constData());
     if (error != 0)
-        return makeEpanetError(*this, error, HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, QStringLiteral("EN_saveinpfile"), HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("Failed to serialize the EPANET project as an INP file"));
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, QStringLiteral("EN_saveinpfile"), HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("Failed to serialize the EPANET project as an INP file"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
 
     QFile inp_file(inp_path);
     if (!inp_file.open(QIODevice::ReadOnly))
@@ -385,4 +445,14 @@ QString EpanetProject::errorMessage(int error_code) const
         return QStringLiteral("Unknown EPANET error code %1").arg(error_code);
 
     return QString::fromUtf8(message);
+}
+
+const QList<HydraulicSimulationDiagnostic> &EpanetProject::diagnostics() const
+{
+    return this->diagnostics_collected;
+}
+
+void EpanetProject::appendDiagnostic(const HydraulicSimulationDiagnostic &diagnostic) const
+{
+    this->diagnostics_collected.append(diagnostic);
 }

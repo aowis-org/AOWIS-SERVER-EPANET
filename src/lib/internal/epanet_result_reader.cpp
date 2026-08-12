@@ -11,7 +11,10 @@ HydraulicSimulationStatus readNodeValue(const EpanetProject &project, int node_i
     if (error == 0)
         return makeEpanetSuccess();
 
-    HydraulicSimulationStatus status = makeEpanetError(project, error, stage, HydraulicSimulationStatusOperation::ReadNodeResult, QStringLiteral("EN_getnodevalue"), entity_type, entity_id, entity_uuid, message);
+    HydraulicSimulationStatus status = processEpanetReturnCode(project, error, stage, HydraulicSimulationStatusOperation::ReadNodeResult, QStringLiteral("EN_getnodevalue"), entity_type, entity_id, entity_uuid, message);
+    if (status.success)
+        return status;
+
     status.property = property;
     status.entity.index = node_index;
     return status;
@@ -23,7 +26,10 @@ HydraulicSimulationStatus readLinkValue(const EpanetProject &project, int link_i
     if (error == 0)
         return makeEpanetSuccess();
 
-    HydraulicSimulationStatus status = makeEpanetError(project, error, stage, HydraulicSimulationStatusOperation::ReadLinkResult, QStringLiteral("EN_getlinkvalue"), entity_type, entity_id, entity_uuid, message);
+    HydraulicSimulationStatus status = processEpanetReturnCode(project, error, stage, HydraulicSimulationStatusOperation::ReadLinkResult, QStringLiteral("EN_getlinkvalue"), entity_type, entity_id, entity_uuid, message);
+    if (status.success)
+        return status;
+
     status.property = property;
     status.entity.index = link_index;
     return status;
@@ -35,7 +41,7 @@ HydraulicSimulationStatus readStatistic(const EpanetProject &project, int backen
     if (error == 0)
         return makeEpanetSuccess();
 
-    return makeEpanetError(project, error, HydraulicSimulationStatusStage::ReadStatistics, HydraulicSimulationStatusOperation::ReadStatistic, QStringLiteral("EN_getstatistic"), HydraulicSimulationStatusEntityType::Result, QString(), message);
+    return processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::ReadStatistics, HydraulicSimulationStatusOperation::ReadStatistic, QStringLiteral("EN_getstatistic"), HydraulicSimulationStatusEntityType::Result, QString(), message);
 }
 
 bool assignPipeRoughness(HydraulicSimulationResultLinkPipe &result, HydraulicHeadlossFormula headloss_formula, double roughness_backend_value)
