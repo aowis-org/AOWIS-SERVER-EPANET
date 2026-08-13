@@ -18,6 +18,8 @@ struct EpanetIndexRegistry
     QHash<QUuid, int> links_pipes;
     QHash<QUuid, int> links_pumps;
     QHash<QUuid, int> links_valves;
+    QHash<QUuid, int> controls_simple;
+    QHash<QUuid, int> controls_rules;
 };
 
 #endif

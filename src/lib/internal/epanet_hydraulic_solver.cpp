@@ -3,6 +3,7 @@
 #include "epanet_result_reader.h"
 #include "epanet_status_helpers.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace
@@ -15,6 +16,23 @@ struct PumpEnergyAccumulator
     double power_kw_hours = 0.0;
     double peak_power_kw = 0.0;
     double total_cost = 0.0;
+};
+
+struct SystemEnergyAccumulator
+{
+    double peak_power_kw = 0.0;
+};
+
+struct FlowBalanceAccumulator
+{
+    double covered_seconds = 0.0;
+    double total_inflow = 0.0;
+    double total_outflow = 0.0;
+    double consumer_demand = 0.0;
+    double demand_deficit = 0.0;
+    double emitter_flow = 0.0;
+    double leakage_flow = 0.0;
+    double storage_flow = 0.0;
 };
 
 double patternFactor(const NetworkHydraulic &network, const QUuid &pattern_uuid, quint64 time_s)
@@ -48,8 +66,9 @@ double pumpEnergyCost(const NetworkHydraulic &network, const HydraulicLinkPump &
     return cost * patternFactor(network, pattern_uuid, time_s);
 }
 
-void accumulatePumpEnergy(const NetworkHydraulic &network, const HydraulicSimulationResult &result, double interval_hours, QList<PumpEnergyAccumulator> &accumulators)
+void accumulatePumpEnergy(const NetworkHydraulic &network, const HydraulicSimulationResult &result, double interval_hours, QList<PumpEnergyAccumulator> &accumulators, SystemEnergyAccumulator &system_accumulator)
 {
+    double simultaneous_power_kw = 0.0;
     for (int index = 0; index < result.links_pumps.size(); index++)
     {
         const HydraulicSimulationResultLinkPump &pump_result = result.links_pumps.at(index);
@@ -61,15 +80,20 @@ void accumulatePumpEnergy(const NetworkHydraulic &network, const HydraulicSimula
         accumulator.online_hours += interval_hours;
         accumulator.efficiency_percent_hours += pump_result.efficiency_percent * interval_hours;
         accumulator.power_kw_hours += pump_result.power_kw * interval_hours;
-        if (std::abs(pump_result.flow_m3_per_h) > 0.0)
-            accumulator.kw_per_flow_hours += pump_result.power_kw / std::abs(pump_result.flow_m3_per_h) * interval_hours;
+        constexpr double minimum_energy_flow_m3_per_h = 1.0e-6 * 101.94;
+        const double energy_flow_m3_per_h = std::max(minimum_energy_flow_m3_per_h, std::abs(pump_result.flow_m3_per_h));
+        accumulator.kw_per_flow_hours += pump_result.power_kw / energy_flow_m3_per_h * interval_hours;
         if (pump_result.power_kw > accumulator.peak_power_kw)
             accumulator.peak_power_kw = pump_result.power_kw;
         accumulator.total_cost += pumpEnergyCost(network, pump, result.time_elapsed_s) * pump_result.power_kw * interval_hours;
+        simultaneous_power_kw += pump_result.power_kw;
     }
+
+    if (simultaneous_power_kw > system_accumulator.peak_power_kw)
+        system_accumulator.peak_power_kw = simultaneous_power_kw;
 }
 
-void storePumpEnergyUsage(const NetworkHydraulic &network, const QList<PumpEnergyAccumulator> &accumulators, HydraulicSimulationResult &result)
+void storePumpEnergyUsage(const NetworkHydraulic &network, const QList<PumpEnergyAccumulator> &accumulators, const SystemEnergyAccumulator &system_accumulator, HydraulicSimulationResult &result)
 {
     const double duration_hours = static_cast<double>(network.duration_s) / 3600.0;
     for (int index = 0; index < network.links_pumps.size(); index++)
@@ -81,6 +105,8 @@ void storePumpEnergyUsage(const NetworkHydraulic &network, const QList<PumpEnerg
         usage.pump_uuid = pump.uuid;
         if (duration_hours > 0.0)
             usage.time_online_percent = accumulator.online_hours / duration_hours * 100.0;
+        else if (accumulator.online_hours > 0.0)
+            usage.time_online_percent = 100.0;
         if (accumulator.online_hours > 0.0)
         {
             usage.average_efficiency_percent = accumulator.efficiency_percent_hours / accumulator.online_hours;
@@ -93,7 +119,85 @@ void storePumpEnergyUsage(const NetworkHydraulic &network, const QList<PumpEnerg
         else
             usage.average_cost_per_day = accumulator.total_cost * 24.0;
         result.links_pump_energy_usage.append(usage);
+        result.energy_usage.energy_cost_per_day += usage.average_cost_per_day;
     }
+
+    result.energy_usage.peak_power_kw = system_accumulator.peak_power_kw;
+    result.energy_usage.demand_charge_per_day = system_accumulator.peak_power_kw * network.options_energy.demand_charge_per_kw;
+    result.energy_usage.total_cost_per_day = result.energy_usage.energy_cost_per_day + result.energy_usage.demand_charge_per_day;
+}
+
+void accumulateFlowBalance(const HydraulicSimulationResult &result, double interval_seconds, FlowBalanceAccumulator &accumulator)
+{
+    double total_inflow = 0.0;
+    double total_outflow = 0.0;
+    double consumer_demand = 0.0;
+    double demand_deficit = 0.0;
+    double emitter_flow = 0.0;
+    double leakage_flow = 0.0;
+    double storage_flow = 0.0;
+
+    for (const HydraulicSimulationResultNodeJunction &junction : result.nodes_junctions)
+    {
+        if (junction.demand_delivered_m3_per_h < 0.0)
+            total_inflow -= junction.demand_delivered_m3_per_h;
+        else
+        {
+            consumer_demand += junction.demand_delivered_m3_per_h;
+            total_outflow += junction.demand_delivered_m3_per_h;
+        }
+        emitter_flow += junction.emitter_flow_m3_per_h;
+        total_outflow += junction.emitter_flow_m3_per_h;
+        leakage_flow += junction.leakage_flow_m3_per_h;
+        total_outflow += junction.leakage_flow_m3_per_h;
+        demand_deficit += junction.demand_deficit_m3_per_h;
+    }
+
+    for (const HydraulicSimulationResultNodeReservoir &reservoir : result.nodes_reservoirs)
+    {
+        if (reservoir.net_demand_m3_per_h >= 0.0)
+            total_outflow += reservoir.net_demand_m3_per_h;
+        else
+            total_inflow -= reservoir.net_demand_m3_per_h;
+    }
+
+    for (const HydraulicSimulationResultNodeTank &tank : result.nodes_tanks)
+        storage_flow += tank.net_demand_m3_per_h;
+
+    accumulator.covered_seconds += interval_seconds;
+    accumulator.total_inflow += total_inflow * interval_seconds;
+    accumulator.total_outflow += total_outflow * interval_seconds;
+    accumulator.consumer_demand += consumer_demand * interval_seconds;
+    accumulator.demand_deficit += demand_deficit * interval_seconds;
+    accumulator.emitter_flow += emitter_flow * interval_seconds;
+    accumulator.leakage_flow += leakage_flow * interval_seconds;
+    accumulator.storage_flow += storage_flow * interval_seconds;
+}
+
+void storeFlowBalance(const FlowBalanceAccumulator &accumulator, HydraulicSimulationResult &result)
+{
+    if (accumulator.covered_seconds <= 0.0)
+        return;
+
+    HydraulicSimulationResultFlowBalance &flow_balance = result.flow_balance;
+    flow_balance.total_inflow_m3_per_h = accumulator.total_inflow / accumulator.covered_seconds;
+    flow_balance.total_outflow_m3_per_h = accumulator.total_outflow / accumulator.covered_seconds;
+    flow_balance.consumer_demand_m3_per_h = accumulator.consumer_demand / accumulator.covered_seconds;
+    flow_balance.demand_deficit_m3_per_h = accumulator.demand_deficit / accumulator.covered_seconds;
+    flow_balance.emitter_flow_m3_per_h = accumulator.emitter_flow / accumulator.covered_seconds;
+    flow_balance.leakage_flow_m3_per_h = accumulator.leakage_flow / accumulator.covered_seconds;
+    flow_balance.storage_flow_m3_per_h = accumulator.storage_flow / accumulator.covered_seconds;
+
+    double adjusted_inflow = flow_balance.total_inflow_m3_per_h;
+    double adjusted_outflow = flow_balance.total_outflow_m3_per_h;
+    if (flow_balance.storage_flow_m3_per_h > 0.0)
+        adjusted_outflow += flow_balance.storage_flow_m3_per_h;
+    else
+        adjusted_inflow -= flow_balance.storage_flow_m3_per_h;
+    if (adjusted_inflow == adjusted_outflow)
+        flow_balance.flow_balance_ratio = 1.0;
+    else if (adjusted_inflow > 0.0)
+        flow_balance.flow_balance_ratio = adjusted_outflow / adjusted_inflow;
 }
 
 HydraulicSimulationDiagnostic diagnosticFromHydraulicStatus(const HydraulicSimulationStatus &status, HydraulicSimulationDiagnosticSeverity severity)
@@ -148,7 +252,7 @@ HydraulicSimulationStatus EpanetHydraulicSolver::configureReport() const
 
 HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTimeline &timeline)
 {
-    HydraulicSimulationStatus status = this->configureReport();
+    HydraulicSimulationStatus status = configureReport();
     if (!status.success)
         return status;
 
@@ -189,6 +293,8 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
     long next_step_s = 0;
     QList<PumpEnergyAccumulator> pump_energy_accumulators;
     pump_energy_accumulators.resize(this->network.links_pumps.size());
+    SystemEnergyAccumulator system_energy_accumulator;
+    FlowBalanceAccumulator flow_balance_accumulator;
 
     do
     {
@@ -264,8 +370,31 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
             break;
         }
 
+        if (result_available && !timeline.results.isEmpty())
+        {
+            const quint64 actual_step_s = static_cast<quint64>(next_step_s);
+            if (actual_step_s != result.event_next.time_until_event_s)
+            {
+                result.event_next.type = HydraulicSimulationTimestepEventType::HydraulicStep;
+                result.event_next.tank_id.clear();
+                result.event_next.tank_uuid = QUuid();
+                result.event_next.control_id.clear();
+                result.event_next.control_uuid = QUuid();
+            }
+            result.event_next.time_until_event_s = actual_step_s;
+            timeline.results.last().event_next = result.event_next;
+        }
+
         if (result_available && next_step_s > 0)
-            accumulatePumpEnergy(this->network, result, static_cast<double>(next_step_s) / 3600.0, pump_energy_accumulators);
+        {
+            accumulatePumpEnergy(this->network, result, static_cast<double>(next_step_s) / 3600.0, pump_energy_accumulators, system_energy_accumulator);
+            accumulateFlowBalance(result, static_cast<double>(next_step_s), flow_balance_accumulator);
+        }
+        else if (result_available && this->network.duration_s == 0)
+        {
+            accumulatePumpEnergy(this->network, result, 1.0, pump_energy_accumulators, system_energy_accumulator);
+            accumulateFlowBalance(result, 1.0, flow_balance_accumulator);
+        }
     }
     while (next_step_s > 0);
 
@@ -280,9 +409,8 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
     if (!timeline.results.isEmpty())
     {
         HydraulicSimulationResult &final_result = timeline.results.last();
-        if (this->network.duration_s == 0 && !final_result.links_pumps.isEmpty() && first_failure.success)
-            accumulatePumpEnergy(this->network, final_result, 1.0, pump_energy_accumulators);
-        storePumpEnergyUsage(this->network, pump_energy_accumulators, final_result);
+        storePumpEnergyUsage(this->network, pump_energy_accumulators, system_energy_accumulator, final_result);
+        storeFlowBalance(flow_balance_accumulator, final_result);
     }
 
     if (!first_failure.success)
@@ -290,4 +418,3 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
 
     return makeEpanetSuccess();
 }
-

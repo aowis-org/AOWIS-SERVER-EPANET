@@ -11,6 +11,7 @@ set(CMAKE_AUTORCC ON)
 option(AOWIS_SERVER_EPANET_BUILD_SERVER "Build AOWIS EPANET REST server executable" ON)
 option(AOWIS_SERVER_EPANET_BUILD_SHARED_EPANET "Build EPANET as shared library" ON)
 option(AOWIS_SERVER_EPANET_FETCH_MODEL "Fetch AOWIS-SERVER-MODEL when it is not provided by a parent project" ${PROJECT_IS_TOP_LEVEL})
+option(AOWIS_SERVER_EPANET_BUILD_TESTS "Build AOWIS EPANET adapter integration tests" ${PROJECT_IS_TOP_LEVEL})
 
 set(AOWIS_SERVER_MODEL_SOURCE_DIR "" CACHE PATH "Optional local AOWIS-SERVER-MODEL source directory")
 set(AOWIS_SERVER_MODEL_GIT_REPOSITORY "https://github.com/aowis-org/AOWIS-SERVER-MODEL.git" CACHE STRING "Git repository used to fetch AOWIS-SERVER-MODEL")
@@ -97,4 +98,9 @@ include(src/lib/CMakeLists.txt)
 
 if(AOWIS_SERVER_EPANET_BUILD_SERVER)
     add_subdirectory(src/server)
+endif()
+
+if(AOWIS_SERVER_EPANET_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()

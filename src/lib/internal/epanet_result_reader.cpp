@@ -3,6 +3,8 @@
 #include "epanet_project.h"
 #include "epanet_status_helpers.h"
 
+#include <cmath>
+
 namespace
 {
 HydraulicSimulationStatus readNodeValue(const EpanetProject &project, int node_index, int backend_property, HydraulicSimulationStatusStage stage, HydraulicSimulationStatusEntityType entity_type, const QString &entity_id, const QUuid &entity_uuid, HydraulicSimulationStatusProperty property, const QString &message, double &value)
@@ -134,6 +136,13 @@ HydraulicSimulationStatus EpanetResultReader::read(HydraulicSimulationResult &re
     }
 
     status = readStatistics(result);
+    if (!status.success)
+    {
+        result.status = status;
+        return status;
+    }
+
+    status = readNextEvent(result);
     result.status = status;
     return status;
 }
@@ -159,6 +168,10 @@ HydraulicSimulationStatus EpanetResultReader::readNodesJunctions(HydraulicSimula
             return status;
 
         status = readNodeValue(this->project, junction_index, EN_DEMANDDEFICIT, HydraulicSimulationStatusStage::ReadJunctionResults, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::DemandDeficit, QStringLiteral("Failed to get junction demand deficit"), junction_result.demand_deficit_m3_per_h);
+        if (!status.success)
+            return status;
+
+        status = readNodeValue(this->project, junction_index, EN_DEMAND, HydraulicSimulationStatusStage::ReadJunctionResults, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::Demand, QStringLiteral("Failed to get total junction demand"), junction_result.total_demand_m3_per_h);
         if (!status.success)
             return status;
 
@@ -301,6 +314,23 @@ HydraulicSimulationStatus EpanetResultReader::readLinksPipes(HydraulicSimulation
         status = readLinkValue(this->project, pipe_index, EN_HEADLOSS, HydraulicSimulationStatusStage::ReadPipeResults, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, HydraulicSimulationStatusProperty::Headloss, QStringLiteral("Failed to get pipe head loss"), pipe_result.head_loss_m);
         if (!status.success)
             return status;
+
+        const double length_m = pipe.length_measured_m.value_or(pipe.length_calculated_m);
+        if (length_m > 0.0)
+            pipe_result.unit_head_loss_m_per_km = pipe_result.head_loss_m / length_m * 1000.0;
+
+        constexpr double meters_per_foot = 0.3048;
+        constexpr double cubic_meters_per_hour_per_cubic_foot_per_second = 101.94;
+        constexpr double tiny_flow_cubic_feet_per_second = 1.0e-6;
+        const double flow_cubic_feet_per_second = std::abs(pipe_result.flow_m3_per_h) / cubic_meters_per_hour_per_cubic_foot_per_second;
+        if (length_m > 0.0 && pipe.diameter_mm > 0.0 && flow_cubic_feet_per_second > tiny_flow_cubic_feet_per_second)
+        {
+            const double head_loss_ft = pipe_result.head_loss_m / meters_per_foot;
+            const double diameter_ft = pipe.diameter_mm / 1000.0 / meters_per_foot;
+            const double length_ft = length_m / meters_per_foot;
+            pipe_result.friction_factor = 39.725 * head_loss_ft * std::pow(diameter_ft, 5.0)
+                / length_ft / std::pow(flow_cubic_feet_per_second, 2.0);
+        }
 
         double link_status = 0.0;
         status = readLinkValue(this->project, pipe_index, EN_STATUS, HydraulicSimulationStatusStage::ReadPipeResults, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, HydraulicSimulationStatusProperty::Status, QStringLiteral("Failed to get pipe status"), link_status);
@@ -476,6 +506,70 @@ HydraulicSimulationStatus EpanetResultReader::readStatistics(HydraulicSimulation
     status = readStatistic(this->project, EN_LEAKAGELOSS, QStringLiteral("Failed to get leakage loss percentage"), result.statistics.leakage_loss_percent);
     if (!status.success)
         return status;
+
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus EpanetResultReader::readNextEvent(HydraulicSimulationResult &result) const
+{
+    int backend_event_type = 0;
+    long duration_s = 0;
+    int element_index = 0;
+    const int error = EN_timetonextevent(this->project.handle(), &backend_event_type, &duration_s, &element_index);
+    if (error != 0)
+    {
+        return processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::ReadNextEvent, HydraulicSimulationStatusOperation::ReadNextEvent, QStringLiteral("EN_timetonextevent"), HydraulicSimulationStatusEntityType::Result, QString(), QStringLiteral("Failed to read the next hydraulic timestep event"));
+    }
+    if (duration_s < 0)
+        return makeEpanetStatus(HydraulicSimulationStatusStage::ReadNextEvent, HydraulicSimulationStatusOperation::ReadNextEvent, HydraulicSimulationStatusEntityType::Result, QString(), QStringLiteral("EPANET returned a negative next-event duration"));
+
+    result.event_next.time_until_event_s = static_cast<quint64>(duration_s);
+    switch (backend_event_type)
+    {
+    case EN_STEP_REPORT:
+        result.event_next.type = HydraulicSimulationTimestepEventType::ReportStep;
+        break;
+    case EN_STEP_HYD:
+        result.event_next.type = HydraulicSimulationTimestepEventType::HydraulicStep;
+        break;
+    case EN_STEP_WQ:
+        result.event_next.type = HydraulicSimulationTimestepEventType::QualityStep;
+        break;
+    case EN_STEP_TANKEVENT:
+    {
+        result.event_next.type = HydraulicSimulationTimestepEventType::TankEvent;
+        const QUuid tank_uuid = this->indices.nodes_tanks.key(element_index);
+        if (tank_uuid.isNull())
+            return makeEpanetStatus(HydraulicSimulationStatusStage::ReadNextEvent, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Tank, QString(), QStringLiteral("Could not resolve the tank that causes the next hydraulic event"));
+        for (const HydraulicNodeTank &tank : this->network.nodes_tanks)
+        {
+            if (tank.uuid != tank_uuid)
+                continue;
+            result.event_next.tank_id = tank.id;
+            result.event_next.tank_uuid = tank.uuid;
+            break;
+        }
+        break;
+    }
+    case EN_STEP_CONTROLEVENT:
+    {
+        result.event_next.type = HydraulicSimulationTimestepEventType::ControlEvent;
+        const QUuid control_uuid = this->indices.controls_simple.key(element_index);
+        if (control_uuid.isNull())
+            return makeEpanetStatus(HydraulicSimulationStatusStage::ReadNextEvent, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Control, QString(), QStringLiteral("Could not resolve the simple control that causes the next hydraulic event"));
+        for (const HydraulicControlSimple &control : this->network.controls_simple)
+        {
+            if (control.uuid != control_uuid)
+                continue;
+            result.event_next.control_id = control.id;
+            result.event_next.control_uuid = control.uuid;
+            break;
+        }
+        break;
+    }
+    default:
+        return makeEpanetStatus(HydraulicSimulationStatusStage::ReadNextEvent, HydraulicSimulationStatusOperation::ReadNextEvent, HydraulicSimulationStatusEntityType::Result, QString(), QStringLiteral("EPANET returned an unknown hydraulic timestep event type"));
+    }
 
     return makeEpanetSuccess();
 }

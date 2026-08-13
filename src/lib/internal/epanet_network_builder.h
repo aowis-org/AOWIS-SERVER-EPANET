@@ -33,8 +33,14 @@ private:
     HydraulicSimulationStatus addLinkPipe(const HydraulicLinkPipe &pipe, HydraulicHeadlossFormula headloss_formula);
     HydraulicSimulationStatus addLinkPump(const HydraulicLinkPump &pump);
     HydraulicSimulationStatus addLinkValve(const HydraulicLinkValve &valve);
+    HydraulicSimulationStatus addControlSimple(const HydraulicControlSimple &control);
+    HydraulicSimulationStatus addControlRule(const HydraulicControlRule &rule);
+    HydraulicSimulationStatus buildControlRuleText(const HydraulicControlRule &rule, QString &rule_text) const;
     HydraulicSimulationStatus refreshNodeIndices(const NetworkHydraulic &request);
     HydraulicSimulationStatus refreshLinkIndices(const NetworkHydraulic &request);
+
+    bool resolveLinkId(const QUuid &uuid, QString &id) const;
+    bool resolveLinkIndex(const QUuid &uuid, int &index) const;
 
     EpanetProject &project;
     EpanetIndexRegistry &indices;
@@ -49,6 +55,8 @@ private:
     QHash<QUuid, QString> pipe_ids_by_uuid;
     QHash<QUuid, QString> pump_ids_by_uuid;
     QHash<QUuid, QString> valve_ids_by_uuid;
+    QHash<QUuid, QString> control_simple_ids_by_uuid;
+    QHash<QUuid, QString> control_rule_ids_by_uuid;
 };
 
 #endif // AOWIS_EPANET_NETWORK_BUILDER_H
