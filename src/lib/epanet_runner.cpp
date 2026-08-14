@@ -130,6 +130,18 @@ void appendReportDiagnostics(QList<HydraulicSimulationDiagnostic> &diagnostics, 
     }
 }
 
+bool cancellationRequested(const std::function<bool()> &cancellation_requested)
+{
+    return cancellation_requested && cancellation_requested();
+}
+
+EpanetResultRun finishCancelledRun(EpanetResultRun result, const EpanetReportCollector &report_collector)
+{
+    result.cancelled = true;
+    result.report_lines = report_collector.lines();
+    return result;
+}
+
 EpanetResultInp finishInp(EpanetResultInp result, const HydraulicSimulationStatus &status, const EpanetReportCollector &report_collector)
 {
     result.status = status;
@@ -194,6 +206,13 @@ EpanetResultInp EpanetRunner::retrieveInp(const NetworkHydraulic &request) const
 
 EpanetResultRun EpanetRunner::run(const NetworkHydraulic &request) const
 {
+    return run(request, std::function<bool()>());
+}
+
+EpanetResultRun EpanetRunner::run(
+    const NetworkHydraulic &request,
+    const std::function<bool()> &cancellation_requested) const
+{
     EpanetResultRun result;
     result.result_timeline.simulation_start_utc = QDateTime::currentDateTimeUtc();
 
@@ -202,17 +221,30 @@ EpanetResultRun EpanetRunner::run(const NetworkHydraulic &request) const
     EpanetIndexRegistry indices;
     NetworkHydraulic prepared_request;
 
+    if (cancellationRequested(cancellation_requested))
+        return finishCancelledRun(std::move(result), report_collector);
+
     HydraulicSimulationStatus status = prepareProject(request, prepared_request, project, report_collector, indices);
+    if (cancellationRequested(cancellation_requested))
+        return finishCancelledRun(std::move(result), report_collector);
+
     if (!status.success)
         return finishRun(std::move(result), status, project, report_collector);
 
     EpanetResultReader result_reader(project, prepared_request, indices);
     EpanetHydraulicSolver hydraulic_solver(project, prepared_request, result_reader);
-    status = hydraulic_solver.run(result.result_timeline);
+    bool cancelled = false;
+    status = hydraulic_solver.run(result.result_timeline, cancellation_requested, cancelled);
+    if (cancelled || cancellationRequested(cancellation_requested))
+        return finishCancelledRun(std::move(result), report_collector);
+
     if (!status.success)
         return finishRun(std::move(result), status, project, report_collector);
 
     int error = EN_saveH(project.handle());
+    if (cancellationRequested(cancellation_requested))
+        return finishCancelledRun(std::move(result), report_collector);
+
     if (error != 0)
     {
         status = processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::SaveHydraulics, HydraulicSimulationStatusOperation::SaveHydraulics, QStringLiteral("EN_saveH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to save EPANET hydraulic results"));
@@ -221,6 +253,9 @@ EpanetResultRun EpanetRunner::run(const NetworkHydraulic &request) const
     }
 
     error = EN_report(project.handle());
+    if (cancellationRequested(cancellation_requested))
+        return finishCancelledRun(std::move(result), report_collector);
+
     if (error != 0)
     {
         status = processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, QStringLiteral("EN_report"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to generate EPANET report"));

@@ -9,6 +9,7 @@ struct EpanetResultRun
 {
     HydraulicSimulationResultTimeline result_timeline;
     QStringList report_lines;
+    bool cancelled = false;
 };
 
 #endif // AOWIS_EPANET_RESULT_RUN_H

@@ -5,6 +5,8 @@
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
 #include <aowis/model/hydraulic/network_hydraulic.h>
 
+#include <functional>
+
 class EpanetProject;
 class EpanetResultReader;
 
@@ -13,7 +15,10 @@ class EpanetHydraulicSolver
 public:
     EpanetHydraulicSolver(EpanetProject &project, const NetworkHydraulic &network, const EpanetResultReader &result_reader);
 
-    HydraulicSimulationStatus run(HydraulicSimulationResultTimeline &timeline);
+    HydraulicSimulationStatus run(
+        HydraulicSimulationResultTimeline &timeline,
+        const std::function<bool()> &cancellation_requested,
+        bool &cancelled);
 
 private:
     HydraulicSimulationStatus configureReport() const;

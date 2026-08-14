@@ -238,6 +238,11 @@ bool canAdvanceAfterRunError(int error_code)
     // errors can represent unusable solver state or allocation failures.
     return error_code == 110;
 }
+
+bool cancellationRequested(const std::function<bool()> &cancellation_requested)
+{
+    return cancellation_requested && cancellation_requested();
+}
 }
 
 EpanetHydraulicSolver::EpanetHydraulicSolver(EpanetProject &project, const NetworkHydraulic &network, const EpanetResultReader &result_reader)
@@ -250,11 +255,28 @@ HydraulicSimulationStatus EpanetHydraulicSolver::configureReport() const
     return this->project.configureReport(this->network);
 }
 
-HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTimeline &timeline)
+HydraulicSimulationStatus EpanetHydraulicSolver::run(
+    HydraulicSimulationResultTimeline &timeline,
+    const std::function<bool()> &cancellation_requested,
+    bool &cancelled)
 {
+    cancelled = false;
+
+    if (cancellationRequested(cancellation_requested))
+    {
+        cancelled = true;
+        return makeEpanetSuccess();
+    }
+
     HydraulicSimulationStatus status = configureReport();
     if (!status.success)
         return status;
+
+    if (cancellationRequested(cancellation_requested))
+    {
+        cancelled = true;
+        return makeEpanetSuccess();
+    }
 
     HydraulicSimulationStatus first_failure = makeEpanetSuccess();
 
@@ -291,16 +313,31 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
     long current_time_s = 0;
     long previous_time_s = -1;
     long next_step_s = 0;
+
+    if (cancellationRequested(cancellation_requested))
+        cancelled = true;
     QList<PumpEnergyAccumulator> pump_energy_accumulators;
     pump_energy_accumulators.resize(this->network.links_pumps.size());
     SystemEnergyAccumulator system_energy_accumulator;
     FlowBalanceAccumulator flow_balance_accumulator;
 
-    do
+    while (!cancelled)
     {
+        if (cancellationRequested(cancellation_requested))
+        {
+            cancelled = true;
+            break;
+        }
+
         bool result_available = true;
 
         error = EN_runH(this->project.handle(), &current_time_s);
+
+        if (cancellationRequested(cancellation_requested))
+        {
+            cancelled = true;
+            break;
+        }
         if (error != 0)
         {
             status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::RunHydraulics, HydraulicSimulationStatusOperation::RunHydraulics, QStringLiteral("EN_runH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("EPANET hydraulic analysis returned a diagnostic"));
@@ -351,6 +388,12 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
             }
         }
 
+        if (cancellationRequested(cancellation_requested))
+        {
+            cancelled = true;
+            break;
+        }
+
         error = EN_nextH(this->project.handle(), &next_step_s);
         if (error != 0)
         {
@@ -395,8 +438,16 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
             accumulatePumpEnergy(this->network, result, 1.0, pump_energy_accumulators, system_energy_accumulator);
             accumulateFlowBalance(result, 1.0, flow_balance_accumulator);
         }
+
+        if (cancellationRequested(cancellation_requested))
+        {
+            cancelled = true;
+            break;
+        }
+
+        if (next_step_s <= 0)
+            break;
     }
-    while (next_step_s > 0);
 
     const int close_error = EN_closeH(this->project.handle());
     if (close_error != 0)
@@ -406,12 +457,15 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(HydraulicSimulationResultTi
             collectHydraulicFailure(this->project, status, first_failure, HydraulicSimulationDiagnosticSeverity::Error, current_time_s);
     }
 
-    if (!timeline.results.isEmpty())
+    if (!cancelled && !timeline.results.isEmpty())
     {
         HydraulicSimulationResult &final_result = timeline.results.last();
         storePumpEnergyUsage(this->network, pump_energy_accumulators, system_energy_accumulator, final_result);
         storeFlowBalance(flow_balance_accumulator, final_result);
     }
+
+    if (cancelled)
+        return makeEpanetSuccess();
 
     if (!first_failure.success)
         return first_failure;
