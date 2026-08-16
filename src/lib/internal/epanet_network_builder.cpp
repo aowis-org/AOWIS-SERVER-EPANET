@@ -10,6 +10,7 @@
 #include <QStringList>
 
 #include <cmath>
+#include <functional>
 #include <limits>
 
 namespace
@@ -1554,16 +1555,20 @@ HydraulicSimulationStatus EpanetNetworkBuilder::buildControlRuleText(const Hydra
             QString link_id;
             if (!resolveLinkId(premise.object_uuid, link_id))
                 return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("Could not resolve a link referenced by a control-rule premise"));
+            if (premise.variable == HydraulicControlRuleVariable::Power)
+            {
+                return makeEpanetStatus(
+                    HydraulicSimulationStatusStage::AddRule,
+                    HydraulicSimulationStatusOperation::AddRule,
+                    HydraulicSimulationStatusEntityType::Rule,
+                    rule.id,
+                    rule.uuid,
+                    QStringLiteral("Pump POWER control-rule premises are not supported by the bundled EPANET 2.3 rule engine"));
+            }
             object_clause = QStringLiteral("LINK %1").arg(link_id);
             variable_supported = premise.variable == HydraulicControlRuleVariable::Flow
                 || premise.variable == HydraulicControlRuleVariable::Status
-                || premise.variable == HydraulicControlRuleVariable::Setting
-                || premise.variable == HydraulicControlRuleVariable::Power;
-            if (premise.variable == HydraulicControlRuleVariable::Power
-                && !this->indices.links_pumps.contains(premise.object_uuid))
-            {
-                return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::AddRule, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("A POWER premise requires a pump"));
-            }
+                || premise.variable == HydraulicControlRuleVariable::Setting;
         }
         else if (premise.object == HydraulicControlRuleObject::System)
         {
@@ -1618,7 +1623,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::buildControlRuleText(const Hydra
         lines.append(QStringLiteral("%1 %2 %3 %4 %5").arg(logical_operator, object_clause, variable, comparison, value_text));
     }
 
-    const auto append_actions = [this, &rule, &lines](const QList<HydraulicControlRuleAction> &actions, const QString &first_keyword) -> HydraulicSimulationStatus
+    const std::function<HydraulicSimulationStatus(const QList<HydraulicControlRuleAction> &, const QString &)> append_actions = [this, &rule, &lines](const QList<HydraulicControlRuleAction> &actions, const QString &first_keyword) -> HydraulicSimulationStatus
     {
         for (int action_index = 0; action_index < actions.size(); action_index++)
         {

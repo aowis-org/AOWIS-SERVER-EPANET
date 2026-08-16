@@ -1,26 +1,27 @@
 #include <aowis/epanet/epanet_runner.h>
 
-#include <algorithm>
-#include <cmath>
-#include <iostream>
+#include "conformance/conformance_test_framework.h"
+#include "conformance/result_contract_scenarios.h"
+
+#include <utility>
 
 namespace
 {
-int failure_count = 0;
+using AowisEpanetTests::ComparisonContext;
+using AowisEpanetTests::HydraulicQuantity;
+using AowisEpanetTests::NumericTolerance;
+using AowisEpanetTests::ScenarioDefinition;
+using AowisEpanetTests::ScenarioRegistry;
+using AowisEpanetTests::TestContext;
 
-void expect(bool condition, const char *message)
+ComparisonContext comparison(std::string field, std::int64_t time_s = -1, std::string entity_type = {}, std::string entity_id = {})
 {
-    if (condition)
-        return;
-
-    std::cerr << "FAIL: " << message << '\n';
-    failure_count++;
-}
-
-bool approximatelyEqual(double left, double right, double relative_tolerance = 1.0e-6)
-{
-    const double scale = std::max({1.0, std::abs(left), std::abs(right)});
-    return std::abs(left - right) <= relative_tolerance * scale;
+    ComparisonContext context;
+    context.time_s = time_s;
+    context.entity_type = std::move(entity_type);
+    context.entity_id = std::move(entity_id);
+    context.field = std::move(field);
+    return context;
 }
 
 NetworkHydraulic makeJunctionNetwork()
@@ -196,45 +197,50 @@ NetworkHydraulic makePumpNetwork(bool with_timer_control, quint64 duration_s)
     return network;
 }
 
-void testPhysicalResultContractAndLeakage()
+void testPhysicalResultContractAndLeakage(TestContext &context)
 {
     const NetworkHydraulic network = makeJunctionNetwork();
     const EpanetResultRun run = EpanetRunner().run(network);
-    expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "leakage network should produce valid results");
-    expect(!run.result_timeline.results.isEmpty(), "leakage network should return timesteps");
+    context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "leakage network should produce valid results");
+    context.expect(!run.result_timeline.results.isEmpty(), "leakage network should return timesteps");
     if (run.result_timeline.results.isEmpty())
         return;
 
     const HydraulicSimulationResult &first = run.result_timeline.results.first();
-    expect(first.nodes_junctions.size() == 1, "junction result should be returned");
-    expect(first.links_pipes.size() == 1, "pipe result should be returned");
+    context.expectEqual(static_cast<std::int64_t>(first.nodes_junctions.size()), std::int64_t{1}, comparison("nodes_junctions.size", first.time_elapsed_s), "junction result should be returned");
+    context.expectEqual(static_cast<std::int64_t>(first.links_pipes.size()), std::int64_t{1}, comparison("links_pipes.size", first.time_elapsed_s), "pipe result should be returned");
     if (first.nodes_junctions.size() != 1 || first.links_pipes.size() != 1)
         return;
 
     const HydraulicSimulationResultNodeJunction &junction = first.nodes_junctions.first();
     const HydraulicSimulationResultLinkPipe &pipe = first.links_pipes.first();
-    expect(approximatelyEqual(junction.total_demand_m3_per_h,
-        junction.demand_delivered_m3_per_h + junction.emitter_flow_m3_per_h + junction.leakage_flow_m3_per_h),
+    context.expectNear(junction.total_demand_m3_per_h,
+        junction.demand_delivered_m3_per_h + junction.emitter_flow_m3_per_h + junction.leakage_flow_m3_per_h,
+        HydraulicQuantity::FlowM3PerHour,
+        comparison("total_demand_m3_per_h", first.time_elapsed_s, "Junction", junction.id.toStdString()),
         "junction total demand should equal all physical outflow components");
-    expect(pipe.leakage_flow_m3_per_h > 0.0, "native EPANET pipe leakage should be positive");
-    expect(junction.leakage_flow_m3_per_h > 0.0, "pipe leakage should be assigned to the junction");
-    expect(junction.appears_in_control && pipe.appears_in_control, "disabled level control should still be represented in control membership");
-    expect(approximatelyEqual(pipe.unit_head_loss_m_per_km, pipe.head_loss_m / 250.0 * 1000.0),
+    context.expect(pipe.leakage_flow_m3_per_h > 0.0, "native EPANET pipe leakage should be positive");
+    context.expect(junction.leakage_flow_m3_per_h > 0.0, "pipe leakage should be assigned to the junction");
+    context.expect(junction.appears_in_control && pipe.appears_in_control, "disabled level control should still be represented in control membership");
+    context.expectNear(pipe.unit_head_loss_m_per_km, pipe.head_loss_m / 250.0 * 1000.0,
+        HydraulicQuantity::HeadMetres,
+        comparison("unit_head_loss_m_per_km", first.time_elapsed_s, "Pipe", pipe.id.toStdString()),
         "pipe unit head loss should match total head loss and length");
-    expect(pipe.friction_factor > 0.0, "flowing pipe should return a friction factor");
+    context.expect(pipe.friction_factor > 0.0, "flowing pipe should return a friction factor");
 
     const HydraulicSimulationResult &final_result = run.result_timeline.results.last();
-    expect(final_result.flow_balance.leakage_flow_m3_per_h > 0.0, "run flow balance should include leakage");
-    expect(approximatelyEqual(final_result.flow_balance.flow_balance_ratio, 1.0, 1.0e-4),
+    context.expect(final_result.flow_balance.leakage_flow_m3_per_h > 0.0, "run flow balance should include leakage");
+    context.expectNear(final_result.flow_balance.flow_balance_ratio, 1.0, NumericTolerance{0.0, 1.0e-4},
+        comparison("flow_balance.flow_balance_ratio", final_result.time_elapsed_s),
         "run flow balance should close");
 }
 
-void testStructuredRuleControl()
+void testStructuredRuleControl(TestContext &context)
 {
     const NetworkHydraulic network = makeReservoirPipeNetwork();
     const EpanetResultRun run = EpanetRunner().run(network);
-    expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "rule-controlled network should produce valid results");
-    expect(!run.result_timeline.results.isEmpty(), "rule-controlled network should return timesteps");
+    context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "rule-controlled network should produce valid results");
+    context.expect(!run.result_timeline.results.isEmpty(), "rule-controlled network should return timesteps");
 
     bool saw_closed_result = false;
     for (const HydraulicSimulationResult &result : run.result_timeline.results)
@@ -242,25 +248,25 @@ void testStructuredRuleControl()
         if (result.time_elapsed_s >= 1800 && !result.links_pipes.isEmpty() && !result.links_pipes.first().open)
             saw_closed_result = true;
     }
-    expect(saw_closed_result, "structured time rule should close its pipe");
+    context.expect(saw_closed_result, "structured time rule should close its pipe");
     if (!run.result_timeline.results.isEmpty() && !run.result_timeline.results.first().links_pipes.isEmpty())
-        expect(run.result_timeline.results.first().links_pipes.first().appears_in_control, "rule-controlled pipe should report control membership");
+        context.expect(run.result_timeline.results.first().links_pipes.first().appears_in_control, "rule-controlled pipe should report control membership");
 }
 
-void testTimerPumpControlAndEnergySummary()
+void testTimerPumpControlAndEnergySummary(TestContext &context)
 {
     const NetworkHydraulic network = makePumpNetwork(true, 3600);
     const EpanetResultRun run = EpanetRunner().run(network);
-    expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "timer-controlled pump network should produce valid results");
-    expect(!run.result_timeline.results.isEmpty(), "timer-controlled pump network should return timesteps");
+    context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "timer-controlled pump network should produce valid results");
+    context.expect(!run.result_timeline.results.isEmpty(), "timer-controlled pump network should return timesteps");
     if (run.result_timeline.results.isEmpty())
         return;
 
     const HydraulicSimulationResult &first = run.result_timeline.results.first();
-    expect(first.event_next.type == HydraulicSimulationTimestepEventType::ControlEvent, "timer should be the first next hydraulic event");
-    expect(first.event_next.time_until_event_s == 1800, "timer event should occur after 1800 seconds");
-    expect(first.event_next.control_id == QStringLiteral("CLOSE_PUMP"), "timer event should identify its simple control");
-    expect(!first.links_pumps.isEmpty() && first.links_pumps.first().appears_in_control, "timer-controlled pump should report control membership");
+    context.expect(first.event_next.type == HydraulicSimulationTimestepEventType::ControlEvent, "timer should be the first next hydraulic event");
+    context.expectEqual(static_cast<std::int64_t>(first.event_next.time_until_event_s), std::int64_t{1800}, comparison("event_next.time_until_event_s", first.time_elapsed_s), "timer event should occur after 1800 seconds");
+    context.expectEqual(first.event_next.control_id.toStdString(), "CLOSE_PUMP", comparison("event_next.control_id", first.time_elapsed_s), "timer event should identify its simple control");
+    context.expect(!first.links_pumps.isEmpty() && first.links_pumps.first().appears_in_control, "timer-controlled pump should report control membership");
 
     bool saw_closed_pump = false;
     for (const HydraulicSimulationResult &result : run.result_timeline.results)
@@ -268,20 +274,25 @@ void testTimerPumpControlAndEnergySummary()
         if (result.time_elapsed_s >= 1800 && !result.links_pumps.isEmpty() && !result.links_pumps.first().open)
             saw_closed_pump = true;
     }
-    expect(saw_closed_pump, "timer control should close the pump");
+    context.expect(saw_closed_pump, "timer control should close the pump");
 
     const HydraulicSimulationResult &final_result = run.result_timeline.results.last();
-    expect(final_result.links_pump_energy_usage.size() == 1, "pump energy usage should be returned");
+    context.expectEqual(static_cast<std::int64_t>(final_result.links_pump_energy_usage.size()), std::int64_t{1}, comparison("links_pump_energy_usage.size", final_result.time_elapsed_s), "pump energy usage should be returned");
     if (!final_result.links_pump_energy_usage.isEmpty())
-        expect(approximatelyEqual(final_result.links_pump_energy_usage.first().time_online_percent, 50.0, 1.0e-4), "pump should be online for half of the run");
-    expect(final_result.energy_usage.peak_power_kw > 0.0, "system peak pump power should be returned");
-    expect(approximatelyEqual(final_result.energy_usage.demand_charge_per_day, final_result.energy_usage.peak_power_kw * 2.0), "demand charge should use simultaneous peak power");
-    expect(approximatelyEqual(final_result.energy_usage.total_cost_per_day,
-        final_result.energy_usage.energy_cost_per_day + final_result.energy_usage.demand_charge_per_day),
+        context.expectNear(final_result.links_pump_energy_usage.first().time_online_percent, 50.0,
+            NumericTolerance{0.0, 1.0e-4}, comparison("time_online_percent", final_result.time_elapsed_s, "Pump", final_result.links_pump_energy_usage.first().pump_id.toStdString()),
+            "pump should be online for half of the run");
+    context.expect(final_result.energy_usage.peak_power_kw > 0.0, "system peak pump power should be returned");
+    context.expectNear(final_result.energy_usage.demand_charge_per_day, final_result.energy_usage.peak_power_kw * 2.0,
+        HydraulicQuantity::Cost, comparison("energy_usage.demand_charge_per_day", final_result.time_elapsed_s),
+        "demand charge should use simultaneous peak power");
+    context.expectNear(final_result.energy_usage.total_cost_per_day,
+        final_result.energy_usage.energy_cost_per_day + final_result.energy_usage.demand_charge_per_day,
+        HydraulicQuantity::Cost, comparison("energy_usage.total_cost_per_day", final_result.time_elapsed_s),
         "total energy cost should include energy and demand charges");
 }
 
-void testPumpPowerRule()
+void testUnsupportedPumpPowerRule(TestContext &context)
 {
     NetworkHydraulic network = makePumpNetwork(false, 3600);
     network.timestep_rule_s = 60;
@@ -305,43 +316,62 @@ void testPumpPowerRule()
     network.controls_rules.append(rule);
 
     const EpanetResultRun run = EpanetRunner().run(network);
-    expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "pump POWER rule network should produce valid results");
-    bool saw_closed_pump = false;
-    for (const HydraulicSimulationResult &result : run.result_timeline.results)
-    {
-        if (result.time_elapsed_s >= 60 && !result.links_pumps.isEmpty() && !result.links_pumps.first().open)
-            saw_closed_pump = true;
-    }
-    expect(saw_closed_pump, "POWER premise should evaluate pump power and close the pump");
+    context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Invalid, "unsupported pump POWER rule should invalidate the run before simulation");
+    context.expect(!run.result_timeline.status.success, "unsupported pump POWER rule should return an error status");
+    context.expect(run.result_timeline.status.message.contains(QStringLiteral("POWER")), "unsupported pump POWER rule should return an explicit diagnostic");
+    context.expect(run.result_timeline.results.isEmpty(), "unsupported pump POWER rule should not return hydraulic results");
 }
 
-void testSteadyStatePumpEnergyRegression()
+void testSteadyStatePumpEnergyRegression(TestContext &context)
 {
     const NetworkHydraulic network = makePumpNetwork(false, 0);
     const EpanetResultRun run = EpanetRunner().run(network);
-    expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "steady-state pump network should produce valid results");
-    expect(run.result_timeline.results.size() == 1, "steady-state run should return one timestep");
+    context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "steady-state pump network should produce valid results");
+    context.expectEqual(static_cast<std::int64_t>(run.result_timeline.results.size()), std::int64_t{1}, comparison("results.size"), "steady-state run should return one timestep");
     if (run.result_timeline.results.isEmpty())
         return;
 
     const HydraulicSimulationResult &result = run.result_timeline.results.last();
-    expect(result.links_pump_energy_usage.size() == 1, "steady-state pump energy usage should be returned");
+    context.expectEqual(static_cast<std::int64_t>(result.links_pump_energy_usage.size()), std::int64_t{1}, comparison("links_pump_energy_usage.size", result.time_elapsed_s), "steady-state pump energy usage should be returned");
     if (!result.links_pump_energy_usage.isEmpty())
-        expect(approximatelyEqual(result.links_pump_energy_usage.first().time_online_percent, 100.0), "running steady-state pump should report 100 percent online");
-    expect(result.energy_usage.peak_power_kw > 0.0, "steady-state system peak power should be returned");
-    expect(approximatelyEqual(result.flow_balance.flow_balance_ratio, 1.0, 1.0e-4), "steady-state flow balance should close");
+        context.expectNear(result.links_pump_energy_usage.first().time_online_percent, 100.0,
+            HydraulicQuantity::Percent,
+            comparison("time_online_percent", result.time_elapsed_s, "Pump", result.links_pump_energy_usage.first().pump_id.toStdString()),
+            "running steady-state pump should report 100 percent online");
+    context.expect(result.energy_usage.peak_power_kw > 0.0, "steady-state system peak power should be returned");
+    context.expectNear(result.flow_balance.flow_balance_ratio, 1.0, NumericTolerance{0.0, 1.0e-4},
+        comparison("flow_balance.flow_balance_ratio", result.time_elapsed_s), "steady-state flow balance should close");
 }
 }
 
-int main()
+namespace AowisEpanetTests
 {
-    testPhysicalResultContractAndLeakage();
-    testStructuredRuleControl();
-    testTimerPumpControlAndEnergySummary();
-    testPumpPowerRule();
-    testSteadyStatePumpEnergyRegression();
-
-    if (failure_count == 0)
-        std::cout << "All EPANET result-contract integration tests passed.\n";
-    return failure_count == 0 ? 0 : 1;
+void registerResultContractScenarios(ScenarioRegistry &registry)
+{
+    registry.add(ScenarioDefinition{
+        "contract-physical-results-and-leakage",
+        "Checks physical junction and pipe result relationships, FAVAD leakage, control membership, and flow balance.",
+        {"contract", "hydraulic", "leakage"},
+        &testPhysicalResultContractAndLeakage});
+    registry.add(ScenarioDefinition{
+        "contract-structured-rule-control",
+        "Checks a structured time rule, its action, and rule membership reporting.",
+        {"contract", "hydraulic", "control"},
+        &testStructuredRuleControl});
+    registry.add(ScenarioDefinition{
+        "contract-timer-pump-energy",
+        "Checks a timer-controlled pump, next-event reporting, and pump and system energy summaries.",
+        {"contract", "hydraulic", "pump", "energy"},
+        &testTimerPumpControlAndEnergySummary});
+    registry.add(ScenarioDefinition{
+        "contract-reject-pump-power-rule",
+        "Checks explicit rejection of pump POWER premises unsupported by the bundled EPANET rule engine.",
+        {"contract", "negative", "control"},
+        &testUnsupportedPumpPowerRule});
+    registry.add(ScenarioDefinition{
+        "contract-steady-state-pump-energy",
+        "Checks steady-state pump energy accumulation and flow balance.",
+        {"contract", "hydraulic", "pump", "energy"},
+        &testSteadyStatePumpEnergyRegression});
+}
 }

@@ -1,0 +1,732 @@
+#include "native_epanet_reference_runner.h"
+
+#include <epanet2_2.h>
+
+#include <QByteArray>
+#include <QFile>
+#include <QTemporaryDir>
+
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
+#include <string>
+
+namespace AowisEpanetTests
+{
+namespace
+{
+constexpr double kMetresPerFoot = 0.3048;
+constexpr double kCubicMetresPerHourPerCubicFootPerSecond = 101.94;
+constexpr double kGallonsPerMinutePerCubicFootPerSecond = 448.831;
+constexpr double kMillionGallonsPerDayPerCubicFootPerSecond = 0.64632;
+constexpr double kImperialMillionGallonsPerDayPerCubicFootPerSecond = 0.5382;
+constexpr double kAcreFeetPerDayPerCubicFootPerSecond = 1.9837;
+constexpr double kLitresPerSecondPerCubicFootPerSecond = 28.317;
+constexpr double kLitresPerMinutePerCubicFootPerSecond = 1699.0;
+constexpr double kMillionLitresPerDayPerCubicFootPerSecond = 2.4466;
+constexpr double kCubicMetresPerDayPerCubicFootPerSecond = 2446.6;
+constexpr double kCubicMetresPerSecondPerCubicFootPerSecond = 0.028317;
+constexpr double kPsiPerFoot = 0.4333;
+constexpr double kKilopascalsPerPsi = 6.895;
+constexpr double kBarPerPsi = 0.068948;
+
+void checkEpanet(int error_code, const char *operation)
+{
+    if (error_code == 0)
+        return;
+
+    char message[EN_MAXMSG + 1] = {};
+    EN_geterror(error_code, message, EN_MAXMSG);
+    throw std::runtime_error(std::string(operation) + " failed with EPANET error "
+        + std::to_string(error_code) + ": " + message);
+}
+
+class NativeProject
+{
+public:
+    NativeProject()
+    {
+        checkEpanet(EN_createproject(&this->handle_), "EN_createproject");
+    }
+
+    ~NativeProject()
+    {
+        if (this->hydraulics_open_)
+            EN_closeH(this->handle_);
+        if (this->project_open_)
+            EN_close(this->handle_);
+        if (this->handle_ != nullptr)
+            EN_deleteproject(this->handle_);
+    }
+
+    EN_Project handle() const
+    {
+        return this->handle_;
+    }
+
+    void markProjectOpen()
+    {
+        this->project_open_ = true;
+    }
+
+    void markHydraulicsOpen()
+    {
+        this->hydraulics_open_ = true;
+    }
+
+    void closeHydraulics()
+    {
+        checkEpanet(EN_closeH(this->handle_), "EN_closeH");
+        this->hydraulics_open_ = false;
+    }
+
+    void closeProject()
+    {
+        checkEpanet(EN_close(this->handle_), "EN_close");
+        this->project_open_ = false;
+    }
+
+private:
+    EN_Project handle_ = nullptr;
+    bool project_open_ = false;
+    bool hydraulics_open_ = false;
+};
+
+struct NativeUnitSystem
+{
+    int flow_units = EN_CMH;
+    int pressure_units = EN_METERS;
+    double specific_gravity = 1.0;
+};
+
+struct PumpEnergyAccumulator
+{
+    QString pump_id;
+    double online_hours = 0.0;
+    double efficiency_percent_hours = 0.0;
+    double kw_per_flow_hours = 0.0;
+    double power_kw_hours = 0.0;
+    double peak_power_kw = 0.0;
+    double total_cost = 0.0;
+};
+
+struct FlowBalanceAccumulator
+{
+    double covered_seconds = 0.0;
+    double total_inflow = 0.0;
+    double total_outflow = 0.0;
+    double consumer_demand = 0.0;
+    double demand_deficit = 0.0;
+    double emitter_flow = 0.0;
+    double leakage_flow = 0.0;
+    double storage_flow = 0.0;
+};
+
+bool usesUsLengthUnits(int flow_units)
+{
+    return flow_units >= EN_CFS && flow_units <= EN_AFD;
+}
+
+double flowToCubicMetresPerHour(double value, int flow_units)
+{
+    switch (flow_units)
+    {
+    case EN_CFS:
+        return value * kCubicMetresPerHourPerCubicFootPerSecond;
+    case EN_GPM:
+        return value / kGallonsPerMinutePerCubicFootPerSecond
+            * kCubicMetresPerHourPerCubicFootPerSecond;
+    case EN_MGD:
+        return value / kMillionGallonsPerDayPerCubicFootPerSecond
+            * kCubicMetresPerHourPerCubicFootPerSecond;
+    case EN_IMGD:
+        return value / kImperialMillionGallonsPerDayPerCubicFootPerSecond
+            * kCubicMetresPerHourPerCubicFootPerSecond;
+    case EN_AFD:
+        return value / kAcreFeetPerDayPerCubicFootPerSecond
+            * kCubicMetresPerHourPerCubicFootPerSecond;
+    case EN_LPS:
+        return value / kLitresPerSecondPerCubicFootPerSecond
+            * kCubicMetresPerHourPerCubicFootPerSecond;
+    case EN_LPM:
+        return value / kLitresPerMinutePerCubicFootPerSecond
+            * kCubicMetresPerHourPerCubicFootPerSecond;
+    case EN_MLD:
+        return value / kMillionLitresPerDayPerCubicFootPerSecond
+            * kCubicMetresPerHourPerCubicFootPerSecond;
+    case EN_CMH:
+        return value;
+    case EN_CMD:
+        return value / kCubicMetresPerDayPerCubicFootPerSecond
+            * kCubicMetresPerHourPerCubicFootPerSecond;
+    case EN_CMS:
+        return value / kCubicMetresPerSecondPerCubicFootPerSecond
+            * kCubicMetresPerHourPerCubicFootPerSecond;
+    }
+    throw std::runtime_error("Native reference runner encountered unknown EPANET flow units");
+}
+
+double headToMetres(double value, int flow_units)
+{
+    return usesUsLengthUnits(flow_units) ? value * kMetresPerFoot : value;
+}
+
+double velocityToMetresPerSecond(double value, int flow_units)
+{
+    return usesUsLengthUnits(flow_units) ? value * kMetresPerFoot : value;
+}
+
+double volumeToCubicMetres(double value, int flow_units)
+{
+    return usesUsLengthUnits(flow_units)
+        ? value * kMetresPerFoot * kMetresPerFoot * kMetresPerFoot
+        : value;
+}
+
+double diameterToMetres(double value, int flow_units)
+{
+    return usesUsLengthUnits(flow_units) ? value * 0.0254 : value / 1000.0;
+}
+
+double pressureToHeadMetres(double value, const NativeUnitSystem &units)
+{
+    switch (units.pressure_units)
+    {
+    case EN_PSI:
+        return value / (kPsiPerFoot * units.specific_gravity) * kMetresPerFoot;
+    case EN_KPA:
+        return value / (kKilopascalsPerPsi * kPsiPerFoot * units.specific_gravity)
+            * kMetresPerFoot;
+    case EN_METERS:
+        return value;
+    case EN_BAR:
+        return value / (kBarPerPsi * kPsiPerFoot * units.specific_gravity)
+            * kMetresPerFoot;
+    case EN_FEET:
+        return value * kMetresPerFoot;
+    }
+    throw std::runtime_error("Native reference runner encountered unknown EPANET pressure units");
+}
+
+double nodeValue(EN_Project project, int node_index, int property)
+{
+    double value = 0.0;
+    checkEpanet(EN_getnodevalue(project, node_index, property, &value), "EN_getnodevalue");
+    return value;
+}
+
+double linkValue(EN_Project project, int link_index, int property)
+{
+    double value = 0.0;
+    checkEpanet(EN_getlinkvalue(project, link_index, property, &value), "EN_getlinkvalue");
+    return value;
+}
+
+double statisticValue(EN_Project project, int statistic)
+{
+    double value = 0.0;
+    checkEpanet(EN_getstatistic(project, statistic, &value), "EN_getstatistic");
+    return value;
+}
+
+double optionValue(EN_Project project, int option)
+{
+    double value = 0.0;
+    checkEpanet(EN_getoption(project, option, &value), "EN_getoption");
+    return value;
+}
+
+long timeParameter(EN_Project project, int parameter)
+{
+    long value = 0;
+    checkEpanet(EN_gettimeparam(project, parameter, &value), "EN_gettimeparam");
+    return value;
+}
+
+int objectCount(EN_Project project, int object_type)
+{
+    int count = 0;
+    checkEpanet(EN_getcount(project, object_type, &count), "EN_getcount");
+    return count;
+}
+
+QString nodeId(EN_Project project, int node_index)
+{
+    char id[EN_MAXID + 1] = {};
+    checkEpanet(EN_getnodeid(project, node_index, id), "EN_getnodeid");
+    return QString::fromUtf8(id);
+}
+
+QString linkId(EN_Project project, int link_index)
+{
+    char id[EN_MAXID + 1] = {};
+    checkEpanet(EN_getlinkid(project, link_index, id), "EN_getlinkid");
+    return QString::fromUtf8(id);
+}
+
+NativeUnitSystem readUnitSystem(EN_Project project)
+{
+    NativeUnitSystem units;
+    checkEpanet(EN_getflowunits(project, &units.flow_units), "EN_getflowunits");
+    units.pressure_units = static_cast<int>(optionValue(project, EN_PRESS_UNITS));
+    units.specific_gravity = optionValue(project, EN_SP_GRAVITY);
+    return units;
+}
+
+void appendNodeResult(EN_Project project, int node_index, const NativeUnitSystem &units, NativeHydraulicResult &result)
+{
+    int node_type = 0;
+    checkEpanet(EN_getnodetype(project, node_index, &node_type), "EN_getnodetype");
+    const QString id = nodeId(project, node_index);
+
+    if (node_type == EN_JUNCTION)
+    {
+        NativeJunctionResult junction;
+        junction.id = id;
+        junction.demand_requested_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_FULLDEMAND), units.flow_units);
+        junction.demand_delivered_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_DEMANDFLOW), units.flow_units);
+        junction.demand_deficit_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_DEMANDDEFICIT), units.flow_units);
+        junction.total_demand_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_DEMAND), units.flow_units);
+        junction.emitter_flow_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_EMITTERFLOW), units.flow_units);
+        junction.leakage_flow_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_LEAKAGEFLOW), units.flow_units);
+        junction.head_m = headToMetres(nodeValue(project, node_index, EN_HEAD), units.flow_units);
+        junction.pressure_head_m = pressureToHeadMetres(nodeValue(project, node_index, EN_PRESSURE), units);
+        junction.appears_in_control = nodeValue(project, node_index, EN_NODE_INCONTROL) != 0.0;
+        result.nodes_junctions.append(junction);
+        return;
+    }
+
+    if (node_type == EN_RESERVOIR)
+    {
+        NativeReservoirResult reservoir;
+        reservoir.id = id;
+        reservoir.net_demand_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_DEMAND), units.flow_units);
+        reservoir.head_m = headToMetres(nodeValue(project, node_index, EN_HEAD), units.flow_units);
+        reservoir.pressure_head_m = pressureToHeadMetres(nodeValue(project, node_index, EN_PRESSURE), units);
+        reservoir.appears_in_control = nodeValue(project, node_index, EN_NODE_INCONTROL) != 0.0;
+        result.nodes_reservoirs.append(reservoir);
+        return;
+    }
+
+    if (node_type == EN_TANK)
+    {
+        NativeTankResult tank;
+        tank.id = id;
+        tank.net_demand_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_DEMAND), units.flow_units);
+        tank.head_m = headToMetres(nodeValue(project, node_index, EN_HEAD), units.flow_units);
+        tank.pressure_head_m = pressureToHeadMetres(nodeValue(project, node_index, EN_PRESSURE), units);
+        tank.water_level_m = headToMetres(nodeValue(project, node_index, EN_TANKLEVEL), units.flow_units);
+        tank.volume_m3 = volumeToCubicMetres(nodeValue(project, node_index, EN_TANKVOLUME), units.flow_units);
+        tank.mixing_zone_volume_m3 = volumeToCubicMetres(nodeValue(project, node_index, EN_MIXZONEVOL), units.flow_units);
+        tank.appears_in_control = nodeValue(project, node_index, EN_NODE_INCONTROL) != 0.0;
+        result.nodes_tanks.append(tank);
+        return;
+    }
+
+    throw std::runtime_error("Native reference runner encountered unknown EPANET node type");
+}
+
+NativePumpState pumpState(double value)
+{
+    switch (static_cast<int>(value))
+    {
+    case EN_PUMP_XHEAD:
+        return NativePumpState::CannotSupplyHead;
+    case EN_PUMP_CLOSED:
+        return NativePumpState::Closed;
+    case EN_PUMP_OPEN:
+        return NativePumpState::Open;
+    case EN_PUMP_XFLOW:
+        return NativePumpState::CannotSupplyFlow;
+    }
+    throw std::runtime_error("Native reference runner encountered unknown EPANET pump state");
+}
+
+double valveSettingToCanonical(double value, int link_type, const NativeUnitSystem &units)
+{
+    switch (link_type)
+    {
+    case EN_PRV:
+    case EN_PSV:
+    case EN_PBV:
+        return pressureToHeadMetres(value, units);
+    case EN_FCV:
+        return flowToCubicMetresPerHour(value, units.flow_units);
+    default:
+        return value;
+    }
+}
+
+void appendLinkResult(EN_Project project, int link_index, const NativeUnitSystem &units, NativeHydraulicResult &result)
+{
+    int link_type = 0;
+    checkEpanet(EN_getlinktype(project, link_index, &link_type), "EN_getlinktype");
+    const QString id = linkId(project, link_index);
+
+    if (link_type == EN_PIPE || link_type == EN_CVPIPE)
+    {
+        NativePipeResult pipe;
+        pipe.id = id;
+        pipe.flow_m3_per_h = flowToCubicMetresPerHour(linkValue(project, link_index, EN_FLOW), units.flow_units);
+        pipe.leakage_flow_m3_per_h = flowToCubicMetresPerHour(linkValue(project, link_index, EN_LINK_LEAKAGE), units.flow_units);
+        pipe.velocity_m_per_s = velocityToMetresPerSecond(linkValue(project, link_index, EN_VELOCITY), units.flow_units);
+        pipe.head_loss_m = headToMetres(linkValue(project, link_index, EN_HEADLOSS), units.flow_units);
+        pipe.open = static_cast<int>(linkValue(project, link_index, EN_STATUS)) != EN_CLOSED;
+        pipe.roughness = linkValue(project, link_index, EN_SETTING);
+        pipe.appears_in_control = linkValue(project, link_index, EN_LINK_INCONTROL) != 0.0;
+
+        const double length_m = headToMetres(linkValue(project, link_index, EN_LENGTH), units.flow_units);
+        if (length_m > 0.0)
+            pipe.unit_head_loss_m_per_km = pipe.head_loss_m / length_m * 1000.0;
+
+        const double diameter_m = diameterToMetres(linkValue(project, link_index, EN_DIAMETER), units.flow_units);
+        const double flow_cubic_feet_per_second = std::abs(pipe.flow_m3_per_h)
+            / kCubicMetresPerHourPerCubicFootPerSecond;
+        constexpr double tiny_flow_cubic_feet_per_second = 1.0e-6;
+        if (length_m > 0.0 && diameter_m > 0.0 && flow_cubic_feet_per_second > tiny_flow_cubic_feet_per_second)
+        {
+            const double head_loss_ft = pipe.head_loss_m / kMetresPerFoot;
+            const double diameter_ft = diameter_m / kMetresPerFoot;
+            const double length_ft = length_m / kMetresPerFoot;
+            pipe.friction_factor = 39.725 * head_loss_ft * std::pow(diameter_ft, 5.0)
+                / length_ft / std::pow(flow_cubic_feet_per_second, 2.0);
+        }
+
+        result.links_pipes.append(pipe);
+        return;
+    }
+
+    if (link_type == EN_PUMP)
+    {
+        NativePumpResult pump;
+        pump.id = id;
+        pump.flow_m3_per_h = flowToCubicMetresPerHour(linkValue(project, link_index, EN_FLOW), units.flow_units);
+        pump.velocity_m_per_s = velocityToMetresPerSecond(linkValue(project, link_index, EN_VELOCITY), units.flow_units);
+        pump.head_gain_m = -headToMetres(linkValue(project, link_index, EN_HEADLOSS), units.flow_units);
+        pump.open = static_cast<int>(linkValue(project, link_index, EN_STATUS)) != EN_CLOSED;
+        pump.state = pumpState(linkValue(project, link_index, EN_PUMP_STATE));
+        pump.speed = linkValue(project, link_index, EN_SETTING);
+        pump.efficiency_percent = linkValue(project, link_index, EN_PUMP_EFFIC) * 100.0;
+        pump.power_kw = linkValue(project, link_index, EN_ENERGY);
+        pump.appears_in_control = linkValue(project, link_index, EN_LINK_INCONTROL) != 0.0;
+        result.links_pumps.append(pump);
+        return;
+    }
+
+    if (link_type >= EN_PRV && link_type <= EN_PCV)
+    {
+        NativeValveResult valve;
+        valve.id = id;
+        valve.flow_m3_per_h = flowToCubicMetresPerHour(linkValue(project, link_index, EN_FLOW), units.flow_units);
+        valve.velocity_m_per_s = velocityToMetresPerSecond(linkValue(project, link_index, EN_VELOCITY), units.flow_units);
+        valve.head_loss_m = headToMetres(linkValue(project, link_index, EN_HEADLOSS), units.flow_units);
+        const int status = static_cast<int>(linkValue(project, link_index, EN_STATUS));
+        valve.open = status != EN_CLOSED;
+        valve.active = status > EN_OPEN;
+        valve.setting = valveSettingToCanonical(linkValue(project, link_index, EN_SETTING), link_type, units);
+        valve.appears_in_control = linkValue(project, link_index, EN_LINK_INCONTROL) != 0.0;
+        result.links_valves.append(valve);
+        return;
+    }
+
+    throw std::runtime_error("Native reference runner encountered unknown EPANET link type");
+}
+
+NativeHydraulicStatistics readStatistics(EN_Project project, const NativeUnitSystem &units)
+{
+    NativeHydraulicStatistics statistics;
+    statistics.hydraulic_iterations = static_cast<std::int64_t>(statisticValue(project, EN_ITERATIONS));
+    statistics.relative_error = statisticValue(project, EN_RELATIVEERROR);
+    statistics.maximum_head_error_m = headToMetres(statisticValue(project, EN_MAXHEADERROR), units.flow_units);
+    statistics.maximum_flow_change_m3_per_h = flowToCubicMetresPerHour(statisticValue(project, EN_MAXFLOWCHANGE), units.flow_units);
+    statistics.deficient_nodes = static_cast<std::int64_t>(statisticValue(project, EN_DEFICIENTNODES));
+    statistics.demand_reduction_percent = statisticValue(project, EN_DEMANDREDUCTION);
+    statistics.leakage_loss_percent = statisticValue(project, EN_LEAKAGELOSS);
+    return statistics;
+}
+
+NativeTimestepEvent readNextEvent(EN_Project project, const NativeReferenceConfiguration &configuration)
+{
+    int event_type = 0;
+    long duration_s = 0;
+    int element_index = 0;
+    checkEpanet(EN_timetonextevent(project, &event_type, &duration_s, &element_index), "EN_timetonextevent");
+    if (duration_s < 0)
+        throw std::runtime_error("Native EPANET returned a negative next-event duration");
+
+    NativeTimestepEvent event;
+    event.time_until_event_s = duration_s;
+    switch (event_type)
+    {
+    case EN_STEP_REPORT:
+        event.type = NativeTimestepEventType::ReportStep;
+        break;
+    case EN_STEP_HYD:
+        event.type = NativeTimestepEventType::HydraulicStep;
+        break;
+    case EN_STEP_WQ:
+        event.type = NativeTimestepEventType::QualityStep;
+        break;
+    case EN_STEP_TANKEVENT:
+        event.type = NativeTimestepEventType::TankEvent;
+        event.tank_id = nodeId(project, element_index);
+        break;
+    case EN_STEP_CONTROLEVENT:
+        event.type = NativeTimestepEventType::ControlEvent;
+        event.control_id = configuration.control_ids_by_index.value(element_index);
+        if (event.control_id.isEmpty())
+            throw std::runtime_error("Native next-event control index has no scenario ID mapping");
+        break;
+    default:
+        throw std::runtime_error("Native reference runner encountered unknown EPANET timestep event type");
+    }
+    return event;
+}
+
+void initializePumpAccumulators(const NativeHydraulicResult &result, QList<PumpEnergyAccumulator> &accumulators)
+{
+    if (!accumulators.isEmpty() || result.links_pumps.isEmpty())
+        return;
+
+    for (const NativePumpResult &pump : result.links_pumps)
+    {
+        PumpEnergyAccumulator accumulator;
+        accumulator.pump_id = pump.id;
+        accumulators.append(accumulator);
+    }
+}
+
+void accumulatePumpEnergy(const NativeHydraulicResult &result, double interval_hours, double global_energy_price_per_kw_h, QList<PumpEnergyAccumulator> &accumulators, double &system_peak_power_kw)
+{
+    initializePumpAccumulators(result, accumulators);
+    if (accumulators.size() != result.links_pumps.size())
+        throw std::runtime_error("Native pump result set changed during the hydraulic timeline");
+
+    double simultaneous_power_kw = 0.0;
+    for (int index = 0; index < result.links_pumps.size(); index++)
+    {
+        const NativePumpResult &pump = result.links_pumps.at(index);
+        if (pump.efficiency_percent <= 0.0)
+            continue;
+
+        PumpEnergyAccumulator &accumulator = accumulators[index];
+        accumulator.online_hours += interval_hours;
+        accumulator.efficiency_percent_hours += pump.efficiency_percent * interval_hours;
+        accumulator.power_kw_hours += pump.power_kw * interval_hours;
+        constexpr double minimum_energy_flow_m3_per_h = 1.0e-6 * kCubicMetresPerHourPerCubicFootPerSecond;
+        const double energy_flow_m3_per_h = std::max(minimum_energy_flow_m3_per_h, std::abs(pump.flow_m3_per_h));
+        accumulator.kw_per_flow_hours += pump.power_kw / energy_flow_m3_per_h * interval_hours;
+        accumulator.peak_power_kw = std::max(accumulator.peak_power_kw, pump.power_kw);
+        accumulator.total_cost += global_energy_price_per_kw_h * pump.power_kw * interval_hours;
+        simultaneous_power_kw += pump.power_kw;
+    }
+    system_peak_power_kw = std::max(system_peak_power_kw, simultaneous_power_kw);
+}
+
+void storePumpEnergy(double duration_hours, double demand_charge_per_kw, const QList<PumpEnergyAccumulator> &accumulators, double system_peak_power_kw, NativeHydraulicResult &result)
+{
+    for (const PumpEnergyAccumulator &accumulator : accumulators)
+    {
+        NativePumpEnergyUsage usage;
+        usage.pump_id = accumulator.pump_id;
+        if (duration_hours > 0.0)
+            usage.time_online_percent = accumulator.online_hours / duration_hours * 100.0;
+        else if (accumulator.online_hours > 0.0)
+            usage.time_online_percent = 100.0;
+        if (accumulator.online_hours > 0.0)
+        {
+            usage.average_efficiency_percent = accumulator.efficiency_percent_hours / accumulator.online_hours;
+            usage.average_kw_per_flow_unit = accumulator.kw_per_flow_hours / accumulator.online_hours;
+            usage.average_power_kw = accumulator.power_kw_hours / accumulator.online_hours;
+        }
+        usage.peak_power_kw = accumulator.peak_power_kw;
+        if (duration_hours > 0.0)
+            usage.average_cost_per_day = accumulator.total_cost * 24.0 / duration_hours;
+        else
+            usage.average_cost_per_day = accumulator.total_cost * 24.0;
+        result.links_pump_energy_usage.append(usage);
+        result.energy_usage.energy_cost_per_day += usage.average_cost_per_day;
+    }
+
+    result.energy_usage.peak_power_kw = system_peak_power_kw;
+    result.energy_usage.demand_charge_per_day = system_peak_power_kw * demand_charge_per_kw;
+    result.energy_usage.total_cost_per_day = result.energy_usage.energy_cost_per_day
+        + result.energy_usage.demand_charge_per_day;
+}
+
+void accumulateFlowBalance(const NativeHydraulicResult &result, double interval_seconds, FlowBalanceAccumulator &accumulator)
+{
+    double total_inflow = 0.0;
+    double total_outflow = 0.0;
+    double consumer_demand = 0.0;
+    double demand_deficit = 0.0;
+    double emitter_flow = 0.0;
+    double leakage_flow = 0.0;
+    double storage_flow = 0.0;
+
+    for (const NativeJunctionResult &junction : result.nodes_junctions)
+    {
+        if (junction.demand_delivered_m3_per_h < 0.0)
+            total_inflow -= junction.demand_delivered_m3_per_h;
+        else
+        {
+            consumer_demand += junction.demand_delivered_m3_per_h;
+            total_outflow += junction.demand_delivered_m3_per_h;
+        }
+        emitter_flow += junction.emitter_flow_m3_per_h;
+        total_outflow += junction.emitter_flow_m3_per_h;
+        leakage_flow += junction.leakage_flow_m3_per_h;
+        total_outflow += junction.leakage_flow_m3_per_h;
+        demand_deficit += junction.demand_deficit_m3_per_h;
+    }
+
+    for (const NativeReservoirResult &reservoir : result.nodes_reservoirs)
+    {
+        if (reservoir.net_demand_m3_per_h >= 0.0)
+            total_outflow += reservoir.net_demand_m3_per_h;
+        else
+            total_inflow -= reservoir.net_demand_m3_per_h;
+    }
+
+    for (const NativeTankResult &tank : result.nodes_tanks)
+        storage_flow += tank.net_demand_m3_per_h;
+
+    accumulator.covered_seconds += interval_seconds;
+    accumulator.total_inflow += total_inflow * interval_seconds;
+    accumulator.total_outflow += total_outflow * interval_seconds;
+    accumulator.consumer_demand += consumer_demand * interval_seconds;
+    accumulator.demand_deficit += demand_deficit * interval_seconds;
+    accumulator.emitter_flow += emitter_flow * interval_seconds;
+    accumulator.leakage_flow += leakage_flow * interval_seconds;
+    accumulator.storage_flow += storage_flow * interval_seconds;
+}
+
+void storeFlowBalance(const FlowBalanceAccumulator &accumulator, NativeHydraulicResult &result)
+{
+    if (accumulator.covered_seconds <= 0.0)
+        return;
+
+    result.flow_balance.total_inflow_m3_per_h = accumulator.total_inflow / accumulator.covered_seconds;
+    result.flow_balance.total_outflow_m3_per_h = accumulator.total_outflow / accumulator.covered_seconds;
+    result.flow_balance.consumer_demand_m3_per_h = accumulator.consumer_demand / accumulator.covered_seconds;
+    result.flow_balance.demand_deficit_m3_per_h = accumulator.demand_deficit / accumulator.covered_seconds;
+    result.flow_balance.emitter_flow_m3_per_h = accumulator.emitter_flow / accumulator.covered_seconds;
+    result.flow_balance.leakage_flow_m3_per_h = accumulator.leakage_flow / accumulator.covered_seconds;
+    result.flow_balance.storage_flow_m3_per_h = accumulator.storage_flow / accumulator.covered_seconds;
+
+    double adjusted_inflow = result.flow_balance.total_inflow_m3_per_h;
+    double adjusted_outflow = result.flow_balance.total_outflow_m3_per_h;
+    if (result.flow_balance.storage_flow_m3_per_h > 0.0)
+        adjusted_outflow += result.flow_balance.storage_flow_m3_per_h;
+    else
+        adjusted_inflow -= result.flow_balance.storage_flow_m3_per_h;
+    if (adjusted_inflow == adjusted_outflow)
+        result.flow_balance.flow_balance_ratio = 1.0;
+    else if (adjusted_inflow > 0.0)
+        result.flow_balance.flow_balance_ratio = adjusted_outflow / adjusted_inflow;
+}
+}
+
+NativeHydraulicTimeline runNativeEpanetReference(const NativeReferenceConfiguration &configuration)
+{
+    NativeHydraulicTimeline timeline;
+    try
+    {
+        if (configuration.input_file.isEmpty())
+            throw std::runtime_error("Native reference input file path is empty");
+
+        QTemporaryDir temporary_directory;
+        if (!temporary_directory.isValid())
+            throw std::runtime_error("Could not create a temporary directory for the native EPANET report");
+
+        NativeProject project;
+        const QByteArray input_file = QFile::encodeName(configuration.input_file);
+        const QByteArray report_file = QFile::encodeName(temporary_directory.filePath(QStringLiteral("native-reference.rpt")));
+        checkEpanet(EN_open(project.handle(), input_file.constData(), report_file.constData(), ""), "EN_open");
+        project.markProjectOpen();
+
+        const NativeUnitSystem units = readUnitSystem(project.handle());
+        const long duration_s = timeParameter(project.handle(), EN_DURATION);
+        if (duration_s < 0)
+            throw std::runtime_error("Native EPANET returned a negative duration");
+        const double global_energy_price_per_kw_h = optionValue(project.handle(), EN_GLOBALPRICE);
+        const double demand_charge_per_kw = optionValue(project.handle(), EN_DEMANDCHARGE);
+
+        checkEpanet(EN_openH(project.handle()), "EN_openH");
+        project.markHydraulicsOpen();
+        checkEpanet(EN_initH(project.handle(), EN_INITFLOW), "EN_initH");
+
+        const int node_count = objectCount(project.handle(), EN_NODECOUNT);
+        const int link_count = objectCount(project.handle(), EN_LINKCOUNT);
+        long previous_time_s = -1;
+        QList<PumpEnergyAccumulator> pump_energy_accumulators;
+        double system_peak_power_kw = 0.0;
+        FlowBalanceAccumulator flow_balance_accumulator;
+
+        while (true)
+        {
+            long current_time_s = 0;
+            checkEpanet(EN_runH(project.handle(), &current_time_s), "EN_runH");
+            if (current_time_s < 0)
+                throw std::runtime_error("Native EPANET returned a negative elapsed time");
+            if (previous_time_s >= 0 && current_time_s <= previous_time_s)
+                throw std::runtime_error("Native EPANET hydraulic time did not advance");
+            previous_time_s = current_time_s;
+
+            NativeHydraulicResult result;
+            result.time_elapsed_s = current_time_s;
+            for (int node_index = 1; node_index <= node_count; node_index++)
+                appendNodeResult(project.handle(), node_index, units, result);
+            for (int link_index = 1; link_index <= link_count; link_index++)
+                appendLinkResult(project.handle(), link_index, units, result);
+            result.statistics = readStatistics(project.handle(), units);
+            result.event_next = readNextEvent(project.handle(), configuration);
+
+            long next_step_s = 0;
+            checkEpanet(EN_nextH(project.handle(), &next_step_s), "EN_nextH");
+            if (next_step_s < 0)
+                throw std::runtime_error("Native EPANET returned a negative hydraulic timestep");
+            if (result.event_next.time_until_event_s != next_step_s)
+            {
+                result.event_next.type = NativeTimestepEventType::HydraulicStep;
+                result.event_next.tank_id.clear();
+                result.event_next.control_id.clear();
+            }
+            result.event_next.time_until_event_s = next_step_s;
+
+            if (next_step_s > 0)
+            {
+                accumulatePumpEnergy(result, static_cast<double>(next_step_s) / 3600.0,
+                    global_energy_price_per_kw_h, pump_energy_accumulators, system_peak_power_kw);
+                accumulateFlowBalance(result, static_cast<double>(next_step_s), flow_balance_accumulator);
+            }
+            else if (duration_s == 0)
+            {
+                accumulatePumpEnergy(result, 1.0, global_energy_price_per_kw_h,
+                    pump_energy_accumulators, system_peak_power_kw);
+                accumulateFlowBalance(result, 1.0, flow_balance_accumulator);
+            }
+
+            timeline.results.append(result);
+            if (next_step_s <= 0)
+                break;
+        }
+
+        project.closeHydraulics();
+        if (!timeline.results.isEmpty())
+        {
+            NativeHydraulicResult &final_result = timeline.results.last();
+            storePumpEnergy(static_cast<double>(duration_s) / 3600.0, demand_charge_per_kw,
+                pump_energy_accumulators, system_peak_power_kw, final_result);
+            storeFlowBalance(flow_balance_accumulator, final_result);
+        }
+        project.closeProject();
+        timeline.success = true;
+    }
+    catch (const std::exception &exception)
+    {
+        timeline.error = QString::fromUtf8(exception.what());
+    }
+    return timeline;
+}
+}

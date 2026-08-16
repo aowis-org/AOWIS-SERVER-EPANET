@@ -82,22 +82,6 @@ HydraulicSimulationStatus prepareEpanetNetwork(const NetworkHydraulic &source, N
     prepared.links_pumps = enabledEntities(source.links_pumps);
     prepared.links_valves = enabledEntities(source.links_valves);
 
-    prepared.controls_simple.clear();
-    prepared.controls_simple.reserve(source.controls_simple.size());
-    for (const HydraulicControlSimple &control : source.controls_simple)
-    {
-        if (control.enabled)
-            prepared.controls_simple.append(control);
-    }
-
-    prepared.controls_rules.clear();
-    prepared.controls_rules.reserve(source.controls_rules.size());
-    for (const HydraulicControlRule &rule : source.controls_rules)
-    {
-        if (rule.enabled)
-            prepared.controls_rules.append(rule);
-    }
-
     const QSet<QUuid> all_node_uuids = nodeUuids(source);
     const QSet<QUuid> enabled_node_uuids = nodeUuids(prepared);
 

@@ -37,3 +37,17 @@ The adapter maps native errors into `HydraulicSimulationStatus`:
 - `operation`, `stage`, `property`, and `entity` remain generic AOWIS concepts.
 
 See `EPANET_SPECIFIC_BOUNDARY.md` for the names deliberately retained as EPANET-specific.
+
+## Hydraulic tests
+
+Configure, build, and run the adapter tests with:
+
+```bash
+./compile_linux_tests.sh
+```
+
+The adapter test executable uses a named scenario registry, and CTest registers each scenario separately. Run `ctest --test-dir build-linux-tests -N` to list them or use `ctest --test-dir build-linux-tests -R <name> --verbose` to run one scenario.
+
+The `conformance-net1` scenario opens the vendored upstream Net1 INP directly with native EPANET, independently constructs the same hydraulic network as `NetworkHydraulic`, runs it through `EpanetRunner`, and compares every hydraulic event and applicable result field.
+
+See `EPANET_HYDRAULIC_CONFORMANCE.md` for the coverage matrix, upstream-test classification, scope, tolerances, and the evidence required before claiming complete hydraulic conformance.
