@@ -197,7 +197,19 @@ enum class NativeReferenceVariant
     TankVolumeCurve,
     PipeInputs,
     DarcyWeisbach,
-    ChezyManning
+    ChezyManning,
+    PumpThreePoint,
+    PumpMultiPoint,
+    PumpConstantPower,
+    PumpInitialSpeed,
+    PumpSpeedPattern,
+    PumpInitialOff,
+    PumpConstantEfficiency,
+    PumpEfficiencyCurve,
+    PumpGlobalEnergy,
+    PumpEnergyPattern,
+    PumpCannotSupplyHead,
+    PumpCannotSupplyFlow
 };
 
 struct NativeReferenceConfiguration

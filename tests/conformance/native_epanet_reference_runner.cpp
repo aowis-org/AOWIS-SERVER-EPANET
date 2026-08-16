@@ -99,6 +99,20 @@ void setFormulaRoughness(EN_Project project, int headloss_formula, double defaul
     }
 }
 
+void disableNet1PumpControls(EN_Project project)
+{
+    checkEpanet(EN_setcontrolenabled(project, 1, 0), "EN_setcontrolenabled(disable 1)");
+    checkEpanet(EN_setcontrolenabled(project, 2, 0), "EN_setcontrolenabled(disable 2)");
+}
+
+void setPumpCurve(EN_Project project, double *flows, double *heads, int point_count)
+{
+    checkEpanet(EN_setcurve(project, 1, flows, heads, point_count), "EN_setcurve(pump head)");
+    checkEpanet(EN_setcurvetype(project, 1, EN_PUMP_CURVE), "EN_setcurvetype(EN_PUMP_CURVE)");
+    const int pump_index = linkIndex(project, "9");
+    checkEpanet(EN_setlinkvalue(project, pump_index, EN_PUMP_HCURVE, 1.0), "EN_setlinkvalue(EN_PUMP_HCURVE)");
+}
+
 void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
 {
     switch (variant)
@@ -294,6 +308,129 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
         setFormulaRoughness(project, EN_CM, 0.013, 0.017);
         return;
+    case NativeReferenceVariant::PumpThreePoint:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        double flows[] = {0.0, 300.0, 600.0};
+        double heads[] = {90.0, 65.0, 20.0};
+        setPumpCurve(project, flows, heads, 3);
+        return;
+    }
+    case NativeReferenceVariant::PumpMultiPoint:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        double flows[] = {0.0, 200.0, 400.0, 650.0};
+        double heads[] = {95.0, 82.0, 55.0, 15.0};
+        setPumpCurve(project, flows, heads, 4);
+        return;
+    }
+    case NativeReferenceVariant::PumpConstantPower:
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        checkEpanet(EN_setlinkvalue(project, linkIndex(project, "9"), EN_PUMP_POWER, 75.0), "EN_setlinkvalue(EN_PUMP_POWER)");
+        return;
+    case NativeReferenceVariant::PumpInitialSpeed:
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        checkEpanet(EN_setlinkvalue(project, linkIndex(project, "9"), EN_INITSETTING, 0.8), "EN_setlinkvalue(EN_INITSETTING)");
+        return;
+    case NativeReferenceVariant::PumpSpeedPattern:
+    {
+        configureCanonicalMetricUnits(project);
+        disableNet1PumpControls(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 7200), "EN_settimeparam(EN_DURATION)");
+        checkEpanet(EN_settimeparam(project, EN_PATTERNSTEP, 3600), "EN_settimeparam(EN_PATTERNSTEP)");
+        double factors[] = {0.8, 1.0, 1.15};
+        const int pattern_index = addPattern(project, "STEP5_SPEED", factors, 3);
+        checkEpanet(EN_setlinkvalue(project, linkIndex(project, "9"), EN_LINKPATTERN, static_cast<double>(pattern_index)), "EN_setlinkvalue(EN_LINKPATTERN)");
+        return;
+    }
+    case NativeReferenceVariant::PumpInitialOff:
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        checkEpanet(EN_setlinkvalue(project, linkIndex(project, "9"), EN_INITSTATUS, EN_CLOSED), "EN_setlinkvalue(EN_INITSTATUS)");
+        return;
+    case NativeReferenceVariant::PumpConstantEfficiency:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        checkEpanet(EN_addcurve(project, "STEP5_CONST_EFF"), "EN_addcurve(STEP5_CONST_EFF)");
+        int curve_index = 0;
+        checkEpanet(EN_getcurveindex(project, "STEP5_CONST_EFF", &curve_index), "EN_getcurveindex(STEP5_CONST_EFF)");
+        double flows[] = {0.0};
+        double efficiencies[] = {83.0};
+        checkEpanet(EN_setcurve(project, curve_index, flows, efficiencies, 1), "EN_setcurve(STEP5_CONST_EFF)");
+        checkEpanet(EN_setcurvetype(project, curve_index, EN_EFFIC_CURVE), "EN_setcurvetype(EN_EFFIC_CURVE)");
+        checkEpanet(EN_setlinkvalue(project, linkIndex(project, "9"), EN_PUMP_ECURVE, static_cast<double>(curve_index)), "EN_setlinkvalue(EN_PUMP_ECURVE)");
+        return;
+    }
+    case NativeReferenceVariant::PumpEfficiencyCurve:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        checkEpanet(EN_addcurve(project, "STEP5_EFF"), "EN_addcurve(STEP5_EFF)");
+        int curve_index = 0;
+        checkEpanet(EN_getcurveindex(project, "STEP5_EFF", &curve_index), "EN_getcurveindex(STEP5_EFF)");
+        double flows[] = {0.0, 200.0, 400.0, 650.0};
+        double efficiencies[] = {60.0, 76.0, 88.0, 79.0};
+        checkEpanet(EN_setcurve(project, curve_index, flows, efficiencies, 4), "EN_setcurve(STEP5_EFF)");
+        checkEpanet(EN_setcurvetype(project, curve_index, EN_EFFIC_CURVE), "EN_setcurvetype(EN_EFFIC_CURVE)");
+        checkEpanet(EN_setlinkvalue(project, linkIndex(project, "9"), EN_PUMP_ECURVE, static_cast<double>(curve_index)), "EN_setlinkvalue(EN_PUMP_ECURVE)");
+        return;
+    }
+    case NativeReferenceVariant::PumpGlobalEnergy:
+    {
+        configureCanonicalMetricUnits(project);
+        disableNet1PumpControls(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 7200), "EN_settimeparam(EN_DURATION)");
+        checkEpanet(EN_settimeparam(project, EN_PATTERNSTEP, 3600), "EN_settimeparam(EN_PATTERNSTEP)");
+        checkEpanet(EN_setoption(project, EN_GLOBALEFFIC, 82.0), "EN_setoption(EN_GLOBALEFFIC)");
+        checkEpanet(EN_setoption(project, EN_GLOBALPRICE, 0.2), "EN_setoption(EN_GLOBALPRICE)");
+        checkEpanet(EN_setoption(project, EN_DEMANDCHARGE, 1.5), "EN_setoption(EN_DEMANDCHARGE)");
+        double factors[] = {1.0, 2.0};
+        const int pattern_index = addPattern(project, "STEP5_GLOBAL_PRICE", factors, 2);
+        checkEpanet(EN_setoption(project, EN_GLOBALPATTERN, static_cast<double>(pattern_index)), "EN_setoption(EN_GLOBALPATTERN)");
+        return;
+    }
+    case NativeReferenceVariant::PumpEnergyPattern:
+    {
+        configureCanonicalMetricUnits(project);
+        disableNet1PumpControls(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 7200), "EN_settimeparam(EN_DURATION)");
+        checkEpanet(EN_settimeparam(project, EN_PATTERNSTEP, 3600), "EN_settimeparam(EN_PATTERNSTEP)");
+        checkEpanet(EN_setoption(project, EN_GLOBALEFFIC, 80.0), "EN_setoption(EN_GLOBALEFFIC)");
+        checkEpanet(EN_setoption(project, EN_GLOBALPRICE, 0.1), "EN_setoption(EN_GLOBALPRICE)");
+        checkEpanet(EN_setoption(project, EN_DEMANDCHARGE, 0.75), "EN_setoption(EN_DEMANDCHARGE)");
+        double global_factors[] = {4.0, 4.0};
+        const int global_pattern_index = addPattern(project, "STEP5_GLOBAL_UNUSED", global_factors, 2);
+        checkEpanet(EN_setoption(project, EN_GLOBALPATTERN, static_cast<double>(global_pattern_index)), "EN_setoption(EN_GLOBALPATTERN)");
+        double pump_factors[] = {1.0, 0.5};
+        const int pump_pattern_index = addPattern(project, "STEP5_PUMP_PRICE", pump_factors, 2);
+        const int pump_index = linkIndex(project, "9");
+        checkEpanet(EN_setlinkvalue(project, pump_index, EN_PUMP_ECOST, 0.3), "EN_setlinkvalue(EN_PUMP_ECOST)");
+        checkEpanet(EN_setlinkvalue(project, pump_index, EN_PUMP_EPAT, static_cast<double>(pump_pattern_index)), "EN_setlinkvalue(EN_PUMP_EPAT)");
+        return;
+    }
+    case NativeReferenceVariant::PumpCannotSupplyHead:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        double flows[] = {100.0};
+        double heads[] = {5.0};
+        setPumpCurve(project, flows, heads, 1);
+        return;
+    }
+    case NativeReferenceVariant::PumpCannotSupplyFlow:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        double flows[] = {0.0, 5.0, 10.0, 20.0};
+        double heads[] = {100.0, 95.0, 90.0, 80.0};
+        setPumpCurve(project, flows, heads, 4);
+        return;
+    }
     }
     throw std::runtime_error("Unknown native reference variant");
 }
@@ -753,7 +890,42 @@ void initializePumpAccumulators(const NativeHydraulicResult &result, QList<PumpE
     }
 }
 
-void accumulatePumpEnergy(const NativeHydraulicResult &result, double interval_hours, double global_energy_price_per_kw_h, QList<PumpEnergyAccumulator> &accumulators, double &system_peak_power_kw)
+double nativePatternFactor(EN_Project project, int pattern_index, long time_s)
+{
+    if (pattern_index <= 0)
+        return 1.0;
+    int pattern_length = 0;
+    checkEpanet(EN_getpatternlen(project, pattern_index, &pattern_length), "EN_getpatternlen");
+    if (pattern_length <= 0)
+        return 1.0;
+    const long pattern_step_s = timeParameter(project, EN_PATTERNSTEP);
+    if (pattern_step_s <= 0)
+        return 1.0;
+    const long pattern_start_s = timeParameter(project, EN_PATTERNSTART);
+    const long period = (time_s + pattern_start_s) / pattern_step_s;
+    const int period_index = static_cast<int>(period % pattern_length) + 1;
+    double factor = 1.0;
+    checkEpanet(EN_getpatternvalue(project, pattern_index, period_index, &factor), "EN_getpatternvalue");
+    return factor;
+}
+
+double nativePumpEnergyPrice(EN_Project project, const NativePumpResult &pump, long time_s)
+{
+    double price = optionValue(project, EN_GLOBALPRICE);
+    int pattern_index = static_cast<int>(optionValue(project, EN_GLOBALPATTERN));
+    const QByteArray pump_id = pump.id.toUtf8();
+    int pump_index = 0;
+    checkEpanet(EN_getlinkindex(project, pump_id.constData(), &pump_index), "EN_getlinkindex(pump energy)");
+    const double pump_price = linkValue(project, pump_index, EN_PUMP_ECOST);
+    const int pump_pattern_index = static_cast<int>(linkValue(project, pump_index, EN_PUMP_EPAT));
+    if (pump_price > 0.0)
+        price = pump_price;
+    if (pump_pattern_index > 0)
+        pattern_index = pump_pattern_index;
+    return price * nativePatternFactor(project, pattern_index, time_s);
+}
+
+void accumulatePumpEnergy(EN_Project project, const NativeHydraulicResult &result, double interval_hours, long time_s, QList<PumpEnergyAccumulator> &accumulators, double &system_peak_power_kw)
 {
     initializePumpAccumulators(result, accumulators);
     if (accumulators.size() != result.links_pumps.size())
@@ -774,7 +946,7 @@ void accumulatePumpEnergy(const NativeHydraulicResult &result, double interval_h
         const double energy_flow_m3_per_h = std::max(minimum_energy_flow_m3_per_h, std::abs(pump.flow_m3_per_h));
         accumulator.kw_per_flow_hours += pump.power_kw / energy_flow_m3_per_h * interval_hours;
         accumulator.peak_power_kw = std::max(accumulator.peak_power_kw, pump.power_kw);
-        accumulator.total_cost += global_energy_price_per_kw_h * pump.power_kw * interval_hours;
+        accumulator.total_cost += nativePumpEnergyPrice(project, pump, time_s) * pump.power_kw * interval_hours;
         simultaneous_power_kw += pump.power_kw;
     }
     system_peak_power_kw = std::max(system_peak_power_kw, simultaneous_power_kw);
@@ -924,7 +1096,6 @@ NativeHydraulicTimeline runNativeEpanetReference(const NativeReferenceConfigurat
         const long duration_s = timeParameter(project.handle(), EN_DURATION);
         if (duration_s < 0)
             throw std::runtime_error("Native EPANET returned a negative duration");
-        const double global_energy_price_per_kw_h = optionValue(project.handle(), EN_GLOBALPRICE);
         const double demand_charge_per_kw = optionValue(project.handle(), EN_DEMANDCHARGE);
 
         checkEpanet(EN_openH(project.handle()), "EN_openH");
@@ -975,13 +1146,13 @@ NativeHydraulicTimeline runNativeEpanetReference(const NativeReferenceConfigurat
 
             if (next_step_s > 0)
             {
-                accumulatePumpEnergy(result, static_cast<double>(next_step_s) / 3600.0,
-                    global_energy_price_per_kw_h, pump_energy_accumulators, system_peak_power_kw);
+                accumulatePumpEnergy(project.handle(), result, static_cast<double>(next_step_s) / 3600.0,
+                    current_time_s, pump_energy_accumulators, system_peak_power_kw);
                 accumulateFlowBalance(result, static_cast<double>(next_step_s), flow_balance_accumulator);
             }
             else if (duration_s == 0)
             {
-                accumulatePumpEnergy(result, 1.0, global_energy_price_per_kw_h,
+                accumulatePumpEnergy(project.handle(), result, 1.0, current_time_s,
                     pump_energy_accumulators, system_peak_power_kw);
                 accumulateFlowBalance(result, 1.0, flow_balance_accumulator);
             }

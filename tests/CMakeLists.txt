@@ -23,6 +23,18 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-upstream-pipe-inputs
     conformance-upstream-pipe-darcy-weisbach
     conformance-upstream-pipe-chezy-manning
+    conformance-upstream-pump-three-point
+    conformance-upstream-pump-multipoint
+    conformance-upstream-pump-constant-power
+    conformance-upstream-pump-initial-speed
+    conformance-upstream-pump-speed-pattern
+    conformance-upstream-pump-initial-off
+    conformance-upstream-pump-constant-efficiency
+    conformance-upstream-pump-efficiency-curve
+    conformance-upstream-pump-global-energy
+    conformance-upstream-pump-energy-pattern
+    conformance-upstream-pump-xhead
+    conformance-upstream-pump-xflow
 )
 
 set(AOWIS_SERVER_EPANET_TEST_SCENARIOS
@@ -44,10 +56,12 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/result_contract_scenarios.h
     conformance/upstream_step3_scenarios.h
     conformance/upstream_step4_scenarios.h
+    conformance/upstream_step5_scenarios.h
     test_net1_conformance.cpp
     test_result_contract.cpp
     test_upstream_step3_conformance.cpp
     test_upstream_step4_conformance.cpp
+    test_upstream_step5_conformance.cpp
 )
 
 target_link_libraries(aowis-server-epanet-conformance-tests
