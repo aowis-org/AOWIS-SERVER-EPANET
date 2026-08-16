@@ -16,6 +16,7 @@ namespace AowisEpanetTests
 namespace
 {
 constexpr double kMetresPerFoot = 0.3048;
+constexpr double kPi = 3.141592653589793238462643383279502884;
 constexpr double kCubicMetresPerHourPerCubicFootPerSecond = 101.94;
 constexpr double kGallonsPerMinutePerCubicFootPerSecond = 448.831;
 constexpr double kMillionGallonsPerDayPerCubicFootPerSecond = 0.64632;
@@ -62,6 +63,40 @@ int linkIndex(EN_Project project, const char *id)
     int index = 0;
     checkEpanet(EN_getlinkindex(project, id, &index), "EN_getlinkindex");
     return index;
+}
+
+void configureCanonicalMetricUnits(EN_Project project)
+{
+    checkEpanet(EN_setflowunits(project, EN_CMH), "EN_setflowunits(EN_CMH)");
+    checkEpanet(EN_setoption(project, EN_PRESS_UNITS, EN_METERS), "EN_setoption(EN_PRESS_UNITS)");
+}
+
+int addPattern(EN_Project project, const char *id, double *factors, int factor_count)
+{
+    checkEpanet(EN_addpattern(project, id), "EN_addpattern");
+    int pattern_index = 0;
+    checkEpanet(EN_getpatternindex(project, id, &pattern_index), "EN_getpatternindex");
+    checkEpanet(EN_setpattern(project, pattern_index, factors, factor_count), "EN_setpattern");
+    return pattern_index;
+}
+
+void setFormulaRoughness(EN_Project project, int headloss_formula, double default_roughness, double pipe_10_roughness)
+{
+    checkEpanet(EN_setoption(project, EN_HEADLOSSFORM, static_cast<double>(headloss_formula)), "EN_setoption(EN_HEADLOSSFORM)");
+    int link_count = 0;
+    checkEpanet(EN_getcount(project, EN_LINKCOUNT, &link_count), "EN_getcount(EN_LINKCOUNT)");
+    for (int link_index = 1; link_index <= link_count; link_index++)
+    {
+        int link_type = 0;
+        checkEpanet(EN_getlinktype(project, link_index, &link_type), "EN_getlinktype");
+        if (link_type != EN_PIPE && link_type != EN_CVPIPE)
+            continue;
+
+        char id[EN_MAXID + 1] = {};
+        checkEpanet(EN_getlinkid(project, link_index, id), "EN_getlinkid");
+        const double roughness = std::string(id) == "10" ? pipe_10_roughness : default_roughness;
+        checkEpanet(EN_setlinkvalue(project, link_index, EN_ROUGHNESS, roughness), "EN_setlinkvalue(EN_ROUGHNESS)");
+    }
 }
 
 void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
@@ -160,6 +195,105 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
             throw std::runtime_error("EPANET did not assign upstream simple-control index 4");
         return;
     }
+    case NativeReferenceVariant::JunctionReservoirInputs:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 7200), "EN_settimeparam(EN_DURATION)");
+
+        const int junction_index = nodeIndex(project, "11");
+        checkEpanet(EN_setjuncdata(project, junction_index, 215.0, 34.0, "1"), "EN_setjuncdata(step4 junction)");
+        checkEpanet(EN_setnodevalue(project, junction_index, EN_EMITTER, 1.75), "EN_setnodevalue(EN_EMITTER)");
+
+        double factors[] = {1.0, 1.05};
+        const int pattern_index = addPattern(project, "STEP4_RES_HEAD", factors, 2);
+        const int reservoir_index = nodeIndex(project, "9");
+        checkEpanet(EN_setnodevalue(project, reservoir_index, EN_ELEVATION, 250.0), "EN_setnodevalue(reservoir head)");
+        checkEpanet(EN_setnodevalue(project, reservoir_index, EN_PATTERN, static_cast<double>(pattern_index)), "EN_setnodevalue(reservoir pattern)");
+        return;
+    }
+    case NativeReferenceVariant::DemandCategories:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 7200), "EN_settimeparam(EN_DURATION)");
+
+        double primary_factors[] = {1.0, 2.0};
+        double secondary_factors[] = {0.5, 1.5};
+        double constant_factors[] = {1.0};
+        addPattern(project, "STEP4_PRIMARY", primary_factors, 2);
+        addPattern(project, "STEP4_SECONDARY", secondary_factors, 2);
+        addPattern(project, "STEP4_CONSTANT", constant_factors, 1);
+
+        const int junction_index = nodeIndex(project, "12");
+        checkEpanet(EN_setjuncdata(project, junction_index, 213.36, 20.0, "STEP4_PRIMARY"), "EN_setjuncdata(step4 primary demand)");
+        checkEpanet(EN_setdemandname(project, junction_index, 1, "PrimaryDemand"), "EN_setdemandname(primary)");
+        checkEpanet(EN_adddemand(project, junction_index, 7.0, "STEP4_CONSTANT", "SecondaryDemand"), "EN_adddemand(constant)");
+        checkEpanet(EN_adddemand(project, junction_index, 5.0, "STEP4_SECONDARY", "TertiaryDemand"), "EN_adddemand(secondary pattern)");
+        return;
+    }
+    case NativeReferenceVariant::TankUniformArea:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        const int tank_index = nodeIndex(project, "2");
+        const double area_m2 = 200.0;
+        const double diameter_m = std::sqrt(4.0 * area_m2 / kPi);
+        checkEpanet(EN_settankdata(project, tank_index, 255.0, 40.0, 30.0, 50.0, diameter_m, 40.0, ""), "EN_settankdata(uniform area)");
+        return;
+    }
+    case NativeReferenceVariant::TankVolumeAtMaximum:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        const int tank_index = nodeIndex(project, "2");
+        const double area_m2 = (4040.0 - 40.0) / (50.0 - 30.0);
+        const double diameter_m = std::sqrt(4.0 * area_m2 / kPi);
+        checkEpanet(EN_settankdata(project, tank_index, 255.0, 40.0, 30.0, 50.0, diameter_m, 40.0, ""), "EN_settankdata(volume at maximum)");
+        return;
+    }
+    case NativeReferenceVariant::TankVolumeCurve:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        checkEpanet(EN_addcurve(project, "STEP4_TANK_VOLUME"), "EN_addcurve(step4 tank volume)");
+        int curve_index = 0;
+        checkEpanet(EN_getcurveindex(project, "STEP4_TANK_VOLUME", &curve_index), "EN_getcurveindex(step4 tank volume)");
+        double levels[] = {30.0, 35.0, 40.0, 45.0, 50.0};
+        double volumes[] = {40.0, 600.0, 1500.0, 2700.0, 4200.0};
+        checkEpanet(EN_setcurve(project, curve_index, levels, volumes, 5), "EN_setcurve(step4 tank volume)");
+        checkEpanet(EN_setcurvetype(project, curve_index, EN_VOLUME_CURVE), "EN_setcurvetype(EN_VOLUME_CURVE)");
+        const int tank_index = nodeIndex(project, "2");
+        checkEpanet(EN_settankdata(project, tank_index, 255.0, 40.0, 30.0, 50.0, 0.0, 40.0, "STEP4_TANK_VOLUME"), "EN_settankdata(volume curve)");
+        return;
+    }
+    case NativeReferenceVariant::PipeInputs:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+
+        const int pipe_111 = linkIndex(project, "111");
+        checkEpanet(EN_setpipedata(project, pipe_111, 1234.0, 275.0, 127.0, 0.65), "EN_setpipedata(step4 pipe 111)");
+
+        int pipe_113 = linkIndex(project, "113");
+        int node_from = 0;
+        int node_to = 0;
+        checkEpanet(EN_getlinknodes(project, pipe_113, &node_from, &node_to), "EN_getlinknodes(pipe 113)");
+        checkEpanet(EN_setlinknodes(project, pipe_113, node_to, node_from), "EN_setlinknodes(reverse pipe 113)");
+        checkEpanet(EN_setlinktype(project, &pipe_113, EN_CVPIPE, EN_UNCONDITIONAL), "EN_setlinktype(EN_CVPIPE)");
+
+        const int pipe_122 = linkIndex(project, "122");
+        checkEpanet(EN_setlinkvalue(project, pipe_122, EN_INITSTATUS, EN_CLOSED), "EN_setlinkvalue(EN_INITSTATUS)");
+        return;
+    }
+    case NativeReferenceVariant::DarcyWeisbach:
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        setFormulaRoughness(project, EN_DW, 0.25, 0.35);
+        return;
+    case NativeReferenceVariant::ChezyManning:
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        setFormulaRoughness(project, EN_CM, 0.013, 0.017);
+        return;
     }
     throw std::runtime_error("Unknown native reference variant");
 }

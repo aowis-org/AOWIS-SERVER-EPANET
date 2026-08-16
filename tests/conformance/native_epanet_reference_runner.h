@@ -189,7 +189,15 @@ enum class NativeReferenceVariant
     OverflowEnabled,
     Pcv,
     DemandPattern,
-    SimpleControl
+    SimpleControl,
+    JunctionReservoirInputs,
+    DemandCategories,
+    TankUniformArea,
+    TankVolumeAtMaximum,
+    TankVolumeCurve,
+    PipeInputs,
+    DarcyWeisbach,
+    ChezyManning
 };
 
 struct NativeReferenceConfiguration

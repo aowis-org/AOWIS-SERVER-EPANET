@@ -20,6 +20,7 @@ public:
 
 private:
     HydraulicSimulationStatus addPatternTime(const HydraulicPatternTime &pattern);
+    HydraulicSimulationStatus configureConstantDemandPattern(const NetworkHydraulic &request);
     HydraulicSimulationStatus configureDefaultDemandPattern(const NetworkHydraulic &request);
     HydraulicSimulationStatus configureGlobalEnergyPattern(const NetworkHydraulic &request);
     HydraulicSimulationStatus addCurveTankVolume(const HydraulicCurveTankVolume &curve);
@@ -57,6 +58,7 @@ private:
     QHash<QUuid, QString> valve_ids_by_uuid;
     QHash<QUuid, QString> control_simple_ids_by_uuid;
     QHash<QUuid, QString> control_rule_ids_by_uuid;
+    QString constant_demand_pattern_id;
 };
 
 #endif // AOWIS_EPANET_NETWORK_BUILDER_H

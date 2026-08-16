@@ -449,6 +449,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulic &re
     this->valve_ids_by_uuid.clear();
     this->control_simple_ids_by_uuid.clear();
     this->control_rule_ids_by_uuid.clear();
+    this->constant_demand_pattern_id.clear();
 
     this->indices.patterns_time.clear();
     this->indices.curves_tank_volume.clear();
@@ -556,6 +557,9 @@ HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulic &re
         status = addPatternTime(pattern);
         collectBuildFailure(this->project, status, first_failure);
     }
+
+    status = configureConstantDemandPattern(request);
+    collectBuildFailure(this->project, status, first_failure);
 
     status = configureDefaultDemandPattern(request);
     collectBuildFailure(this->project, status, first_failure);
@@ -693,6 +697,73 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addPatternTime(const HydraulicPa
     }
 
     this->indices.patterns_time.insert(pattern.uuid, pattern_index);
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus EpanetNetworkBuilder::configureConstantDemandPattern(const NetworkHydraulic &request)
+{
+    bool needs_constant_pattern = false;
+    for (const HydraulicNodeJunction &junction : request.nodes_junctions)
+    {
+        for (const HydraulicNodeJunctionDemand &demand : junction.demands)
+        {
+            if (demand.pattern_mode == HydraulicTimePatternMode::Constant)
+            {
+                needs_constant_pattern = true;
+                break;
+            }
+        }
+        if (needs_constant_pattern)
+            break;
+    }
+
+    if (!needs_constant_pattern)
+        return makeEpanetSuccess();
+
+    QString pattern_id = QStringLiteral("__AOWIS_CONSTANT");
+    int suffix = 1;
+    bool id_in_use = true;
+    while (id_in_use)
+    {
+        id_in_use = false;
+        for (const HydraulicPatternTime &pattern : request.patterns_time)
+        {
+            if (pattern.id == pattern_id)
+            {
+                id_in_use = true;
+                pattern_id = QStringLiteral("__AOWIS_CONSTANT_%1").arg(suffix++);
+                break;
+            }
+        }
+    }
+
+    const QByteArray pattern_id_utf8 = pattern_id.toUtf8();
+    int error = EN_addpattern(this->project.handle(), pattern_id_utf8.constData());
+    if (error != 0)
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::AddPattern, QStringLiteral("EN_addpattern"), HydraulicSimulationStatusEntityType::Pattern, pattern_id, QUuid(), QStringLiteral("Failed to add internal constant-demand pattern"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
+
+    int pattern_index = 0;
+    error = EN_getpatternindex(this->project.handle(), pattern_id_utf8.constData(), &pattern_index);
+    if (error != 0)
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::ResolveEntity, QStringLiteral("EN_getpatternindex"), HydraulicSimulationStatusEntityType::Pattern, pattern_id, QUuid(), QStringLiteral("Failed to resolve internal constant-demand pattern"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
+
+    error = EN_setpatternvalue(this->project.handle(), pattern_index, 1, 1.0);
+    if (error != 0)
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::AddPattern, QStringLiteral("EN_setpatternvalue"), HydraulicSimulationStatusEntityType::Pattern, pattern_id, QUuid(), QStringLiteral("Failed to set internal constant-demand pattern"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
+
+    this->constant_demand_pattern_id = pattern_id;
     return makeEpanetSuccess();
 }
 
@@ -982,8 +1053,16 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
     {
         const HydraulicNodeJunctionDemand &first_demand = junction.demands.first();
         QByteArray first_pattern_id;
-        if (!resolveBackendId(this->pattern_ids_by_uuid, first_demand.pattern_uuid, first_pattern_id))
+        if (first_demand.pattern_mode == HydraulicTimePatternMode::Constant)
+        {
+            if (this->constant_demand_pattern_id.isEmpty())
+                return makeEpanetStatus(HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Internal constant-demand pattern is unavailable"));
+            first_pattern_id = this->constant_demand_pattern_id.toUtf8();
+        }
+        else if (!resolveBackendId(this->pattern_ids_by_uuid, first_demand.pattern_uuid, first_pattern_id))
+        {
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Could not resolve primary demand pattern UUID"));
+        }
 
         error = EN_setjuncdata(this->project.handle(), junction_index, elevation_m, first_demand.base_demand_m3_per_h, first_pattern_id.constData());
         if (error != 0)
@@ -1006,8 +1085,16 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
         {
             const HydraulicNodeJunctionDemand &demand = junction.demands.at(index);
             QByteArray pattern_id;
-            if (!resolveBackendId(this->pattern_ids_by_uuid, demand.pattern_uuid, pattern_id))
+            if (demand.pattern_mode == HydraulicTimePatternMode::Constant)
+            {
+                if (this->constant_demand_pattern_id.isEmpty())
+                    return makeEpanetStatus(HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Internal constant-demand pattern is unavailable"));
+                pattern_id = this->constant_demand_pattern_id.toUtf8();
+            }
+            else if (!resolveBackendId(this->pattern_ids_by_uuid, demand.pattern_uuid, pattern_id))
+            {
                 return makeEpanetStatus(HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Could not resolve demand pattern UUID"));
+            }
 
             const QByteArray demand_name = demand.category_name.isEmpty() ? QStringLiteral("Demand %1").arg(index + 1).toUtf8() : demand.category_name.toUtf8();
             error = EN_adddemand(this->project.handle(), junction_index, demand.base_demand_m3_per_h, pattern_id.constData(), demand_name.constData());

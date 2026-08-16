@@ -15,6 +15,14 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-upstream-demand-pattern
     conformance-upstream-simple-control
     conformance-upstream-hydraulic-stepping
+    conformance-upstream-junction-reservoir-inputs
+    conformance-upstream-demand-categories
+    conformance-upstream-tank-uniform-area
+    conformance-upstream-tank-volume-at-max
+    conformance-upstream-tank-volume-curve
+    conformance-upstream-pipe-inputs
+    conformance-upstream-pipe-darcy-weisbach
+    conformance-upstream-pipe-chezy-manning
 )
 
 set(AOWIS_SERVER_EPANET_TEST_SCENARIOS
@@ -35,9 +43,11 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/net1_fixture.h
     conformance/result_contract_scenarios.h
     conformance/upstream_step3_scenarios.h
+    conformance/upstream_step4_scenarios.h
     test_net1_conformance.cpp
     test_result_contract.cpp
     test_upstream_step3_conformance.cpp
+    test_upstream_step4_conformance.cpp
 )
 
 target_link_libraries(aowis-server-epanet-conformance-tests
