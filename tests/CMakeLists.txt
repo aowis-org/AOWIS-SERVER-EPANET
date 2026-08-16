@@ -35,6 +35,98 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-upstream-pump-energy-pattern
     conformance-upstream-pump-xhead
     conformance-upstream-pump-xflow
+    conformance-upstream-valve-prv
+    conformance-upstream-valve-psv
+    conformance-upstream-valve-pbv
+    conformance-upstream-valve-fcv
+    conformance-upstream-valve-tcv
+    conformance-upstream-valve-gpv
+    conformance-controls-simple-low-level
+    conformance-controls-simple-high-level
+    conformance-controls-simple-timer
+    conformance-controls-simple-time-of-day
+    conformance-controls-action-open
+    conformance-controls-action-close
+    conformance-controls-action-setting
+    conformance-controls-simple-disabled
+    conformance-controls-rule-logical-if
+    conformance-controls-rule-logical-and
+    conformance-controls-rule-logical-or
+    conformance-controls-rule-then
+    conformance-controls-rule-else
+    conformance-controls-rule-setting-action
+    conformance-controls-rule-active-action
+    conformance-controls-rule-source-text
+    conformance-controls-rule-priority
+    conformance-controls-rule-disabled
+    conformance-controls-premise-node-demand
+    conformance-controls-premise-node-head
+    conformance-controls-premise-node-grade
+    conformance-controls-premise-node-level
+    conformance-controls-premise-node-pressure
+    conformance-controls-premise-node-fill-time
+    conformance-controls-premise-node-drain-time
+    conformance-controls-premise-link-flow
+    conformance-controls-premise-link-status
+    conformance-controls-premise-link-setting
+    conformance-controls-premise-system-demand
+    conformance-controls-premise-system-time
+    conformance-controls-premise-system-clock-time
+    conformance-controls-operator-equal
+    conformance-controls-operator-not-equal
+    conformance-controls-operator-less-or-equal
+    conformance-controls-operator-greater-or-equal
+    conformance-controls-operator-less
+    conformance-controls-operator-greater
+    conformance-controls-operator-is
+    conformance-controls-operator-is-not
+    conformance-controls-operator-below
+    conformance-controls-operator-above
+    conformance-controls-next-hydraulic-event
+    conformance-controls-control-event-identification
+    conformance-options-time-duration
+    conformance-options-time-hydraulic-step
+    conformance-options-time-quality-step
+    conformance-options-time-pattern-step
+    conformance-options-time-pattern-start
+    conformance-options-time-report-step
+    conformance-options-time-report-start
+    conformance-options-time-rule-step
+    conformance-options-time-start-clock
+    conformance-options-report-statistic-series
+    conformance-options-report-statistic-average
+    conformance-options-report-statistic-minimum
+    conformance-options-report-statistic-maximum
+    conformance-options-report-statistic-range
+    conformance-options-hydraulic-headloss-hazen-williams
+    conformance-options-hydraulic-demand-model-dda
+    conformance-options-hydraulic-demand-model-pda
+    conformance-options-hydraulic-minimum-pressure
+    conformance-options-hydraulic-required-pressure
+    conformance-options-hydraulic-pressure-exponent
+    conformance-options-hydraulic-maximum-trials
+    conformance-options-hydraulic-accuracy
+    conformance-options-hydraulic-unbalanced-stop
+    conformance-options-hydraulic-unbalanced-continue
+    conformance-options-hydraulic-check-frequency
+    conformance-options-hydraulic-maximum-check
+    conformance-options-hydraulic-damping-limit
+    conformance-options-hydraulic-maximum-head-error
+    conformance-options-hydraulic-maximum-flow-change
+    conformance-options-hydraulic-demand-multiplier
+    conformance-options-hydraulic-default-demand-pattern-none
+    conformance-options-hydraulic-default-demand-pattern
+    conformance-options-hydraulic-emitter-exponent
+    conformance-options-hydraulic-emitter-backflow-disabled
+    conformance-options-hydraulic-emitter-backflow-enabled
+    conformance-options-hydraulic-specific-gravity
+    conformance-options-hydraulic-relative-viscosity
+    conformance-operational-statistics
+    conformance-operational-flow-balance
+    conformance-operational-warning-diagnostics
+    conformance-operational-error-diagnostics
+    conformance-operational-cancellation-before-results
+    conformance-operational-cancellation-partial-results
 )
 
 set(AOWIS_SERVER_EPANET_TEST_SCENARIOS
@@ -57,11 +149,15 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/upstream_step3_scenarios.h
     conformance/upstream_step4_scenarios.h
     conformance/upstream_step5_scenarios.h
+    conformance/upstream_step6_scenarios.h
+    conformance/upstream_step7_scenarios.h
     test_net1_conformance.cpp
     test_result_contract.cpp
     test_upstream_step3_conformance.cpp
     test_upstream_step4_conformance.cpp
     test_upstream_step5_conformance.cpp
+    test_upstream_step6_conformance.cpp
+    test_upstream_step7_conformance.cpp
 )
 
 target_link_libraries(aowis-server-epanet-conformance-tests

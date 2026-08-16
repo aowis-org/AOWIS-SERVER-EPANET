@@ -112,6 +112,80 @@ QHash<QUuid, QString> reportLinkIdsByUuid(const NetworkHydraulic &network)
     return ids_by_uuid;
 }
 
+QString normalizeSavedRuleFillDrainTimes(QString inp_text)
+{
+    QStringList lines = inp_text.split(QChar('\n'));
+    bool in_rules = false;
+
+    for (QString &line : lines)
+    {
+        const QString trimmed = line.trimmed();
+        if (trimmed.startsWith(QChar('[')))
+        {
+            in_rules = trimmed.compare(QStringLiteral("[RULES]"), Qt::CaseInsensitive) == 0;
+            continue;
+        }
+
+        if (!in_rules
+            || (!line.contains(QStringLiteral(" FILLTIME "), Qt::CaseInsensitive)
+                && !line.contains(QStringLiteral(" DRAINTIME "), Qt::CaseInsensitive)))
+        {
+            continue;
+        }
+
+        int value_end = line.size() - 1;
+        while (value_end >= 0 && line.at(value_end).isSpace())
+            value_end--;
+        if (value_end < 0)
+            continue;
+
+        int value_start = value_end;
+        while (value_start >= 0 && !line.at(value_start).isSpace())
+            value_start--;
+        value_start++;
+
+        const QString value_text = line.mid(value_start, value_end - value_start + 1);
+        if (!value_text.contains(QChar(':')))
+            continue;
+
+        const QStringList parts = value_text.split(QChar(':'));
+        if (parts.size() != 2 && parts.size() != 3)
+            continue;
+
+        bool hours_ok = false;
+        bool minutes_ok = false;
+        bool seconds_ok = true;
+        const double hours = parts.at(0).toDouble(&hours_ok);
+        const double minutes = parts.at(1).toDouble(&minutes_ok);
+        double seconds = 0.0;
+        if (parts.size() == 3)
+            seconds = parts.at(2).toDouble(&seconds_ok);
+
+        if (!hours_ok || !minutes_ok || !seconds_ok)
+            continue;
+
+        const double decimal_hours = hours + minutes / 60.0 + seconds / 3600.0;
+        line.replace(value_start, value_end - value_start + 1, QString::number(decimal_hours, 'g', 17));
+    }
+
+    return lines.join(QChar('\n'));
+}
+
+QString preserveNoDefaultDemandPattern(QString inp_text, const QString &unused_pattern_id)
+{
+    QStringList lines = inp_text.split(QChar('\n'));
+    for (int index = 0; index < lines.size(); index++)
+    {
+        if (lines.at(index).trimmed().compare(QStringLiteral("[OPTIONS]"), Qt::CaseInsensitive) != 0)
+            continue;
+
+        lines.insert(index + 1, QStringLiteral(" PATTERN             %1").arg(unused_pattern_id));
+        return lines.join(QChar('\n'));
+    }
+
+    return inp_text;
+}
+
 HydraulicSimulationStatus reportSelectionCommand(const QString &entity_name, HydraulicSimulationStatusEntityType entity_type, const HydraulicSimulationReportSelection &selection, const QHash<QUuid, QString> &ids_by_uuid, QString &command)
 {
     switch (selection.mode)
@@ -403,6 +477,15 @@ HydraulicSimulationStatus EpanetProject::retrieveInpText(QString &inp_text) cons
 {
     inp_text.clear();
 
+    double default_demand_pattern_index = 0.0;
+    const int demand_pattern_error = EN_getoption(this->project, EN_DEMANDPATTERN, &default_demand_pattern_index);
+    if (demand_pattern_error != 0)
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, demand_pattern_error, HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, QStringLiteral("EN_getoption(EN_DEMANDPATTERN)"), HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("Failed to inspect the default demand pattern before EPANET INP export"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
+
     QTemporaryDir temporary_directory;
     if (!temporary_directory.isValid())
         return makeEpanetStatus(HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("Failed to create a temporary directory for the EPANET INP export"));
@@ -425,7 +508,31 @@ HydraulicSimulationStatus EpanetProject::retrieveInpText(QString &inp_text) cons
     if (inp_file.error() != QFileDevice::NoError)
         return makeEpanetStatus(HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("Failed while reading the EPANET INP export: %1").arg(inp_file.errorString()));
 
-    inp_text = QString::fromUtf8(inp_data);
+    inp_text = normalizeSavedRuleFillDrainTimes(QString::fromUtf8(inp_data));
+    if (default_demand_pattern_index == 0.0)
+    {
+        QString unused_pattern_id = QStringLiteral("__AOWIS_NO_DEFAULT");
+        int suffix = 1;
+        while (true)
+        {
+            const QByteArray pattern_id_utf8 = unused_pattern_id.toUtf8();
+            int pattern_index = 0;
+            const int pattern_error = EN_getpatternindex(this->project, pattern_id_utf8.constData(), &pattern_index);
+            if (pattern_error == 205)
+                break;
+            if (pattern_error != 0)
+            {
+                const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, pattern_error, HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, QStringLiteral("EN_getpatternindex"), HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("Failed to choose an unused default-demand-pattern sentinel for EPANET INP export"));
+                if (!epanet_status.success)
+                    return epanet_status;
+            }
+
+            unused_pattern_id = QStringLiteral("__AOWIS_NO_DEFAULT_%1").arg(suffix++);
+        }
+
+        inp_text = preserveNoDefaultDemandPattern(inp_text, unused_pattern_id);
+    }
+
     return makeEpanetSuccess();
 }
 

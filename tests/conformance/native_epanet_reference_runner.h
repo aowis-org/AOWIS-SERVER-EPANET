@@ -92,6 +92,8 @@ struct NativePumpResult
 struct NativeValveResult
 {
     QString id;
+    double diameter_mm = 0.0;
+    double minor_loss = 0.0;
     double flow_m3_per_h = 0.0;
     double velocity_m_per_s = 0.0;
     double head_loss_m = 0.0;
@@ -209,7 +211,13 @@ enum class NativeReferenceVariant
     PumpGlobalEnergy,
     PumpEnergyPattern,
     PumpCannotSupplyHead,
-    PumpCannotSupplyFlow
+    PumpCannotSupplyFlow,
+    ValvePrv,
+    ValvePsv,
+    ValvePbv,
+    ValveFcv,
+    ValveTcv,
+    ValveGpv
 };
 
 struct NativeReferenceConfiguration

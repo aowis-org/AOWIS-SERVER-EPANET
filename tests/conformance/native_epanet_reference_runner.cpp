@@ -113,6 +113,116 @@ void setPumpCurve(EN_Project project, double *flows, double *heads, int point_co
     checkEpanet(EN_setlinkvalue(project, pump_index, EN_PUMP_HCURVE, 1.0), "EN_setlinkvalue(EN_PUMP_HCURVE)");
 }
 
+double feetToCanonicalMetres(double feet)
+{
+    return feet * kMetresPerFoot;
+}
+
+double gallonsPerMinuteToCanonicalCubicMetresPerHour(double gallons_per_minute)
+{
+    return gallons_per_minute / kGallonsPerMinutePerCubicFootPerSecond
+        * kCubicMetresPerHourPerCubicFootPerSecond;
+}
+
+void configureCanonicalMetricNet1Inputs(EN_Project project)
+{
+    // Reapply Net1 through the canonical metric API values used by AOWIS.
+    // Merely switching the loaded US fixture to CMH/metres leaves tiny round-trip
+    // differences that pressure-breaker valves can amplify at solver tolerance.
+    configureCanonicalMetricUnits(project);
+
+    struct JunctionInput
+    {
+        const char *id;
+        double elevation_ft;
+        double demand_gpm;
+    };
+
+    const JunctionInput junctions[] = {
+        {"10", 710.0, 0.0},
+        {"11", 710.0, 150.0},
+        {"12", 700.0, 150.0},
+        {"13", 695.0, 100.0},
+        {"21", 700.0, 150.0},
+        {"22", 695.0, 200.0},
+        {"23", 690.0, 150.0},
+        {"31", 700.0, 100.0},
+        {"32", 710.0, 100.0}
+    };
+
+    for (const JunctionInput &junction : junctions)
+    {
+        checkEpanet(EN_setjuncdata(
+            project,
+            nodeIndex(project, junction.id),
+            feetToCanonicalMetres(junction.elevation_ft),
+            gallonsPerMinuteToCanonicalCubicMetresPerHour(junction.demand_gpm),
+            "1"),
+            "EN_setjuncdata(canonical Net1)");
+    }
+
+    checkEpanet(EN_setnodevalue(
+        project,
+        nodeIndex(project, "9"),
+        EN_ELEVATION,
+        feetToCanonicalMetres(800.0)),
+        "EN_setnodevalue(canonical reservoir head)");
+
+    checkEpanet(EN_settankdata(
+        project,
+        nodeIndex(project, "2"),
+        feetToCanonicalMetres(850.0),
+        feetToCanonicalMetres(120.0),
+        feetToCanonicalMetres(100.0),
+        feetToCanonicalMetres(150.0),
+        feetToCanonicalMetres(50.5),
+        0.0,
+        ""),
+        "EN_settankdata(canonical Net1)");
+
+    struct PipeInput
+    {
+        const char *id;
+        double length_ft;
+        double diameter_in;
+    };
+
+    const PipeInput pipes[] = {
+        {"10", 10530.0, 18.0},
+        {"11", 5280.0, 14.0},
+        {"12", 5280.0, 10.0},
+        {"21", 5280.0, 10.0},
+        {"22", 5280.0, 12.0},
+        {"31", 5280.0, 6.0},
+        {"110", 200.0, 18.0},
+        {"111", 5280.0, 10.0},
+        {"112", 5280.0, 12.0},
+        {"113", 5280.0, 8.0},
+        {"121", 5280.0, 8.0},
+        {"122", 5280.0, 6.0}
+    };
+
+    for (const PipeInput &pipe : pipes)
+    {
+        checkEpanet(EN_setpipedata(
+            project,
+            linkIndex(project, pipe.id),
+            feetToCanonicalMetres(pipe.length_ft),
+            pipe.diameter_in * 25.4,
+            100.0,
+            0.0),
+            "EN_setpipedata(canonical Net1)");
+    }
+
+    double pump_flows[] = {gallonsPerMinuteToCanonicalCubicMetresPerHour(1500.0)};
+    double pump_heads[] = {feetToCanonicalMetres(250.0)};
+    setPumpCurve(project, pump_flows, pump_heads, 1);
+
+    const int pump_index = linkIndex(project, "9");
+    checkEpanet(EN_setlinkvalue(project, pump_index, EN_INITSETTING, 1.0), "EN_setlinkvalue(canonical pump speed)");
+    checkEpanet(EN_setlinkvalue(project, pump_index, EN_INITSTATUS, EN_OPEN), "EN_setlinkvalue(canonical pump status)");
+}
+
 void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
 {
     switch (variant)
@@ -153,11 +263,12 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
     }
     case NativeReferenceVariant::Pcv:
     {
+        configureCanonicalMetricNet1Inputs(project);
         checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
 
         int valve_index = linkIndex(project, "22");
         checkEpanet(EN_setlinktype(project, &valve_index, EN_PCV, EN_UNCONDITIONAL), "EN_setlinktype(EN_PCV)");
-        checkEpanet(EN_setlinkvalue(project, valve_index, EN_DIAMETER, 12.0), "EN_setlinkvalue(EN_DIAMETER)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_DIAMETER, 12.0 * 25.4), "EN_setlinkvalue(EN_DIAMETER)");
         checkEpanet(EN_setlinkvalue(project, valve_index, EN_MINORLOSS, 0.19), "EN_setlinkvalue(EN_MINORLOSS)");
 
         checkEpanet(EN_addcurve(project, "ValveCurve"), "EN_addcurve");
@@ -429,6 +540,80 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         double flows[] = {0.0, 5.0, 10.0, 20.0};
         double heads[] = {100.0, 95.0, 90.0, 80.0};
         setPumpCurve(project, flows, heads, 4);
+        return;
+    }
+    case NativeReferenceVariant::ValvePrv:
+    {
+        configureCanonicalMetricNet1Inputs(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        int valve_index = linkIndex(project, "121");
+        checkEpanet(EN_setlinktype(project, &valve_index, EN_PRV, EN_UNCONDITIONAL), "EN_setlinktype(EN_PRV)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_DIAMETER, 230.0), "EN_setlinkvalue(EN_DIAMETER)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_MINORLOSS, 0.35), "EN_setlinkvalue(EN_MINORLOSS)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_INITSETTING, 80.0), "EN_setlinkvalue(EN_INITSETTING)");
+        return;
+    }
+    case NativeReferenceVariant::ValvePsv:
+    {
+        configureCanonicalMetricNet1Inputs(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        int valve_index = linkIndex(project, "10");
+        checkEpanet(EN_setlinktype(project, &valve_index, EN_PSV, EN_UNCONDITIONAL), "EN_setlinktype(EN_PSV)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_DIAMETER, 400.0), "EN_setlinkvalue(EN_DIAMETER)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_MINORLOSS, 0.22), "EN_setlinkvalue(EN_MINORLOSS)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_INITSETTING, 86.0), "EN_setlinkvalue(EN_INITSETTING)");
+        return;
+    }
+    case NativeReferenceVariant::ValvePbv:
+    {
+        configureCanonicalMetricNet1Inputs(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        int valve_index = linkIndex(project, "121");
+        checkEpanet(EN_setlinktype(project, &valve_index, EN_PBV, EN_UNCONDITIONAL), "EN_setlinktype(EN_PBV)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_DIAMETER, 225.0), "EN_setlinkvalue(EN_DIAMETER)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_MINORLOSS, 0.33), "EN_setlinkvalue(EN_MINORLOSS)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_INITSETTING, 5.0), "EN_setlinkvalue(EN_INITSETTING)");
+        return;
+    }
+    case NativeReferenceVariant::ValveFcv:
+    {
+        configureCanonicalMetricNet1Inputs(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        int valve_index = linkIndex(project, "121");
+        checkEpanet(EN_setlinktype(project, &valve_index, EN_FCV, EN_UNCONDITIONAL), "EN_setlinktype(EN_FCV)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_DIAMETER, 210.0), "EN_setlinkvalue(EN_DIAMETER)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_MINORLOSS, 0.44), "EN_setlinkvalue(EN_MINORLOSS)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_INITSETTING, 20.0), "EN_setlinkvalue(EN_INITSETTING)");
+        return;
+    }
+    case NativeReferenceVariant::ValveTcv:
+    {
+        configureCanonicalMetricNet1Inputs(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        int valve_index = linkIndex(project, "121");
+        checkEpanet(EN_setlinktype(project, &valve_index, EN_TCV, EN_UNCONDITIONAL), "EN_setlinktype(EN_TCV)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_DIAMETER, 205.0), "EN_setlinkvalue(EN_DIAMETER)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_MINORLOSS, 0.18), "EN_setlinkvalue(EN_MINORLOSS)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_INITSETTING, 12.0), "EN_setlinkvalue(EN_INITSETTING)");
+        return;
+    }
+    case NativeReferenceVariant::ValveGpv:
+    {
+        configureCanonicalMetricNet1Inputs(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        int valve_index = linkIndex(project, "121");
+        checkEpanet(EN_setlinktype(project, &valve_index, EN_GPV, EN_UNCONDITIONAL), "EN_setlinktype(EN_GPV)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_DIAMETER, 220.0), "EN_setlinkvalue(EN_DIAMETER)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_MINORLOSS, 0.26), "EN_setlinkvalue(EN_MINORLOSS)");
+        checkEpanet(EN_addcurve(project, "STEP6_GPV"), "EN_addcurve(STEP6_GPV)");
+        int curve_index = 0;
+        checkEpanet(EN_getcurveindex(project, "STEP6_GPV", &curve_index), "EN_getcurveindex(STEP6_GPV)");
+        double flows[] = {0.0, 20.0, 40.0, 80.0};
+        double head_losses[] = {0.0, 0.4, 2.0, 8.0};
+        checkEpanet(EN_setcurve(project, curve_index, flows, head_losses, 4), "EN_setcurve(STEP6_GPV)");
+        checkEpanet(EN_setcurvetype(project, curve_index, EN_HLOSS_CURVE), "EN_setcurvetype(EN_HLOSS_CURVE)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_GPV_CURVE, static_cast<double>(curve_index)), "EN_setlinkvalue(EN_GPV_CURVE)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_INITSTATUS, EN_OPEN), "EN_setlinkvalue(EN_INITSTATUS)");
         return;
     }
     }
@@ -811,6 +996,8 @@ void appendLinkResult(EN_Project project, int link_index, const NativeUnitSystem
     {
         NativeValveResult valve;
         valve.id = id;
+        valve.diameter_mm = diameterToMetres(linkValue(project, link_index, EN_DIAMETER), units.flow_units) * 1000.0;
+        valve.minor_loss = linkValue(project, link_index, EN_MINORLOSS);
         valve.flow_m3_per_h = flowToCubicMetresPerHour(linkValue(project, link_index, EN_FLOW), units.flow_units);
         valve.velocity_m_per_s = velocityToMetresPerSecond(linkValue(project, link_index, EN_VELOCITY), units.flow_units);
         valve.head_loss_m = headToMetres(linkValue(project, link_index, EN_HEADLOSS), units.flow_units);

@@ -423,6 +423,21 @@ void testPcv(TestContext &context)
     context.expect(valve != nullptr, "upstream PCV result must contain converted link 22");
     if (valve != nullptr)
     {
+        context.expect(valve->open, "upstream PCV must be hydraulically open");
+        context.expect(valve->active, "upstream PCV must report Active status");
+        context.expect(valve->flow_m3_per_h > 0.0, "upstream PCV must carry positive flow");
+        context.expect(valve->velocity_m_per_s > 0.0, "upstream PCV must report positive velocity");
+        context.expectNear(valve->diameter_mm, 12.0 * 25.4,
+            NumericTolerance{1.0e-9, 1.0e-12},
+            comparison("upstream_golden.diameter_mm", result.time_elapsed_s, "Valve", "22"),
+            "upstream PCV must retain its configured 12-inch diameter");
+        context.expectNear(valve->minor_loss, 0.19,
+            NumericTolerance{1.0e-12, 1.0e-12},
+            comparison("upstream_golden.minor_loss", result.time_elapsed_s, "Valve", "22"),
+            "upstream PCV must retain its configured minor-loss coefficient");
+        context.expectNear(valve->setting, 35.0, NumericTolerance{1.0e-7, 1.0e-6},
+            comparison("upstream_golden.returned_setting", result.time_elapsed_s, "Valve", "22"),
+            "upstream PCV must return its configured 35-percent position");
         context.expectNear(valve->head_loss_m, feetToMetres(0.0255),
             NumericTolerance{feetToMetres(0.001), 0.0},
             comparison("upstream_golden.head_loss_m", result.time_elapsed_s, "Valve", "22"),

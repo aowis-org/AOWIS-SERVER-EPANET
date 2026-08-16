@@ -139,6 +139,9 @@ EpanetResultRun finishCancelledRun(EpanetResultRun result, const EpanetReportCol
 {
     result.cancelled = true;
     result.report_lines = report_collector.lines();
+    result.result_timeline.validity = result.result_timeline.results.isEmpty()
+        ? HydraulicSimulationResultValidity::Invalid
+        : HydraulicSimulationResultValidity::Partial;
     return result;
 }
 

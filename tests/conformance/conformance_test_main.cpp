@@ -4,6 +4,8 @@
 #include "upstream_step3_scenarios.h"
 #include "upstream_step4_scenarios.h"
 #include "upstream_step5_scenarios.h"
+#include "upstream_step6_scenarios.h"
+#include "upstream_step7_scenarios.h"
 
 #include <iostream>
 
@@ -15,5 +17,7 @@ int main(int argc, char *argv[])
     AowisEpanetTests::registerUpstreamStep3Scenarios(registry);
     AowisEpanetTests::registerUpstreamStep4Scenarios(registry);
     AowisEpanetTests::registerUpstreamStep5Scenarios(registry);
+    AowisEpanetTests::registerUpstreamStep6Scenarios(registry);
+    AowisEpanetTests::registerUpstreamStep7Scenarios(registry);
     return AowisEpanetTests::runTestProgram(argc, argv, registry, std::cout, std::cerr);
 }

@@ -18,7 +18,7 @@ external/epanet/tests/test_hydraulics.cpp|test_hydr_usefile|boost-case|not-appli
 external/epanet/tests/test_leakage.cpp|test_leakage_model|boost-case|wrapper-candidate|3-upstream|FAVAD parameters, pipe leakage, node leakage, and conservation map directly to AOWIS.
 external/epanet/tests/test_link.cpp|test_adddelete_link|boost-case|native-only|none|Mutable Toolkit link CRUD is not an EpanetRunner operation.
 external/epanet/tests/test_link.cpp|test_link_id_isvalid|boost-case|wrapper-candidate|8-fidelity-hardening|Invalid link IDs must be rejected by model-to-EPANET translation.
-external/epanet/tests/test_link.cpp|test_setlinktype|boost-case|wrapper-candidate|3-upstream|The check-valve pipe and PRV behavior can be rebuilt as equivalent AOWIS entities.
+external/epanet/tests/test_link.cpp|test_setlinktype|boost-case|wrapper-candidate|6-valves|The check-valve pipe path is covered by step 4 and the PRV conversion/regulation path is covered by complete valve conformance.
 external/epanet/tests/test_link.cpp|test_link_setid_save|boost-case|native-only|none|Renaming a live Toolkit link is not exposed by EpanetRunner.
 external/epanet/tests/test_link.cpp|test_link_setid_reopen|boost-case|native-only|none|This verifies Toolkit rename persistence rather than wrapper translation.
 external/epanet/tests/test_link.cpp|test_link_comments|boost-case|wrapper-candidate|8-fidelity-hardening|Link comments are part of planned INP metadata fidelity.
@@ -64,7 +64,7 @@ external/epanet/tests/test_units.cpp|test_pressure_units|boost-case|native-only|
 external/epanet/tests/test_units.cpp|test_pda_unit_change|boost-case|native-only|none|Changing native project units and converting existing PDA pressure limits is not an AOWIS wrapper operation.
 external/epanet/tests/test_units.cpp|test_rule_unit_change|boost-case|native-only|none|Changing native project units and rewriting existing rule/control quantities is not exposed by the canonical metric wrapper.
 external/epanet/tests/test_units.cpp|test_decoupled_pressure_units|boost-case|native-only|none|Selecting native pressure units independently from flow units is not exposed by the canonical metric wrapper.
-external/epanet/tests/test_valve.cpp|test_PCV_valve|boost-case|wrapper-candidate|3-upstream|The PCV curve, setting, minor loss, and golden head-loss result map to AOWIS.
+external/epanet/tests/test_valve.cpp|test_PCV_valve|boost-case|wrapper-candidate|6-valves|The upstream PCV characteristic curve, 35-percent setting, minor loss, status, returned setting, and golden head-loss result are native-compared.
 external/epanet/tests/outfile/test_output.cpp|OpenCloseTest|boost-case|native-only|none|The binary Output API handle lifecycle is outside the high-level wrapper contract.
 external/epanet/tests/outfile/test_output.cpp|test_getNetSize|boost-case|native-only|none|Binary Output API access is tested upstream and is not used by EpanetRunner.
 external/epanet/tests/outfile/test_output.cpp|test_getUnits|boost-case|not-applicable|none|This is a binary Output API water-quality unit test.
