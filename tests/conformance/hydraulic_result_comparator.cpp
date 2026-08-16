@@ -217,7 +217,7 @@ void compareJunctions(const NativeHydraulicResult &expected, const HydraulicSimu
             continue;
 
         const HydraulicNodeJunction *model_junction = findModelJunction(network, expected_junction.id);
-        context.expect(model_junction != nullptr, "Net1 fixture is missing junction " + id);
+        context.expect(model_junction != nullptr, "AOWIS fixture is missing junction " + id);
         if (model_junction != nullptr)
             expectUuid(context, actual_junction->uuid, model_junction->uuid,
                 comparison("uuid", expected.time_elapsed_s, "Junction", id));
@@ -260,7 +260,7 @@ void compareReservoirs(const NativeHydraulicResult &expected, const HydraulicSim
             continue;
 
         const HydraulicNodeReservoir *model_reservoir = findModelReservoir(network, expected_reservoir.id);
-        context.expect(model_reservoir != nullptr, "Net1 fixture is missing reservoir " + id);
+        context.expect(model_reservoir != nullptr, "AOWIS fixture is missing reservoir " + id);
         if (model_reservoir != nullptr)
             expectUuid(context, actual_reservoir->uuid, model_reservoir->uuid,
                 comparison("uuid", expected.time_elapsed_s, "Reservoir", id));
@@ -293,7 +293,7 @@ void compareTanks(const NativeHydraulicResult &expected, const HydraulicSimulati
             continue;
 
         const HydraulicNodeTank *model_tank = findModelTank(network, expected_tank.id);
-        context.expect(model_tank != nullptr, "Net1 fixture is missing tank " + id);
+        context.expect(model_tank != nullptr, "AOWIS fixture is missing tank " + id);
         if (model_tank != nullptr)
             expectUuid(context, actual_tank->uuid, model_tank->uuid,
                 comparison("uuid", expected.time_elapsed_s, "Tank", id));
@@ -361,7 +361,7 @@ void comparePipes(const NativeHydraulicResult &expected, const HydraulicSimulati
             continue;
 
         const HydraulicLinkPipe *model_pipe = findModelPipe(network, expected_pipe.id);
-        context.expect(model_pipe != nullptr, "Net1 fixture is missing pipe " + id);
+        context.expect(model_pipe != nullptr, "AOWIS fixture is missing pipe " + id);
         if (model_pipe != nullptr)
             expectUuid(context, actual_pipe->uuid, model_pipe->uuid,
                 comparison("uuid", expected.time_elapsed_s, "Pipe", id));
@@ -418,7 +418,7 @@ void comparePumps(const NativeHydraulicResult &expected, const HydraulicSimulati
             continue;
 
         const HydraulicLinkPump *model_pump = findModelPump(network, expected_pump.id);
-        context.expect(model_pump != nullptr, "Net1 fixture is missing pump " + id);
+        context.expect(model_pump != nullptr, "AOWIS fixture is missing pump " + id);
         if (model_pump != nullptr)
             expectUuid(context, actual_pump->uuid, model_pump->uuid,
                 comparison("uuid", expected.time_elapsed_s, "Pump", id));
@@ -614,10 +614,10 @@ void compareHydraulicTimelines(const NativeHydraulicTimeline &expected,
     TestContext &context)
 {
     context.expect(expected.success, expected.error.toStdString());
-    context.expect(!actual.cancelled, "Net1 wrapper run must not be cancelled");
-    context.expect(actual.result_timeline.status.success, "Net1 wrapper run must return a successful status");
+    context.expect(!actual.cancelled, "wrapper run must not be cancelled");
+    context.expect(actual.result_timeline.status.success, "wrapper run must return a successful status");
     context.expect(actual.result_timeline.validity == HydraulicSimulationResultValidity::Valid,
-        "Net1 wrapper run must return valid numerical results");
+        "wrapper run must return valid numerical results");
     context.expectEqual(static_cast<std::int64_t>(actual.result_timeline.results.size()),
         static_cast<std::int64_t>(expected.results.size()), comparison("results.size"),
         "native and wrapper timelines must contain identical hydraulic event sequences");

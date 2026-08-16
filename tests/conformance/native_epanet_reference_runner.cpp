@@ -41,6 +41,129 @@ void checkEpanet(int error_code, const char *operation)
         + std::to_string(error_code) + ": " + message);
 }
 
+int checkEpanetAllowWarning(int error_code, const char *operation)
+{
+    if (error_code >= 0 && error_code < 100)
+        return error_code;
+
+    checkEpanet(error_code, operation);
+    return error_code;
+}
+
+int nodeIndex(EN_Project project, const char *id)
+{
+    int index = 0;
+    checkEpanet(EN_getnodeindex(project, id, &index), "EN_getnodeindex");
+    return index;
+}
+
+int linkIndex(EN_Project project, const char *id)
+{
+    int index = 0;
+    checkEpanet(EN_getlinkindex(project, id, &index), "EN_getlinkindex");
+    return index;
+}
+
+void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
+{
+    switch (variant)
+    {
+    case NativeReferenceVariant::None:
+        return;
+    case NativeReferenceVariant::DdaStress:
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        checkEpanet(EN_setoption(project, EN_DEMANDMULT, 10.0), "EN_setoption(EN_DEMANDMULT)");
+        return;
+    case NativeReferenceVariant::PdaStress:
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        checkEpanet(EN_setoption(project, EN_DEMANDMULT, 10.0), "EN_setoption(EN_DEMANDMULT)");
+        checkEpanet(EN_setdemandmodel(project, EN_PDA, 20.0, 100.0, 0.5), "EN_setdemandmodel");
+        return;
+    case NativeReferenceVariant::Leakage:
+    {
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        const int pipe_index = linkIndex(project, "21");
+        checkEpanet(EN_setlinkvalue(project, pipe_index, EN_LEAK_AREA, 1.0), "EN_setlinkvalue(EN_LEAK_AREA)");
+        checkEpanet(EN_setlinkvalue(project, pipe_index, EN_LEAK_EXPAN, 0.1), "EN_setlinkvalue(EN_LEAK_EXPAN)");
+        return;
+    }
+    case NativeReferenceVariant::OverflowDisabled:
+    case NativeReferenceVariant::OverflowEnabled:
+    {
+        const int tank_index = nodeIndex(project, "2");
+        checkEpanet(EN_setnodevalue(project, tank_index, EN_TANKLEVEL, 130.0), "EN_setnodevalue(EN_TANKLEVEL)");
+        checkEpanet(EN_setnodevalue(project, tank_index, EN_MAXLEVEL, 130.0), "EN_setnodevalue(EN_MAXLEVEL)");
+        checkEpanet(EN_setnodevalue(
+            project,
+            tank_index,
+            EN_CANOVERFLOW,
+            variant == NativeReferenceVariant::OverflowEnabled ? 1.0 : 0.0),
+            "EN_setnodevalue(EN_CANOVERFLOW)");
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 3600), "EN_settimeparam(EN_DURATION)");
+        return;
+    }
+    case NativeReferenceVariant::Pcv:
+    {
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+
+        int valve_index = linkIndex(project, "22");
+        checkEpanet(EN_setlinktype(project, &valve_index, EN_PCV, EN_UNCONDITIONAL), "EN_setlinktype(EN_PCV)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_DIAMETER, 12.0), "EN_setlinkvalue(EN_DIAMETER)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_MINORLOSS, 0.19), "EN_setlinkvalue(EN_MINORLOSS)");
+
+        checkEpanet(EN_addcurve(project, "ValveCurve"), "EN_addcurve");
+        int curve_index = 0;
+        checkEpanet(EN_getcurveindex(project, "ValveCurve", &curve_index), "EN_getcurveindex");
+        double positions[] = {0.0, 25.0, 50.0, 75.0, 100.0};
+        double relative_flows[] = {0.0, 8.9, 18.4, 40.6, 100.0};
+        checkEpanet(EN_setcurve(project, curve_index, positions, relative_flows, 5), "EN_setcurve");
+        checkEpanet(EN_setcurvetype(project, curve_index, EN_VALVE_CURVE), "EN_setcurvetype");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_PCV_CURVE, static_cast<double>(curve_index)), "EN_setlinkvalue(EN_PCV_CURVE)");
+        checkEpanet(EN_setlinkvalue(project, valve_index, EN_INITSETTING, 35.0), "EN_setlinkvalue(EN_INITSETTING)");
+        return;
+    }
+    case NativeReferenceVariant::DemandPattern:
+    {
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 21600), "EN_settimeparam(EN_DURATION)");
+
+        checkEpanet(EN_setpatternid(project, 1, "Pat1"), "EN_setpatternid");
+        int default_pattern_index = 0;
+        checkEpanet(EN_getpatternindex(project, "Pat1", &default_pattern_index), "EN_getpatternindex(Pat1)");
+        if (default_pattern_index != 1)
+            throw std::runtime_error("Renamed upstream default demand pattern did not retain index 1");
+
+        checkEpanet(EN_addpattern(project, "Step3Pattern"), "EN_addpattern");
+        int pattern_index = 0;
+        checkEpanet(EN_getpatternindex(project, "Step3Pattern", &pattern_index), "EN_getpatternindex");
+        double factors[] = {3.1, 3.2, 3.3, 3.4};
+        checkEpanet(EN_setpattern(project, pattern_index, factors, 4), "EN_setpattern");
+        const int junction_index = nodeIndex(project, "12");
+        checkEpanet(EN_setdemandpattern(project, junction_index, 1, pattern_index), "EN_setdemandpattern");
+        return;
+    }
+    case NativeReferenceVariant::SimpleControl:
+    {
+        const int pump_index = linkIndex(project, "9");
+        const int tank_index = nodeIndex(project, "2");
+
+        checkEpanet(EN_setcontrol(project, 1, EN_LOWLEVEL, 0, 0.0, 0, 0.0), "EN_setcontrol(disable 1)");
+        checkEpanet(EN_setcontrol(project, 2, EN_HILEVEL, 0, 0.0, 0, 0.0), "EN_setcontrol(disable 2)");
+        checkEpanet(EN_setcontrolenabled(project, 1, 0), "EN_setcontrolenabled(disable 1)");
+        checkEpanet(EN_setcontrolenabled(project, 2, 0), "EN_setcontrolenabled(disable 2)");
+
+        int control_index = 0;
+        checkEpanet(EN_addcontrol(project, EN_LOWLEVEL, pump_index, EN_OPEN, tank_index, 110.0, &control_index), "EN_addcontrol(low)");
+        if (control_index != 3)
+            throw std::runtime_error("EPANET did not assign upstream simple-control index 3");
+        checkEpanet(EN_addcontrol(project, EN_HILEVEL, pump_index, EN_CLOSED, tank_index, 140.0, &control_index), "EN_addcontrol(high)");
+        if (control_index != 4)
+            throw std::runtime_error("EPANET did not assign upstream simple-control index 4");
+        return;
+    }
+    }
+    throw std::runtime_error("Unknown native reference variant");
+}
+
 class NativeProject
 {
 public:
@@ -644,8 +767,26 @@ NativeHydraulicTimeline runNativeEpanetReference(const NativeReferenceConfigurat
         const QByteArray report_file = QFile::encodeName(temporary_directory.filePath(QStringLiteral("native-reference.rpt")));
         checkEpanet(EN_open(project.handle(), input_file.constData(), report_file.constData(), ""), "EN_open");
         project.markProjectOpen();
+        applyReferenceVariant(project.handle(), configuration.variant);
 
         const NativeUnitSystem units = readUnitSystem(project.handle());
+
+        int demand_model = EN_DDA;
+        double minimum_pressure = 0.0;
+        double required_pressure = 0.0;
+        double pressure_exponent = 0.0;
+        checkEpanet(EN_getdemandmodel(
+            project.handle(),
+            &demand_model,
+            &minimum_pressure,
+            &required_pressure,
+            &pressure_exponent),
+            "EN_getdemandmodel");
+        timeline.pressure_driven_demand = demand_model == EN_PDA;
+        timeline.minimum_pressure_head_m = pressureToHeadMetres(minimum_pressure, units);
+        timeline.required_pressure_head_m = pressureToHeadMetres(required_pressure, units);
+        timeline.pressure_exponent = pressure_exponent;
+
         const long duration_s = timeParameter(project.handle(), EN_DURATION);
         if (duration_s < 0)
             throw std::runtime_error("Native EPANET returned a negative duration");
@@ -666,7 +807,9 @@ NativeHydraulicTimeline runNativeEpanetReference(const NativeReferenceConfigurat
         while (true)
         {
             long current_time_s = 0;
-            checkEpanet(EN_runH(project.handle(), &current_time_s), "EN_runH");
+            const int run_error = checkEpanetAllowWarning(EN_runH(project.handle(), &current_time_s), "EN_runH");
+            if (run_error > 0)
+                timeline.warning_codes.append(run_error);
             if (current_time_s < 0)
                 throw std::runtime_error("Native EPANET returned a negative elapsed time");
             if (previous_time_s >= 0 && current_time_s <= previous_time_s)
@@ -683,7 +826,9 @@ NativeHydraulicTimeline runNativeEpanetReference(const NativeReferenceConfigurat
             result.event_next = readNextEvent(project.handle(), configuration);
 
             long next_step_s = 0;
-            checkEpanet(EN_nextH(project.handle(), &next_step_s), "EN_nextH");
+            const int next_error = checkEpanetAllowWarning(EN_nextH(project.handle(), &next_step_s), "EN_nextH");
+            if (next_error > 0)
+                timeline.warning_codes.append(next_error);
             if (next_step_s < 0)
                 throw std::runtime_error("Native EPANET returned a negative hydraulic timestep");
             if (result.event_next.time_until_event_s != next_step_s)

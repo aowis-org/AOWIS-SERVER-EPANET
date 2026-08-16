@@ -60,10 +60,10 @@ external/epanet/tests/test_quality.cpp|test_solveQ|boost-case|not-applicable|non
 external/epanet/tests/test_quality.cpp|test_qual_step|boost-case|not-applicable|none|Water quality is explicitly excluded from the current conformance scope.
 external/epanet/tests/test_quality.cpp|test_progressive_step|boost-case|not-applicable|none|Water quality is explicitly excluded from the current conformance scope.
 external/epanet/tests/test_report.cpp|test_rprt_anlysstats|boost-case|wrapper-candidate|7-controls-options|Hydraulic iterations and error statistics map to wrapper results. Quality mass balance is excluded.
-external/epanet/tests/test_units.cpp|test_pressure_units|boost-case|wrapper-candidate|2-net1|Independent native pressure-unit conversion validates reference normalization to metres.
-external/epanet/tests/test_units.cpp|test_pda_unit_change|boost-case|wrapper-candidate|3-upstream|Independent conversion of PDA pressure limits validates canonical AOWIS units.
-external/epanet/tests/test_units.cpp|test_rule_unit_change|boost-case|wrapper-candidate|7-controls-options|Independent conversion of rule and control quantities validates typed setting units.
-external/epanet/tests/test_units.cpp|test_decoupled_pressure_units|boost-case|wrapper-candidate|2-net1|Decoupled native units exercise independent reference-result normalization.
+external/epanet/tests/test_units.cpp|test_pressure_units|boost-case|native-only|none|Changing native pressure display units is not exposed by the canonical metric AOWIS wrapper.
+external/epanet/tests/test_units.cpp|test_pda_unit_change|boost-case|native-only|none|Changing native project units and converting existing PDA pressure limits is not an AOWIS wrapper operation.
+external/epanet/tests/test_units.cpp|test_rule_unit_change|boost-case|native-only|none|Changing native project units and rewriting existing rule/control quantities is not exposed by the canonical metric wrapper.
+external/epanet/tests/test_units.cpp|test_decoupled_pressure_units|boost-case|native-only|none|Selecting native pressure units independently from flow units is not exposed by the canonical metric wrapper.
 external/epanet/tests/test_valve.cpp|test_PCV_valve|boost-case|wrapper-candidate|3-upstream|The PCV curve, setting, minor loss, and golden head-loss result map to AOWIS.
 external/epanet/tests/outfile/test_output.cpp|OpenCloseTest|boost-case|native-only|none|The binary Output API handle lifecycle is outside the high-level wrapper contract.
 external/epanet/tests/outfile/test_output.cpp|test_getNetSize|boost-case|native-only|none|Binary Output API access is tested upstream and is not used by EpanetRunner.

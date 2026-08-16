@@ -8,6 +8,13 @@ set(AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS
 
 set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-net1
+    conformance-upstream-dda-pda
+    conformance-upstream-leakage
+    conformance-upstream-tank-overflow
+    conformance-upstream-pcv
+    conformance-upstream-demand-pattern
+    conformance-upstream-simple-control
+    conformance-upstream-hydraulic-stepping
 )
 
 set(AOWIS_SERVER_EPANET_TEST_SCENARIOS
@@ -27,8 +34,10 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/net1_fixture.cpp
     conformance/net1_fixture.h
     conformance/result_contract_scenarios.h
+    conformance/upstream_step3_scenarios.h
     test_net1_conformance.cpp
     test_result_contract.cpp
+    test_upstream_step3_conformance.cpp
 )
 
 target_link_libraries(aowis-server-epanet-conformance-tests

@@ -22,9 +22,9 @@ An excluded field is not treated as covered. Water quality will receive its own 
 
 ## Current claim
 
-Roadmap step 2 is implemented: the suite contains a native EPANET reference runner, independent unit normalization, an explicit AOWIS reconstruction of upstream Net1, complete timeline/entity alignment, and field-level comparison diagnostics.
+Roadmap step 3 is implemented in the suite. In addition to the step-2 Net1 differential baseline, individually runnable upstream-derived scenarios now cover DDA/PDA stress behavior, FAVAD leakage, tank overflow, PCV characteristic curves, demand/default-pattern assignment, replacement simple controls, and explicit hydraulic stepping. AOWIS intentionally exposes only its canonical metric hydraulic unit contract, so alternate EPANET user-unit modes are not part of wrapper conformance.
 
-Net1 now provides the first real differential conformance evidence. At every hydraulic event, the suite compares all applicable non-quality junction, reservoir, tank, pipe, pump, statistic, event, energy-summary, and flow-balance fields. It also retains upstream golden values at 10,800 seconds. This proves the covered Net1 paths, but it does **not** yet prove complete hydraulic conformance: the remaining useful upstream scenarios and purpose-built non-default cases are still required.
+Each step-3 scenario runs the relevant vendored EPANET case natively and through an independently configured AOWIS model, retains the useful upstream golden value or physical invariant, and then compares every applicable non-quality hydraulic result field at every event. This materially broadens differential evidence beyond nominal Net1 behavior, but it does **not** yet prove complete hydraulic conformance: the systematic node/pipe, pump/energy, valve, controls/options, and fidelity-hardening phases remain.
 
 ## Running the tests
 
@@ -70,6 +70,13 @@ Run all scenarios through the executable without CTest:
 | `aowis-server-epanet-contract-reject-pump-power-rule` | Negative contract | Pump `POWER` premises are rejected explicitly because the bundled rule engine cannot execute them |
 | `aowis-server-epanet-contract-steady-state-pump-energy` | Regression | A steady-state run returns one timestep, pump energy, and a closed flow balance |
 | `aowis-server-epanet-conformance-net1` | Differential conformance | Native upstream Net1 and its independently constructed AOWIS equivalent match at every hydraulic event; original upstream 10,800-second golden values also pass |
+| `aowis-server-epanet-conformance-upstream-dda-pda` | Differential conformance | Upstream DDA warning/deficient-node behavior and PDA demand reduction/deficit goldens, followed by complete native-wrapper comparisons |
+| `aowis-server-epanet-conformance-upstream-leakage` | Differential conformance | Upstream FAVAD pipe leakage, node conservation, independent formula check, and complete native-wrapper comparison |
+| `aowis-server-epanet-conformance-upstream-tank-overflow` | Differential conformance | Overflow disabled/enabled behavior, full-tank and spillage/inflow invariants, and complete native-wrapper comparisons |
+| `aowis-server-epanet-conformance-upstream-pcv` | Differential conformance | PCV position curve and 35%-open head-loss golden with complete valve/result comparison |
+| `aowis-server-epanet-conformance-upstream-demand-pattern` | Differential conformance | Default-pattern identity plus explicit demand-pattern factors/assignment and complete timeline comparison |
+| `aowis-server-epanet-conformance-upstream-simple-control` | Differential conformance | Upstream replacement low/high controls, final tank-head invariant, event identity, and complete timeline comparison |
+| `aowis-server-epanet-conformance-upstream-hydraulic-stepping` | Differential conformance | Explicit EN_runH/EN_nextH monotonic stepping and all intermediate event boundaries compared against the wrapper |
 | `aowis-server-epanet-test-scenario-manifest` | Framework | Every C++ scenario is individually registered in CTest and vice versa |
 | `aowis-server-epanet-upstream-test-inventory` | Framework | Every active vendored upstream source-level test has an explicit classification |
 
@@ -81,8 +88,8 @@ The vendored source currently contains:
 
 | Classification | Count | Meaning |
 |---|---:|---|
-| Wrapper candidate | 43 | Rebuild as an AOWIS model scenario, retain useful upstream golden assertions, and compare native versus wrapper behavior |
-| Native-only | 35 | Keep in the upstream baseline because it tests Toolkit CRUD, handles, files, internal utilities, or binary Output API behavior not exposed by the wrapper |
+| Wrapper candidate | 39 | Rebuild as an AOWIS model scenario, retain useful upstream golden assertions, and compare native versus wrapper behavior |
+| Native-only | 39 | Keep in the upstream baseline because it tests Toolkit CRUD, handles, files, internal utilities, arbitrary native unit modes, or binary Output API behavior not exposed by the wrapper |
 | Not applicable now | 7 | Water-quality behavior or a quality-dependent path excluded from the current hydraulic scope |
 | **Total active source-level cases** | **85** | 84 active Boost cases plus the standalone re-entrancy program |
 
@@ -190,4 +197,4 @@ Numeric and exact field failures identify:
 
 A hydraulic-complete claim is allowed only when every included row is `Complete`, every supported Model field has a field-level child row, every numeric result is exercised non-default, every useful upstream candidate has a disposition and scenario, and both upstream EPANET tests and wrapper conformance tests pass.
 
-The next implementation step is roadmap step 3: port the useful upstream DDA/PDA, leakage, overflow, PCV, demand/pattern, unit-conversion, simple-control, and hydraulic-stepping scenarios through both paths.
+The next implementation step is roadmap step 4: systematically exercise the remaining non-default junction, reservoir, tank, pipe, demand-category, tank-volume-curve, and formula-specific pipe input mappings through both paths.

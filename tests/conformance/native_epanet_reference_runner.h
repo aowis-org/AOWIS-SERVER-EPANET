@@ -171,13 +171,32 @@ struct NativeHydraulicTimeline
 {
     bool success = false;
     QString error;
+    QList<int> warning_codes;
+    bool pressure_driven_demand = false;
+    double minimum_pressure_head_m = 0.0;
+    double required_pressure_head_m = 0.0;
+    double pressure_exponent = 0.0;
     QList<NativeHydraulicResult> results;
+};
+
+enum class NativeReferenceVariant
+{
+    None,
+    DdaStress,
+    PdaStress,
+    Leakage,
+    OverflowDisabled,
+    OverflowEnabled,
+    Pcv,
+    DemandPattern,
+    SimpleControl
 };
 
 struct NativeReferenceConfiguration
 {
     QString input_file;
     QHash<int, QString> control_ids_by_index;
+    NativeReferenceVariant variant = NativeReferenceVariant::None;
 };
 
 NativeHydraulicTimeline runNativeEpanetReference(const NativeReferenceConfiguration &configuration);
