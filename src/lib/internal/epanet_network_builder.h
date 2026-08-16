@@ -28,6 +28,7 @@ private:
     HydraulicSimulationStatus addCurvePumpEfficiency(const HydraulicCurvePumpEfficiency &curve);
     HydraulicSimulationStatus addCurveValveHeadloss(const HydraulicCurveValveHeadloss &curve);
     HydraulicSimulationStatus addCurveValveCharacteristic(const HydraulicCurveValveCharacteristic &curve);
+    HydraulicSimulationStatus addCurveGeneric(const HydraulicCurveGeneric &curve);
     HydraulicSimulationStatus addNodeReservoir(const HydraulicNodeReservoir &reservoir);
     HydraulicSimulationStatus addNodeJunction(const HydraulicNodeJunction &junction);
     HydraulicSimulationStatus addNodeTank(const HydraulicNodeTank &tank);
@@ -53,6 +54,7 @@ private:
     QHash<QUuid, QString> pump_efficiency_curve_ids_by_uuid;
     QHash<QUuid, QString> valve_headloss_curve_ids_by_uuid;
     QHash<QUuid, QString> valve_characteristic_curve_ids_by_uuid;
+    QHash<QUuid, QString> generic_curve_ids_by_uuid;
     QHash<QUuid, QString> pipe_ids_by_uuid;
     QHash<QUuid, QString> pump_ids_by_uuid;
     QHash<QUuid, QString> valve_ids_by_uuid;

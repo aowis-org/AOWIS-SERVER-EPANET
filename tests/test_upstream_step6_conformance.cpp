@@ -123,6 +123,11 @@ void expectValveInputs(const NativeValveResult &valve, double diameter_mm, doubl
 
 void expectActiveValve(const NativeValveResult &valve, double expected_setting, TestContext &context)
 {
+    context.expect(valve.initially_open, "Active initial valve status must be hydraulically open");
+    context.expect(valve.initially_active, "native valve must retain the configured Active initial status");
+    context.expectNear(valve.initial_setting, expected_setting, NumericTolerance{1.0e-7, 1.0e-6},
+        comparison("upstream_golden.initial_setting", 0, "Valve", valve.id.toStdString()),
+        "native valve must retain its configured initial setting");
     context.expect(valve.open, "active valve must be hydraulically open");
     context.expect(valve.active, "active valve must report EPANET active status");
     context.expectNear(valve.setting, expected_setting, NumericTolerance{1.0e-7, 1.0e-6},
@@ -284,6 +289,12 @@ void testValveGpv(TestContext &context)
         context.expect(valve != nullptr, "GPV native result must contain converted link 121");
         if (valve != nullptr)
         {
+            context.expect(valve->initially_open, "native GPV must retain the explicitly Open initial status");
+            context.expect(!valve->initially_active, "native GPV initial status must not be Active");
+            context.expect(valve->initial_setting > 0.0, "native GPV initial setting must identify its configured curve");
+            context.expectNear(valve->initial_setting, valve->setting, NumericTolerance{1.0e-12, 1.0e-12},
+                comparison("upstream_golden.initial_curve_setting", 0, "Valve", "121"),
+                "GPV initial and returned settings must identify the same native curve");
             context.expect(valve->open, "explicitly Open GPV must remain hydraulically open");
             context.expect(!valve->active, "explicitly Open GPV must exercise the non-Active initial-status path");
             context.expect(std::abs(valve->flow_m3_per_h) > 0.0, "GPV must carry nonzero flow");

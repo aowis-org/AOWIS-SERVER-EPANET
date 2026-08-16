@@ -423,6 +423,11 @@ void testPcv(TestContext &context)
     context.expect(valve != nullptr, "upstream PCV result must contain converted link 22");
     if (valve != nullptr)
     {
+        context.expect(valve->initially_open, "upstream PCV must retain its configured Active initial status");
+        context.expect(valve->initially_active, "upstream PCV initial status must be Active");
+        context.expectNear(valve->initial_setting, 35.0, NumericTolerance{1.0e-7, 1.0e-6},
+            comparison("upstream_golden.initial_setting", result.time_elapsed_s, "Valve", "22"),
+            "upstream PCV must retain its configured 35-percent initial position");
         context.expect(valve->open, "upstream PCV must be hydraulically open");
         context.expect(valve->active, "upstream PCV must report Active status");
         context.expect(valve->flow_m3_per_h > 0.0, "upstream PCV must carry positive flow");

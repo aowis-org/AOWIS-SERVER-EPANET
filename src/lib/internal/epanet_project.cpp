@@ -11,6 +11,7 @@
 #include <QStringList>
 #include <QTemporaryDir>
 #include <QUuid>
+#include <QtGlobal>
 
 #include <aowis/model/hydraulic/network_hydraulic.h>
 
@@ -110,6 +111,132 @@ QHash<QUuid, QString> reportLinkIdsByUuid(const NetworkHydraulic &network)
     for (const HydraulicLinkValve &valve : network.links_valves)
         ids_by_uuid.insert(valve.uuid, valve.id);
     return ids_by_uuid;
+}
+
+void appendReportFieldCommands(QStringList &commands, const QString &field_name, const HydraulicSimulationReportField &field)
+{
+    commands.append(field_name + (field.enabled ? QStringLiteral(" YES") : QStringLiteral(" NO")));
+    if (!field.enabled)
+        return;
+
+    if (field.precision.has_value())
+        commands.append(field_name + QStringLiteral(" PRECISION %1").arg(field.precision.value()));
+    if (field.below.has_value())
+        commands.append(field_name + QStringLiteral(" BELOW %1").arg(QString::number(field.below.value(), 'g', 17)));
+    if (field.above.has_value())
+        commands.append(field_name + QStringLiteral(" ABOVE %1").arg(QString::number(field.above.value(), 'g', 17)));
+}
+
+void appendTypedReportFieldCommands(QStringList &commands, const HydraulicSimulationReportOptions &options)
+{
+    appendReportFieldCommands(commands, QStringLiteral("ELEVATION"), options.fields_node.elevation);
+    appendReportFieldCommands(commands, QStringLiteral("DEMAND"), options.fields_node.demand);
+    appendReportFieldCommands(commands, QStringLiteral("HEAD"), options.fields_node.head);
+    appendReportFieldCommands(commands, QStringLiteral("PRESSURE"), options.fields_node.pressure);
+    appendReportFieldCommands(commands, QStringLiteral("QUALITY"), options.fields_node.quality);
+
+    appendReportFieldCommands(commands, QStringLiteral("LENGTH"), options.fields_link.length);
+    appendReportFieldCommands(commands, QStringLiteral("DIAMETER"), options.fields_link.diameter);
+    appendReportFieldCommands(commands, QStringLiteral("FLOW"), options.fields_link.flow);
+    appendReportFieldCommands(commands, QStringLiteral("VELOCITY"), options.fields_link.velocity);
+    appendReportFieldCommands(commands, QStringLiteral("HEADLOSS"), options.fields_link.headloss);
+    // The model's link "position" report field maps to EPANET's link State column.
+    appendReportFieldCommands(commands, QStringLiteral("STATE"), options.fields_link.position);
+    appendReportFieldCommands(commands, QStringLiteral("SETTING"), options.fields_link.setting);
+    appendReportFieldCommands(commands, QStringLiteral("REACTION"), options.fields_link.reaction);
+    appendReportFieldCommands(commands, QStringLiteral("F-FACTOR"), options.fields_link.friction);
+}
+
+HydraulicSimulationReportField effectiveFrictionReportField(const HydraulicSimulationReportOptions &options)
+{
+    HydraulicSimulationReportField field = options.fields_link.friction;
+    for (const QString &backend_command : options.backend_commands)
+    {
+        const QStringList tokens = backend_command.simplified().split(QChar(' '), Qt::SkipEmptyParts);
+        if (tokens.isEmpty() || tokens.first().compare(QStringLiteral("F-FACTOR"), Qt::CaseInsensitive) != 0)
+            continue;
+
+        if (tokens.size() == 1 || tokens.at(1).compare(QStringLiteral("YES"), Qt::CaseInsensitive) == 0)
+        {
+            field.enabled = true;
+            continue;
+        }
+        if (tokens.at(1).compare(QStringLiteral("NO"), Qt::CaseInsensitive) == 0)
+        {
+            field.enabled = false;
+            continue;
+        }
+        if (tokens.size() < 3)
+            continue;
+
+        bool value_ok = false;
+        const double value = tokens.at(2).toDouble(&value_ok);
+        if (!value_ok)
+            continue;
+
+        if (tokens.at(1).compare(QStringLiteral("PRECISION"), Qt::CaseInsensitive) == 0)
+        {
+            field.enabled = true;
+            field.precision = qRound(value);
+        }
+        else if (tokens.at(1).compare(QStringLiteral("BELOW"), Qt::CaseInsensitive) == 0)
+            field.below = value;
+        else if (tokens.at(1).compare(QStringLiteral("ABOVE"), Qt::CaseInsensitive) == 0)
+            field.above = value;
+    }
+
+    return field;
+}
+
+QString preserveFrictionReportField(QString inp_text, const HydraulicSimulationReportOptions &options)
+{
+    QStringList commands;
+    appendReportFieldCommands(commands, QStringLiteral("F-FACTOR"), effectiveFrictionReportField(options));
+
+    QStringList lines = inp_text.split(QChar('\n'));
+    int report_section_index = -1;
+    int next_section_index = lines.size();
+    for (int index = 0; index < lines.size(); index++)
+    {
+        const QString trimmed = lines.at(index).trimmed();
+        if (trimmed.compare(QStringLiteral("[REPORT]"), Qt::CaseInsensitive) == 0)
+        {
+            report_section_index = index;
+            continue;
+        }
+        if (report_section_index >= 0 && index > report_section_index && trimmed.startsWith(QChar('[')))
+        {
+            next_section_index = index;
+            break;
+        }
+    }
+
+    if (report_section_index < 0)
+        return inp_text;
+
+    // EPANET 2.3 omits F-Factor from EN_saveinpfile(). Remove any existing
+    // F-Factor rows as well so this remains correct if the native writer is
+    // fixed in a later vendored EPANET release.
+    for (int index = next_section_index - 1; index > report_section_index; index--)
+    {
+        const QString trimmed = lines.at(index).trimmed();
+        const QStringList tokens = trimmed.simplified().split(QChar(' '), Qt::SkipEmptyParts);
+        if (!tokens.isEmpty() && tokens.first().compare(QStringLiteral("F-FACTOR"), Qt::CaseInsensitive) == 0)
+        {
+            lines.removeAt(index);
+            next_section_index--;
+        }
+    }
+
+    QStringList formatted_commands;
+    formatted_commands.reserve(commands.size());
+    for (const QString &command : commands)
+        formatted_commands.append(QLatin1Char(' ') + command);
+
+    for (int index = formatted_commands.size() - 1; index >= 0; index--)
+        lines.insert(next_section_index, formatted_commands.at(index));
+
+    return lines.join(QChar('\n'));
 }
 
 QString normalizeSavedRuleFillDrainTimes(QString inp_text)
@@ -285,6 +412,17 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
             return epanet_status;
     }
 
+    const QByteArray title_line_1 = request.title_line_1.toUtf8();
+    const QByteArray title_line_2 = request.title_line_2.toUtf8();
+    const QByteArray title_line_3 = request.title_line_3.toUtf8();
+    error = EN_settitle(this->project, title_line_1.constData(), title_line_2.constData(), title_line_3.constData());
+    if (error != 0)
+    {
+        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::InitializeSimulation, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_settitle"), HydraulicSimulationStatusEntityType::Network, request.id, request.uuid, QStringLiteral("Failed to configure EPANET title lines"));
+        if (!epanet_status.success)
+            return epanet_status;
+    }
+
     error = EN_setoption(this->project, EN_PRESS_UNITS, static_cast<double>(EN_METERS));
     if (error != 0)
     {
@@ -453,6 +591,7 @@ HydraulicSimulationStatus EpanetProject::configureReport(const NetworkHydraulic 
              << QStringLiteral("ENERGY %1").arg(options.energy ? QStringLiteral("YES") : QStringLiteral("NO"))
              << nodes_command
              << links_command;
+    appendTypedReportFieldCommands(commands, options);
     commands.append(options.backend_commands);
 
     for (const QString &command : commands)
@@ -473,7 +612,7 @@ HydraulicSimulationStatus EpanetProject::configureReport(const NetworkHydraulic 
     return makeEpanetSuccess();
 }
 
-HydraulicSimulationStatus EpanetProject::retrieveInpText(QString &inp_text) const
+HydraulicSimulationStatus EpanetProject::retrieveInpText(const NetworkHydraulic &request, QString &inp_text) const
 {
     inp_text.clear();
 
@@ -532,6 +671,11 @@ HydraulicSimulationStatus EpanetProject::retrieveInpText(QString &inp_text) cons
 
         inp_text = preserveNoDefaultDemandPattern(inp_text, unused_pattern_id);
     }
+
+    // EPANET 2.3's native INP writer currently omits the final F-Factor report
+    // field from [REPORT]. Reinsert the effective configured value so reopening
+    // the generated INP preserves the complete typed report configuration.
+    inp_text = preserveFrictionReportField(inp_text, request.options_report);
 
     return makeEpanetSuccess();
 }

@@ -12,6 +12,7 @@ struct EpanetIndexRegistry
     QHash<QUuid, int> curves_pump_efficiency;
     QHash<QUuid, int> curves_valve_headloss;
     QHash<QUuid, int> curves_valve_characteristic;
+    QHash<QUuid, int> curves_generic;
     QHash<QUuid, int> nodes_reservoirs;
     QHash<QUuid, int> nodes_junctions;
     QHash<QUuid, int> nodes_tanks;

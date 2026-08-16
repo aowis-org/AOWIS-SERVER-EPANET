@@ -998,6 +998,10 @@ void appendLinkResult(EN_Project project, int link_index, const NativeUnitSystem
         valve.id = id;
         valve.diameter_mm = diameterToMetres(linkValue(project, link_index, EN_DIAMETER), units.flow_units) * 1000.0;
         valve.minor_loss = linkValue(project, link_index, EN_MINORLOSS);
+        const int initial_status = static_cast<int>(linkValue(project, link_index, EN_INITSTATUS));
+        valve.initially_open = initial_status != EN_CLOSED;
+        valve.initially_active = initial_status > EN_OPEN;
+        valve.initial_setting = valveSettingToCanonical(linkValue(project, link_index, EN_INITSETTING), link_type, units);
         valve.flow_m3_per_h = flowToCubicMetresPerHour(linkValue(project, link_index, EN_FLOW), units.flow_units);
         valve.velocity_m_per_s = velocityToMetresPerSecond(linkValue(project, link_index, EN_VELOCITY), units.flow_units);
         valve.head_loss_m = headToMetres(linkValue(project, link_index, EN_HEADLOSS), units.flow_units);
