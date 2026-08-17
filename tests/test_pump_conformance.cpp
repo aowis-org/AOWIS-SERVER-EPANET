@@ -4,7 +4,7 @@
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
 #include "conformance/net1_fixture.h"
-#include "conformance/upstream_step5_scenarios.h"
+#include "conformance/pump_scenarios.h"
 
 #include <QUuid>
 
@@ -98,7 +98,7 @@ NativeHydraulicTimeline runNative(const Net1Fixture &fixture, NativeReferenceVar
     const NativeHydraulicTimeline timeline = AowisEpanetTests::runNativeEpanetReference(
         nativeConfiguration(variant, fixture.native_control_ids_by_index));
     context.expect(timeline.success, timeline.error.toStdString());
-    context.expect(!timeline.results.isEmpty(), "native step-5 timeline must contain at least one hydraulic result");
+    context.expect(!timeline.results.isEmpty(), "native pump-conformance timeline must contain at least one hydraulic result");
     return timeline;
 }
 
@@ -138,7 +138,7 @@ HydraulicLinkPump *replaceHeadCurve(Net1Fixture &fixture, HydraulicLinkPumpDefin
     if (pump == nullptr)
         return nullptr;
     fixture.network.curves_pump_head.clear();
-    HydraulicCurvePumpHead curve = makeHeadCurve(QStringLiteral("STEP5_HEAD"), points);
+    HydraulicCurvePumpHead curve = makeHeadCurve(QStringLiteral("PUMP_HEAD_CURVE"), points);
     pump->definition_type = definition_type;
     pump->head_curve_uuid = curve.uuid;
     fixture.network.curves_pump_head.append(curve);
@@ -170,7 +170,7 @@ void testPumpThreePoint(TestContext &context)
     fixture.network.duration_s = 0;
     HydraulicLinkPump *pump = replaceHeadCurve(fixture, HydraulicLinkPumpDefinitionType::ThreePointCurve,
         {{0.0, 90.0}, {300.0, 65.0}, {600.0, 20.0}});
-    context.expect(pump != nullptr, "step-5 fixture must contain pump 9");
+    context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
     if (pump == nullptr)
         return;
 
@@ -194,7 +194,7 @@ void testPumpMultiPoint(TestContext &context)
     fixture.network.duration_s = 0;
     const QList<std::pair<double, double>> points = {{0.0, 95.0}, {200.0, 82.0}, {400.0, 55.0}, {650.0, 15.0}};
     HydraulicLinkPump *pump = replaceHeadCurve(fixture, HydraulicLinkPumpDefinitionType::MultiPointCurve, points);
-    context.expect(pump != nullptr, "step-5 fixture must contain pump 9");
+    context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
     if (pump == nullptr)
         return;
 
@@ -219,7 +219,7 @@ void testPumpConstantPower(TestContext &context)
     Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     fixture.network.duration_s = 0;
     HydraulicLinkPump *pump = findModelPump(fixture.network, QStringLiteral("9"));
-    context.expect(pump != nullptr, "step-5 fixture must contain pump 9");
+    context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
     if (pump == nullptr)
         return;
     pump->definition_type = HydraulicLinkPumpDefinitionType::ConstantPower;
@@ -245,7 +245,7 @@ void testPumpInitialSpeed(TestContext &context)
     Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     fixture.network.duration_s = 0;
     HydraulicLinkPump *pump = findModelPump(fixture.network, QStringLiteral("9"));
-    context.expect(pump != nullptr, "step-5 fixture must contain pump 9");
+    context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
     if (pump == nullptr)
         return;
     pump->initial_speed = 0.8;
@@ -272,12 +272,12 @@ void testPumpSpeedPattern(TestContext &context)
     disablePumpControls(fixture);
 
     HydraulicPatternTime pattern;
-    pattern.id = QStringLiteral("STEP5_SPEED");
+    pattern.id = QStringLiteral("PUMP_SPEED_PATTERN");
     pattern.uuid = QUuid::createUuid();
     pattern.factors = {0.8, 1.0, 1.15};
     fixture.network.patterns_time.append(pattern);
     HydraulicLinkPump *pump = findModelPump(fixture.network, QStringLiteral("9"));
-    context.expect(pump != nullptr, "step-5 fixture must contain pump 9");
+    context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
     if (pump == nullptr)
         return;
     pump->speed_pattern_uuid = pattern.uuid;
@@ -306,7 +306,7 @@ void testPumpInitialOff(TestContext &context)
     Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     fixture.network.duration_s = 0;
     HydraulicLinkPump *pump = findModelPump(fixture.network, QStringLiteral("9"));
-    context.expect(pump != nullptr, "step-5 fixture must contain pump 9");
+    context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
     if (pump == nullptr)
         return;
     pump->initial_status = HydraulicLinkPumpInitialStatus::Off;
@@ -332,7 +332,7 @@ void testPumpConstantEfficiency(TestContext &context)
     Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     fixture.network.duration_s = 0;
     HydraulicLinkPump *pump = findModelPump(fixture.network, QStringLiteral("9"));
-    context.expect(pump != nullptr, "step-5 fixture must contain pump 9");
+    context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
     if (pump == nullptr)
         return;
     pump->efficiency_input_type = HydraulicLinkPumpEfficiencyInputType::Constant;
@@ -359,7 +359,7 @@ void testPumpEfficiencyCurve(TestContext &context)
     const QList<std::pair<double, double>> points = {{0.0, 60.0}, {200.0, 76.0}, {400.0, 88.0}, {650.0, 79.0}};
 
     HydraulicCurvePumpEfficiency curve;
-    curve.id = QStringLiteral("STEP5_EFF");
+    curve.id = QStringLiteral("PUMP_EFFICIENCY_CURVE");
     curve.uuid = QUuid::createUuid();
     for (const std::pair<double, double> &value : points)
     {
@@ -371,7 +371,7 @@ void testPumpEfficiencyCurve(TestContext &context)
     fixture.network.curves_pump_efficiency.append(curve);
 
     HydraulicLinkPump *pump = findModelPump(fixture.network, QStringLiteral("9"));
-    context.expect(pump != nullptr, "step-5 fixture must contain pump 9");
+    context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
     if (pump == nullptr)
         return;
     pump->efficiency_input_type = HydraulicLinkPumpEfficiencyInputType::Curve;
@@ -404,7 +404,7 @@ void testPumpGlobalEnergy(TestContext &context)
     fixture.network.options_energy.demand_charge_per_kw = 1.5;
 
     HydraulicPatternTime pattern;
-    pattern.id = QStringLiteral("STEP5_GLOBAL_PRICE");
+    pattern.id = QStringLiteral("GLOBAL_ENERGY_PRICE_PATTERN");
     pattern.uuid = QUuid::createUuid();
     pattern.factors = {1.0, 2.0};
     fixture.network.patterns_time.append(pattern);
@@ -435,20 +435,20 @@ void testPumpEnergyPattern(TestContext &context)
     fixture.network.options_energy.demand_charge_per_kw = 0.75;
 
     HydraulicPatternTime global_pattern;
-    global_pattern.id = QStringLiteral("STEP5_GLOBAL_UNUSED");
+    global_pattern.id = QStringLiteral("UNUSED_GLOBAL_PRICE_PATTERN");
     global_pattern.uuid = QUuid::createUuid();
     global_pattern.factors = {4.0, 4.0};
     fixture.network.patterns_time.append(global_pattern);
     fixture.network.options_energy.global_energy_price_pattern_uuid = global_pattern.uuid;
 
     HydraulicPatternTime pump_pattern;
-    pump_pattern.id = QStringLiteral("STEP5_PUMP_PRICE");
+    pump_pattern.id = QStringLiteral("PUMP_ENERGY_PRICE_PATTERN");
     pump_pattern.uuid = QUuid::createUuid();
     pump_pattern.factors = {1.0, 0.5};
     fixture.network.patterns_time.append(pump_pattern);
 
     HydraulicLinkPump *pump = findModelPump(fixture.network, QStringLiteral("9"));
-    context.expect(pump != nullptr, "step-5 fixture must contain pump 9");
+    context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
     if (pump == nullptr)
         return;
     pump->energy_price_input_type = HydraulicLinkPumpEnergyPriceInputType::Pattern;
@@ -472,7 +472,7 @@ void testPumpCannotSupplyHead(TestContext &context)
     Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     fixture.network.duration_s = 0;
     HydraulicLinkPump *pump = replaceHeadCurve(fixture, HydraulicLinkPumpDefinitionType::OnePointCurve, {{100.0, 5.0}});
-    context.expect(pump != nullptr, "step-5 fixture must contain pump 9");
+    context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
     if (pump == nullptr)
         return;
 
@@ -497,7 +497,7 @@ void testPumpCannotSupplyFlow(TestContext &context)
     fixture.network.duration_s = 0;
     HydraulicLinkPump *pump = replaceHeadCurve(fixture, HydraulicLinkPumpDefinitionType::MultiPointCurve,
         {{0.0, 100.0}, {5.0, 95.0}, {10.0, 90.0}, {20.0, 80.0}});
-    context.expect(pump != nullptr, "step-5 fixture must contain pump 9");
+    context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
     if (pump == nullptr)
         return;
 
@@ -519,7 +519,7 @@ void testPumpCannotSupplyFlow(TestContext &context)
 
 namespace AowisEpanetTests
 {
-void registerUpstreamStep5Scenarios(ScenarioRegistry &registry)
+void registerPumpScenarios(ScenarioRegistry &registry)
 {
     registry.add(ScenarioDefinition{"conformance-upstream-pump-three-point",
         "Exercises a three-point pump head definition and complete pump hydraulic result mapping.",

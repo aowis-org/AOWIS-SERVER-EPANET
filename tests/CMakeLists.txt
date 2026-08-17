@@ -155,6 +155,14 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-negative-invalid-report-numeric
     conformance-negative-unsupported-configuration
     conformance-negative-structured-diagnostics
+    conformance-stress-chain-small-hw
+    conformance-stress-chain-medium-dw
+    conformance-stress-branch-medium-hw
+    conformance-stress-ring-medium-cm
+    conformance-stress-grid-small-hw
+    conformance-stress-grid-medium-dw
+    conformance-stress-grid-large-hw
+    conformance-stress-dual-source-mesh-hw
 )
 
 set(AOWIS_SERVER_EPANET_TEST_SCENARIOS
@@ -168,28 +176,32 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/conformance_test_main.cpp
     conformance/hydraulic_result_comparator.cpp
     conformance/hydraulic_result_comparator.h
+    conformance/generated_network_stress_fixture.cpp
+    conformance/generated_network_stress_fixture.h
     conformance/native_epanet_reference_runner.cpp
     conformance/native_epanet_reference_runner.h
     conformance/net1_conformance_scenarios.h
     conformance/net1_fixture.cpp
     conformance/net1_fixture.h
     conformance/result_contract_scenarios.h
-    conformance/upstream_step3_scenarios.h
-    conformance/upstream_step4_scenarios.h
-    conformance/upstream_step5_scenarios.h
-    conformance/upstream_step6_scenarios.h
-    conformance/upstream_step7_scenarios.h
-    conformance/upstream_step8a_scenarios.h
-    conformance/upstream_step8b_scenarios.h
+    conformance/hydraulic_behavior_scenarios.h
+    conformance/input_mapping_scenarios.h
+    conformance/pump_scenarios.h
+    conformance/valve_scenarios.h
+    conformance/controls_options_operations_scenarios.h
+    conformance/export_fidelity_scenarios.h
+    conformance/negative_validation_scenarios.h
+    conformance/deterministic_stress_scenarios.h
     test_net1_conformance.cpp
     test_result_contract.cpp
-    test_upstream_step3_conformance.cpp
-    test_upstream_step4_conformance.cpp
-    test_upstream_step5_conformance.cpp
-    test_upstream_step6_conformance.cpp
-    test_upstream_step7_conformance.cpp
-    test_upstream_step8a_conformance.cpp
-    test_upstream_step8b_conformance.cpp
+    test_hydraulic_behavior_conformance.cpp
+    test_input_mapping_conformance.cpp
+    test_pump_conformance.cpp
+    test_valve_conformance.cpp
+    test_controls_options_operations_conformance.cpp
+    test_export_fidelity_conformance.cpp
+    test_negative_validation_conformance.cpp
+    test_deterministic_stress_conformance.cpp
 )
 
 target_link_libraries(aowis-server-epanet-conformance-tests
@@ -223,10 +235,20 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONTRACT_
 endforeach()
 
 foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS)
+    set(AOWIS_SERVER_EPANET_TEST_LABELS "conformance;hydraulic")
+
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-negative-")
+        list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "negative")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-export-")
+        list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "export")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-stress-")
+        list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "stress")
+    endif()
+
     set_tests_properties(
         aowis-server-epanet-${AOWIS_SERVER_EPANET_TEST_SCENARIO}
         PROPERTIES
-            LABELS "conformance;hydraulic;upstream"
+            LABELS "${AOWIS_SERVER_EPANET_TEST_LABELS}"
     )
 endforeach()
 
@@ -240,7 +262,7 @@ add_test(
 set_tests_properties(
     aowis-server-epanet-test-scenario-manifest
     PROPERTIES
-        LABELS "framework"
+        LABELS "framework;proof"
 )
 
 add_test(
@@ -254,5 +276,145 @@ add_test(
 set_tests_properties(
     aowis-server-epanet-upstream-test-inventory
     PROPERTIES
-        LABELS "framework;upstream"
+        LABELS "framework;proof;upstream"
 )
+
+get_target_property(AOWIS_SERVER_MODEL_REAL_TARGET AOWIS::ServerModel ALIASED_TARGET)
+if(NOT AOWIS_SERVER_MODEL_REAL_TARGET)
+    set(AOWIS_SERVER_MODEL_REAL_TARGET AOWIS::ServerModel)
+endif()
+
+get_target_property(
+    AOWIS_SERVER_MODEL_SOURCE_ROOT
+    ${AOWIS_SERVER_MODEL_REAL_TARGET}
+    SOURCE_DIR
+)
+
+if(NOT AOWIS_SERVER_MODEL_SOURCE_ROOT
+   OR NOT EXISTS "${AOWIS_SERVER_MODEL_SOURCE_ROOT}/include/aowis/model/hydraulic/network_hydraulic.h")
+    get_target_property(
+        AOWIS_SERVER_MODEL_INTERFACE_INCLUDE_DIRS
+        ${AOWIS_SERVER_MODEL_REAL_TARGET}
+        INTERFACE_INCLUDE_DIRECTORIES
+    )
+
+    foreach(AOWIS_SERVER_MODEL_INCLUDE_DIR IN LISTS AOWIS_SERVER_MODEL_INTERFACE_INCLUDE_DIRS)
+        if(AOWIS_SERVER_MODEL_INCLUDE_DIR MATCHES "^\\$<BUILD_INTERFACE:(.*)>$")
+            set(AOWIS_SERVER_MODEL_INCLUDE_DIR "${CMAKE_MATCH_1}")
+        elseif(AOWIS_SERVER_MODEL_INCLUDE_DIR MATCHES "^\\$<INSTALL_INTERFACE:")
+            continue()
+        endif()
+
+        if(EXISTS "${AOWIS_SERVER_MODEL_INCLUDE_DIR}/aowis/model/hydraulic/network_hydraulic.h")
+            get_filename_component(
+                AOWIS_SERVER_MODEL_SOURCE_ROOT
+                "${AOWIS_SERVER_MODEL_INCLUDE_DIR}"
+                DIRECTORY
+            )
+            break()
+        endif()
+    endforeach()
+endif()
+
+if(NOT AOWIS_SERVER_MODEL_SOURCE_ROOT
+   OR NOT EXISTS "${AOWIS_SERVER_MODEL_SOURCE_ROOT}/include/aowis/model/hydraulic/network_hydraulic.h")
+    message(FATAL_ERROR
+        "The hydraulic field-conformance audit requires readable AOWIS-SERVER-MODEL hydraulic headers."
+    )
+endif()
+
+string(REPLACE ";" "\n" AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS "${AOWIS_SERVER_EPANET_TEST_SCENARIOS}")
+set(AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS_FILE
+    "${CMAKE_CURRENT_BINARY_DIR}/registered_scenarios.txt"
+)
+file(WRITE
+    "${AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS_FILE}"
+    "${AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS}\n"
+)
+
+add_test(
+    NAME aowis-server-epanet-hydraulic-field-conformance-audit
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DAOWIS_MODEL_SOURCE_ROOT=${AOWIS_SERVER_MODEL_SOURCE_ROOT}
+        -DAOWIS_FIELD_AUDIT_POLICY=${CMAKE_CURRENT_SOURCE_DIR}/hydraulic_field_conformance_policy.txt
+        -DAOWIS_REGISTERED_SCENARIOS_FILE=${AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS_FILE}
+        -DAOWIS_FIELD_AUDIT_REPORT=${CMAKE_CURRENT_BINARY_DIR}/hydraulic_field_conformance_audit.tsv
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/conformance/verify_hydraulic_field_conformance.cmake
+)
+set_tests_properties(
+    aowis-server-epanet-hydraulic-field-conformance-audit
+    PROPERTIES
+        LABELS "framework;proof"
+)
+
+if(AOWIS_SERVER_EPANET_ENABLE_UPSTREAM_BOOST_TESTS)
+    if(WIN32)
+        set(Boost_USE_STATIC_LIBS ON)
+    else()
+        set(Boost_USE_STATIC_LIBS OFF)
+    endif()
+    find_package(Boost REQUIRED COMPONENTS unit_test_framework system thread filesystem)
+
+    set(AOWIS_SERVER_EPANET_UPSTREAM_BOOST_BUILD_DIR
+        "${CMAKE_CURRENT_BINARY_DIR}/upstream-boost"
+    )
+
+    add_test(
+        NAME aowis-server-epanet-upstream-boost-suite
+        COMMAND
+            ${CMAKE_COMMAND}
+            -DAOWIS_UPSTREAM_SOURCE_DIR=${PROJECT_SOURCE_DIR}/external/epanet
+            -DAOWIS_UPSTREAM_BINARY_DIR=${AOWIS_SERVER_EPANET_UPSTREAM_BOOST_BUILD_DIR}
+            -DAOWIS_UPSTREAM_GENERATOR=${CMAKE_GENERATOR}
+            -DAOWIS_UPSTREAM_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+            -DAOWIS_UPSTREAM_C_COMPILER=${CMAKE_C_COMPILER}
+            -DAOWIS_UPSTREAM_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+            -DAOWIS_UPSTREAM_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+            -DAOWIS_UPSTREAM_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/conformance/run_upstream_boost_suite.cmake
+    )
+    set_tests_properties(
+        aowis-server-epanet-upstream-boost-suite
+        PROPERTIES
+            LABELS "upstream;upstream-original"
+            RUN_SERIAL TRUE
+    )
+endif()
+
+if(AOWIS_SERVER_EPANET_ENABLE_COVERAGE)
+    set(AOWIS_SERVER_EPANET_COVERAGE_OUTPUT_DIR
+        "${CMAKE_BINARY_DIR}/coverage"
+    )
+
+    add_custom_target(aowis-server-epanet-coverage
+        COMMAND ${CMAKE_COMMAND} -E rm -rf "${AOWIS_SERVER_EPANET_COVERAGE_OUTPUT_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${AOWIS_SERVER_EPANET_COVERAGE_OUTPUT_DIR}"
+        COMMAND ${CMAKE_COMMAND}
+            -DAOWIS_COVERAGE_BINARY_DIR=${CMAKE_BINARY_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/conformance/reset_coverage_data.cmake
+        COMMAND ${CMAKE_CTEST_COMMAND}
+            --test-dir "${CMAKE_BINARY_DIR}"
+            -L "^(contract|conformance|framework)$"
+            --output-on-failure
+        COMMAND ${AOWIS_SERVER_EPANET_GCOVR_EXECUTABLE}
+            --root "${PROJECT_SOURCE_DIR}"
+            --filter "${PROJECT_SOURCE_DIR}/src/lib"
+            --txt "${AOWIS_SERVER_EPANET_COVERAGE_OUTPUT_DIR}/line-coverage.txt"
+            "${CMAKE_BINARY_DIR}"
+        COMMAND ${AOWIS_SERVER_EPANET_GCOVR_EXECUTABLE}
+            --root "${PROJECT_SOURCE_DIR}"
+            --filter "${PROJECT_SOURCE_DIR}/src/lib"
+            --branches
+            --txt "${AOWIS_SERVER_EPANET_COVERAGE_OUTPUT_DIR}/branch-coverage.txt"
+            "${CMAKE_BINARY_DIR}"
+        COMMAND ${AOWIS_SERVER_EPANET_GCOVR_EXECUTABLE}
+            --root "${PROJECT_SOURCE_DIR}"
+            --filter "${PROJECT_SOURCE_DIR}/src/lib"
+            --html-details "${AOWIS_SERVER_EPANET_COVERAGE_OUTPUT_DIR}/coverage.html"
+            "${CMAKE_BINARY_DIR}"
+        DEPENDS aowis-server-epanet-conformance-tests
+        USES_TERMINAL
+        COMMENT "Run AOWIS hydraulic conformance tests and generate line/branch coverage reports"
+    )
+endif()

@@ -292,9 +292,9 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         if (default_pattern_index != 1)
             throw std::runtime_error("Renamed upstream default demand pattern did not retain index 1");
 
-        checkEpanet(EN_addpattern(project, "Step3Pattern"), "EN_addpattern");
+        checkEpanet(EN_addpattern(project, "DEMAND_PATTERN"), "EN_addpattern");
         int pattern_index = 0;
-        checkEpanet(EN_getpatternindex(project, "Step3Pattern", &pattern_index), "EN_getpatternindex");
+        checkEpanet(EN_getpatternindex(project, "DEMAND_PATTERN", &pattern_index), "EN_getpatternindex");
         double factors[] = {3.1, 3.2, 3.3, 3.4};
         checkEpanet(EN_setpattern(project, pattern_index, factors, 4), "EN_setpattern");
         const int junction_index = nodeIndex(project, "12");
@@ -326,11 +326,11 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         checkEpanet(EN_settimeparam(project, EN_DURATION, 7200), "EN_settimeparam(EN_DURATION)");
 
         const int junction_index = nodeIndex(project, "11");
-        checkEpanet(EN_setjuncdata(project, junction_index, 215.0, 34.0, "1"), "EN_setjuncdata(step4 junction)");
+        checkEpanet(EN_setjuncdata(project, junction_index, 215.0, 34.0, "1"), "EN_setjuncdata(input-mapping junction)");
         checkEpanet(EN_setnodevalue(project, junction_index, EN_EMITTER, 1.75), "EN_setnodevalue(EN_EMITTER)");
 
         double factors[] = {1.0, 1.05};
-        const int pattern_index = addPattern(project, "STEP4_RES_HEAD", factors, 2);
+        const int pattern_index = addPattern(project, "RESERVOIR_HEAD_PATTERN", factors, 2);
         const int reservoir_index = nodeIndex(project, "9");
         checkEpanet(EN_setnodevalue(project, reservoir_index, EN_ELEVATION, 250.0), "EN_setnodevalue(reservoir head)");
         checkEpanet(EN_setnodevalue(project, reservoir_index, EN_PATTERN, static_cast<double>(pattern_index)), "EN_setnodevalue(reservoir pattern)");
@@ -344,15 +344,15 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         double primary_factors[] = {1.0, 2.0};
         double secondary_factors[] = {0.5, 1.5};
         double constant_factors[] = {1.0};
-        addPattern(project, "STEP4_PRIMARY", primary_factors, 2);
-        addPattern(project, "STEP4_SECONDARY", secondary_factors, 2);
-        addPattern(project, "STEP4_CONSTANT", constant_factors, 1);
+        addPattern(project, "PRIMARY_DEMAND", primary_factors, 2);
+        addPattern(project, "SECONDARY_DEMAND_PATTERN", secondary_factors, 2);
+        addPattern(project, "CONSTANT_DEMAND_PATTERN", constant_factors, 1);
 
         const int junction_index = nodeIndex(project, "12");
-        checkEpanet(EN_setjuncdata(project, junction_index, 213.36, 20.0, "STEP4_PRIMARY"), "EN_setjuncdata(step4 primary demand)");
+        checkEpanet(EN_setjuncdata(project, junction_index, 213.36, 20.0, "PRIMARY_DEMAND"), "EN_setjuncdata(primary demand category)");
         checkEpanet(EN_setdemandname(project, junction_index, 1, "PrimaryDemand"), "EN_setdemandname(primary)");
-        checkEpanet(EN_adddemand(project, junction_index, 7.0, "STEP4_CONSTANT", "SecondaryDemand"), "EN_adddemand(constant)");
-        checkEpanet(EN_adddemand(project, junction_index, 5.0, "STEP4_SECONDARY", "TertiaryDemand"), "EN_adddemand(secondary pattern)");
+        checkEpanet(EN_adddemand(project, junction_index, 7.0, "CONSTANT_DEMAND_PATTERN", "SecondaryDemand"), "EN_adddemand(constant)");
+        checkEpanet(EN_adddemand(project, junction_index, 5.0, "SECONDARY_DEMAND_PATTERN", "TertiaryDemand"), "EN_adddemand(secondary pattern)");
         return;
     }
     case NativeReferenceVariant::TankUniformArea:
@@ -379,15 +379,15 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
     {
         configureCanonicalMetricUnits(project);
         checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
-        checkEpanet(EN_addcurve(project, "STEP4_TANK_VOLUME"), "EN_addcurve(step4 tank volume)");
+        checkEpanet(EN_addcurve(project, "TANK_VOLUME_CURVE"), "EN_addcurve(tank volume curve)");
         int curve_index = 0;
-        checkEpanet(EN_getcurveindex(project, "STEP4_TANK_VOLUME", &curve_index), "EN_getcurveindex(step4 tank volume)");
+        checkEpanet(EN_getcurveindex(project, "TANK_VOLUME_CURVE", &curve_index), "EN_getcurveindex(tank volume curve)");
         double levels[] = {30.0, 35.0, 40.0, 45.0, 50.0};
         double volumes[] = {40.0, 600.0, 1500.0, 2700.0, 4200.0};
-        checkEpanet(EN_setcurve(project, curve_index, levels, volumes, 5), "EN_setcurve(step4 tank volume)");
+        checkEpanet(EN_setcurve(project, curve_index, levels, volumes, 5), "EN_setcurve(tank volume curve)");
         checkEpanet(EN_setcurvetype(project, curve_index, EN_VOLUME_CURVE), "EN_setcurvetype(EN_VOLUME_CURVE)");
         const int tank_index = nodeIndex(project, "2");
-        checkEpanet(EN_settankdata(project, tank_index, 255.0, 40.0, 30.0, 50.0, 0.0, 40.0, "STEP4_TANK_VOLUME"), "EN_settankdata(volume curve)");
+        checkEpanet(EN_settankdata(project, tank_index, 255.0, 40.0, 30.0, 50.0, 0.0, 40.0, "TANK_VOLUME_CURVE"), "EN_settankdata(volume curve)");
         return;
     }
     case NativeReferenceVariant::PipeInputs:
@@ -396,7 +396,7 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
 
         const int pipe_111 = linkIndex(project, "111");
-        checkEpanet(EN_setpipedata(project, pipe_111, 1234.0, 275.0, 127.0, 0.65), "EN_setpipedata(step4 pipe 111)");
+        checkEpanet(EN_setpipedata(project, pipe_111, 1234.0, 275.0, 127.0, 0.65), "EN_setpipedata(pipe 111 input mapping)");
 
         int pipe_113 = linkIndex(project, "113");
         int node_from = 0;
@@ -454,7 +454,7 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         checkEpanet(EN_settimeparam(project, EN_DURATION, 7200), "EN_settimeparam(EN_DURATION)");
         checkEpanet(EN_settimeparam(project, EN_PATTERNSTEP, 3600), "EN_settimeparam(EN_PATTERNSTEP)");
         double factors[] = {0.8, 1.0, 1.15};
-        const int pattern_index = addPattern(project, "STEP5_SPEED", factors, 3);
+        const int pattern_index = addPattern(project, "PUMP_SPEED_PATTERN", factors, 3);
         checkEpanet(EN_setlinkvalue(project, linkIndex(project, "9"), EN_LINKPATTERN, static_cast<double>(pattern_index)), "EN_setlinkvalue(EN_LINKPATTERN)");
         return;
     }
@@ -467,12 +467,12 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
     {
         configureCanonicalMetricUnits(project);
         checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
-        checkEpanet(EN_addcurve(project, "STEP5_CONST_EFF"), "EN_addcurve(STEP5_CONST_EFF)");
+        checkEpanet(EN_addcurve(project, "CONSTANT_EFFICIENCY_CURVE"), "EN_addcurve(CONSTANT_EFFICIENCY_CURVE)");
         int curve_index = 0;
-        checkEpanet(EN_getcurveindex(project, "STEP5_CONST_EFF", &curve_index), "EN_getcurveindex(STEP5_CONST_EFF)");
+        checkEpanet(EN_getcurveindex(project, "CONSTANT_EFFICIENCY_CURVE", &curve_index), "EN_getcurveindex(CONSTANT_EFFICIENCY_CURVE)");
         double flows[] = {0.0};
         double efficiencies[] = {83.0};
-        checkEpanet(EN_setcurve(project, curve_index, flows, efficiencies, 1), "EN_setcurve(STEP5_CONST_EFF)");
+        checkEpanet(EN_setcurve(project, curve_index, flows, efficiencies, 1), "EN_setcurve(CONSTANT_EFFICIENCY_CURVE)");
         checkEpanet(EN_setcurvetype(project, curve_index, EN_EFFIC_CURVE), "EN_setcurvetype(EN_EFFIC_CURVE)");
         checkEpanet(EN_setlinkvalue(project, linkIndex(project, "9"), EN_PUMP_ECURVE, static_cast<double>(curve_index)), "EN_setlinkvalue(EN_PUMP_ECURVE)");
         return;
@@ -481,12 +481,12 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
     {
         configureCanonicalMetricUnits(project);
         checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
-        checkEpanet(EN_addcurve(project, "STEP5_EFF"), "EN_addcurve(STEP5_EFF)");
+        checkEpanet(EN_addcurve(project, "PUMP_EFFICIENCY_CURVE"), "EN_addcurve(PUMP_EFFICIENCY_CURVE)");
         int curve_index = 0;
-        checkEpanet(EN_getcurveindex(project, "STEP5_EFF", &curve_index), "EN_getcurveindex(STEP5_EFF)");
+        checkEpanet(EN_getcurveindex(project, "PUMP_EFFICIENCY_CURVE", &curve_index), "EN_getcurveindex(PUMP_EFFICIENCY_CURVE)");
         double flows[] = {0.0, 200.0, 400.0, 650.0};
         double efficiencies[] = {60.0, 76.0, 88.0, 79.0};
-        checkEpanet(EN_setcurve(project, curve_index, flows, efficiencies, 4), "EN_setcurve(STEP5_EFF)");
+        checkEpanet(EN_setcurve(project, curve_index, flows, efficiencies, 4), "EN_setcurve(PUMP_EFFICIENCY_CURVE)");
         checkEpanet(EN_setcurvetype(project, curve_index, EN_EFFIC_CURVE), "EN_setcurvetype(EN_EFFIC_CURVE)");
         checkEpanet(EN_setlinkvalue(project, linkIndex(project, "9"), EN_PUMP_ECURVE, static_cast<double>(curve_index)), "EN_setlinkvalue(EN_PUMP_ECURVE)");
         return;
@@ -501,7 +501,7 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         checkEpanet(EN_setoption(project, EN_GLOBALPRICE, 0.2), "EN_setoption(EN_GLOBALPRICE)");
         checkEpanet(EN_setoption(project, EN_DEMANDCHARGE, 1.5), "EN_setoption(EN_DEMANDCHARGE)");
         double factors[] = {1.0, 2.0};
-        const int pattern_index = addPattern(project, "STEP5_GLOBAL_PRICE", factors, 2);
+        const int pattern_index = addPattern(project, "GLOBAL_ENERGY_PRICE_PATTERN", factors, 2);
         checkEpanet(EN_setoption(project, EN_GLOBALPATTERN, static_cast<double>(pattern_index)), "EN_setoption(EN_GLOBALPATTERN)");
         return;
     }
@@ -515,10 +515,10 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         checkEpanet(EN_setoption(project, EN_GLOBALPRICE, 0.1), "EN_setoption(EN_GLOBALPRICE)");
         checkEpanet(EN_setoption(project, EN_DEMANDCHARGE, 0.75), "EN_setoption(EN_DEMANDCHARGE)");
         double global_factors[] = {4.0, 4.0};
-        const int global_pattern_index = addPattern(project, "STEP5_GLOBAL_UNUSED", global_factors, 2);
+        const int global_pattern_index = addPattern(project, "UNUSED_GLOBAL_PRICE_PATTERN", global_factors, 2);
         checkEpanet(EN_setoption(project, EN_GLOBALPATTERN, static_cast<double>(global_pattern_index)), "EN_setoption(EN_GLOBALPATTERN)");
         double pump_factors[] = {1.0, 0.5};
-        const int pump_pattern_index = addPattern(project, "STEP5_PUMP_PRICE", pump_factors, 2);
+        const int pump_pattern_index = addPattern(project, "PUMP_ENERGY_PRICE_PATTERN", pump_factors, 2);
         const int pump_index = linkIndex(project, "9");
         checkEpanet(EN_setlinkvalue(project, pump_index, EN_PUMP_ECOST, 0.3), "EN_setlinkvalue(EN_PUMP_ECOST)");
         checkEpanet(EN_setlinkvalue(project, pump_index, EN_PUMP_EPAT, static_cast<double>(pump_pattern_index)), "EN_setlinkvalue(EN_PUMP_EPAT)");
@@ -605,12 +605,12 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         checkEpanet(EN_setlinktype(project, &valve_index, EN_GPV, EN_UNCONDITIONAL), "EN_setlinktype(EN_GPV)");
         checkEpanet(EN_setlinkvalue(project, valve_index, EN_DIAMETER, 220.0), "EN_setlinkvalue(EN_DIAMETER)");
         checkEpanet(EN_setlinkvalue(project, valve_index, EN_MINORLOSS, 0.26), "EN_setlinkvalue(EN_MINORLOSS)");
-        checkEpanet(EN_addcurve(project, "STEP6_GPV"), "EN_addcurve(STEP6_GPV)");
+        checkEpanet(EN_addcurve(project, "GPV_HEADLOSS_CURVE"), "EN_addcurve(GPV_HEADLOSS_CURVE)");
         int curve_index = 0;
-        checkEpanet(EN_getcurveindex(project, "STEP6_GPV", &curve_index), "EN_getcurveindex(STEP6_GPV)");
+        checkEpanet(EN_getcurveindex(project, "GPV_HEADLOSS_CURVE", &curve_index), "EN_getcurveindex(GPV_HEADLOSS_CURVE)");
         double flows[] = {0.0, 20.0, 40.0, 80.0};
         double head_losses[] = {0.0, 0.4, 2.0, 8.0};
-        checkEpanet(EN_setcurve(project, curve_index, flows, head_losses, 4), "EN_setcurve(STEP6_GPV)");
+        checkEpanet(EN_setcurve(project, curve_index, flows, head_losses, 4), "EN_setcurve(GPV_HEADLOSS_CURVE)");
         checkEpanet(EN_setcurvetype(project, curve_index, EN_HLOSS_CURVE), "EN_setcurvetype(EN_HLOSS_CURVE)");
         checkEpanet(EN_setlinkvalue(project, valve_index, EN_GPV_CURVE, static_cast<double>(curve_index)), "EN_setlinkvalue(EN_GPV_CURVE)");
         checkEpanet(EN_setlinkvalue(project, valve_index, EN_INITSTATUS, EN_OPEN), "EN_setlinkvalue(EN_INITSTATUS)");

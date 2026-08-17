@@ -5,7 +5,7 @@
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
 #include "conformance/net1_fixture.h"
-#include "conformance/upstream_step7_scenarios.h"
+#include "conformance/controls_options_operations_scenarios.h"
 
 #include <QFile>
 #include <QTemporaryDir>
@@ -205,7 +205,7 @@ HydraulicControlSimple makeSimpleControl(
     bool enabled = true)
 {
     HydraulicControlSimple control;
-    control.id = QStringLiteral("STEP7_SIMPLE");
+    control.id = QStringLiteral("SIMPLE_CONTROL");
     control.uuid = QUuid::createUuid();
     control.type = type;
     control.link_uuid = linkUuid(network, QStringLiteral("9"));
@@ -254,7 +254,7 @@ HydraulicControlRule makeRule(
     bool enabled = true)
 {
     HydraulicControlRule rule;
-    rule.id = QStringLiteral("STEP7_RULE");
+    rule.id = QStringLiteral("STRUCTURED_RULE");
     rule.uuid = QUuid::createUuid();
     rule.premises = premises;
     rule.actions_then.append(closePumpAction(network));
@@ -726,7 +726,7 @@ void testRuleSettingAction(TestContext &context)
         1800.0));
 
     HydraulicControlRule rule;
-    rule.id = QStringLiteral("STEP7_RULE_SETTING");
+    rule.id = QStringLiteral("RULE_SETTING_ACTION");
     rule.uuid = QUuid::createUuid();
     rule.premises = premises;
     HydraulicControlRuleAction action;
@@ -762,7 +762,7 @@ void testRuleActiveAction(TestContext &context)
 
     const HydraulicLinkPipe replaced_pipe = network.links_pipes.takeAt(pipe_index);
     HydraulicLinkValve valve;
-    valve.id = QStringLiteral("STEP7_ACTIVE_VALVE");
+    valve.id = QStringLiteral("ACTIVE_VALVE");
     valve.uuid = QUuid::createUuid();
     valve.node_uuid_from = replaced_pipe.node_uuid_from;
     valve.node_uuid_to = replaced_pipe.node_uuid_to;
@@ -783,7 +783,7 @@ void testRuleActiveAction(TestContext &context)
         1800.0));
 
     HydraulicControlRule rule;
-    rule.id = QStringLiteral("STEP7_RULE_ACTIVE");
+    rule.id = QStringLiteral("RULE_ACTIVE_ACTION");
     rule.uuid = QUuid::createUuid();
     rule.premises = premises;
     HydraulicControlRuleAction action;
@@ -805,10 +805,10 @@ void testRuleSourceText(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
     HydraulicControlRule rule;
-    rule.id = QStringLiteral("STEP7_SOURCE_TEXT");
+    rule.id = QStringLiteral("SOURCE_TEXT_RULE");
     rule.uuid = QUuid::createUuid();
     rule.source_text = QStringLiteral(
-        "RULE STEP7_SOURCE_TEXT\n"
+        "RULE SOURCE_TEXT_RULE\n"
         "IF SYSTEM TIME >= 0.5\n"
         "THEN PUMP 9 STATUS = CLOSED\n"
         "PRIORITY 3.5\n");
@@ -817,7 +817,7 @@ void testRuleSourceText(TestContext &context)
     const NativeSavedProject native_project(network);
     char rule_id[EN_MAXID + 1] = {};
     checkEpanet(EN_getruleID(native_project.handle(), 1, rule_id), "EN_getruleID");
-    context.expectEqual(std::string_view(rule_id), std::string_view("STEP7_SOURCE_TEXT"), comparison("rule.id"));
+    context.expectEqual(std::string_view(rule_id), std::string_view("SOURCE_TEXT_RULE"), comparison("rule.id"));
 
     int premise_count = 0;
     int then_count = 0;
@@ -860,9 +860,9 @@ void testRulePriority(TestContext &context)
         1800.0));
 
     HydraulicControlRule close_rule = makeRule(open_wins, premises, false, 1.0);
-    close_rule.id = QStringLiteral("STEP7_PRIORITY_CLOSE");
+    close_rule.id = QStringLiteral("PRIORITY_CLOSE_RULE");
     HydraulicControlRule open_rule = makeRule(open_wins, premises, false, 5.0);
-    open_rule.id = QStringLiteral("STEP7_PRIORITY_OPEN");
+    open_rule.id = QStringLiteral("PRIORITY_OPEN_RULE");
     open_rule.actions_then.clear();
     open_rule.actions_then.append(openPumpAction(open_wins));
     open_wins.controls_rules.append(close_rule);
@@ -1402,6 +1402,10 @@ void testWarningDiagnostics(TestContext &context)
         if (diagnostic.severity == HydraulicSimulationDiagnosticSeverity::Warning)
         {
             found_warning = true;
+            context.expect(diagnostic.backend_name == QStringLiteral("EPANET"), "warning diagnostic must retain the backend name");
+            context.expect(diagnostic.backend_error_code > 0 && diagnostic.backend_error_code < 100, "warning diagnostic must retain the native EPANET warning code");
+            context.expect(!diagnostic.backend_operation.isEmpty(), "warning diagnostic must retain the native EPANET operation");
+            context.expect(!diagnostic.message_backend.isEmpty(), "warning diagnostic must retain the native EPANET message");
             break;
         }
     }
@@ -1494,7 +1498,7 @@ void testCancellationPartialResults(TestContext &context)
 
 namespace AowisEpanetTests
 {
-void registerUpstreamStep7Scenarios(ScenarioRegistry &registry)
+void registerControlsOptionsOperationsScenarios(ScenarioRegistry &registry)
 {
     registry.add(ScenarioDefinition{"conformance-controls-simple-low-level", "Checks low-level simple-control mapping.", {"conformance", "hydraulic", "control"}, &testSimpleLowLevel});
     registry.add(ScenarioDefinition{"conformance-controls-simple-high-level", "Checks high-level simple-control mapping.", {"conformance", "hydraulic", "control"}, &testSimpleHighLevel});
@@ -1560,7 +1564,7 @@ void registerUpstreamStep7Scenarios(ScenarioRegistry &registry)
     registry.add(ScenarioDefinition{"conformance-options-report-statistic-maximum", "Checks MAXIMUM report-statistic mapping.", {"conformance", "hydraulic", "options"}, &testReportStatisticMaximum});
     registry.add(ScenarioDefinition{"conformance-options-report-statistic-range", "Checks RANGE report-statistic mapping.", {"conformance", "hydraulic", "options"}, &testReportStatisticRange});
 
-    registry.add(ScenarioDefinition{"conformance-options-hydraulic-headloss-hazen-williams", "Checks Hazen-Williams solver-option mapping; Darcy-Weisbach and Chezy-Manning have dedicated step-4 tests.", {"conformance", "hydraulic", "options"}, &testHeadlossHazenWilliams});
+    registry.add(ScenarioDefinition{"conformance-options-hydraulic-headloss-hazen-williams", "Checks Hazen-Williams solver-option mapping; Darcy-Weisbach and Chezy-Manning have dedicated input-mapping tests.", {"conformance", "hydraulic", "options"}, &testHeadlossHazenWilliams});
     registry.add(ScenarioDefinition{"conformance-options-hydraulic-demand-model-dda", "Checks demand-driven solver-option mapping.", {"conformance", "hydraulic", "options"}, &testDemandModelDda});
     registry.add(ScenarioDefinition{"conformance-options-hydraulic-demand-model-pda", "Checks pressure-driven solver-option mapping.", {"conformance", "hydraulic", "options"}, &testDemandModelPda});
     registry.add(ScenarioDefinition{"conformance-options-hydraulic-minimum-pressure", "Checks minimum-pressure solver-option mapping.", {"conformance", "hydraulic", "options"}, &testDemandMinimumPressure});

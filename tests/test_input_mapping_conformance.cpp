@@ -4,7 +4,7 @@
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
 #include "conformance/net1_fixture.h"
-#include "conformance/upstream_step4_scenarios.h"
+#include "conformance/input_mapping_scenarios.h"
 
 #include <QUuid>
 
@@ -148,7 +148,7 @@ NativeHydraulicTimeline runNative(const Net1Fixture &fixture, NativeReferenceVar
     const NativeHydraulicTimeline timeline = AowisEpanetTests::runNativeEpanetReference(
         nativeConfiguration(variant, fixture.native_control_ids_by_index));
     context.expect(timeline.success, timeline.error.toStdString());
-    context.expect(!timeline.results.isEmpty(), "native step-4 timeline must contain at least one hydraulic result");
+    context.expect(!timeline.results.isEmpty(), "native input-mapping timeline must contain at least one hydraulic result");
     return timeline;
 }
 
@@ -167,8 +167,8 @@ void testJunctionReservoirInputs(TestContext &context)
 
     HydraulicNodeJunction *junction = findModelJunction(fixture.network, QStringLiteral("11"));
     HydraulicNodeReservoir *reservoir = findModelReservoir(fixture.network, QStringLiteral("9"));
-    context.expect(junction != nullptr, "step-4 junction fixture must contain junction 11");
-    context.expect(reservoir != nullptr, "step-4 reservoir fixture must contain reservoir 9");
+    context.expect(junction != nullptr, "junction input-mapping fixture must contain junction 11");
+    context.expect(reservoir != nullptr, "reservoir input-mapping fixture must contain reservoir 9");
     if (junction == nullptr || reservoir == nullptr)
         return;
 
@@ -185,7 +185,7 @@ void testJunctionReservoirInputs(TestContext &context)
     junction->demands[0].pattern_uuid = fixture.network.patterns_time.first().uuid;
 
     HydraulicPatternTime reservoir_pattern;
-    reservoir_pattern.id = QStringLiteral("STEP4_RES_HEAD");
+    reservoir_pattern.id = QStringLiteral("RESERVOIR_HEAD_PATTERN");
     reservoir_pattern.uuid = QUuid::createUuid();
     reservoir_pattern.factors = {1.0, 1.05};
     fixture.network.patterns_time.append(reservoir_pattern);
@@ -242,19 +242,19 @@ void testDemandCategories(TestContext &context)
     fixture.network.duration_s = 7200;
 
     HydraulicPatternTime primary_pattern;
-    primary_pattern.id = QStringLiteral("STEP4_PRIMARY");
+    primary_pattern.id = QStringLiteral("PRIMARY_DEMAND");
     primary_pattern.uuid = QUuid::createUuid();
     primary_pattern.factors = {1.0, 2.0};
     fixture.network.patterns_time.append(primary_pattern);
 
     HydraulicPatternTime secondary_pattern;
-    secondary_pattern.id = QStringLiteral("STEP4_SECONDARY");
+    secondary_pattern.id = QStringLiteral("SECONDARY_DEMAND_PATTERN");
     secondary_pattern.uuid = QUuid::createUuid();
     secondary_pattern.factors = {0.5, 1.5};
     fixture.network.patterns_time.append(secondary_pattern);
 
     HydraulicNodeJunction *junction = findModelJunction(fixture.network, QStringLiteral("12"));
-    context.expect(junction != nullptr, "step-4 demand-category fixture must contain junction 12");
+    context.expect(junction != nullptr, "demand-category fixture must contain junction 12");
     if (junction == nullptr)
         return;
     junction->demands.clear();
@@ -317,7 +317,7 @@ void configureTankBase(Net1Fixture &fixture, HydraulicNodeTankGeometryInputType 
 {
     fixture.network.duration_s = 0;
     HydraulicNodeTank *tank = findModelTank(fixture.network, QStringLiteral("2"));
-    context.expect(tank != nullptr, "step-4 tank fixture must contain tank 2");
+    context.expect(tank != nullptr, "tank input-mapping fixture must contain tank 2");
     if (tank == nullptr)
         return;
 
@@ -337,7 +337,7 @@ void assertTankGolden(const NativeHydraulicTimeline &native_timeline, double exp
     if (!native_timeline.success || native_timeline.results.isEmpty())
         return;
     const NativeTankResult *tank = findTank(native_timeline.results.first(), QStringLiteral("2"));
-    context.expect(tank != nullptr, "native step-4 tank result must contain tank 2");
+    context.expect(tank != nullptr, "native tank input-mapping result must contain tank 2");
     if (tank == nullptr)
         return;
     context.expectNear(tank->head_m, 295.0, NumericTolerance{1.0e-9, 0.0},
@@ -383,7 +383,7 @@ void testTankVolumeCurve(TestContext &context)
         return;
 
     HydraulicCurveTankVolume curve;
-    curve.id = QStringLiteral("STEP4_TANK_VOLUME");
+    curve.id = QStringLiteral("TANK_VOLUME_CURVE");
     curve.uuid = QUuid::createUuid();
 
     const double levels[] = {30.0, 35.0, 40.0, 45.0, 50.0};
@@ -411,9 +411,9 @@ void testPipeInputs(TestContext &context)
     HydraulicLinkPipe *pipe_111 = findModelPipe(fixture.network, QStringLiteral("111"));
     HydraulicLinkPipe *pipe_113 = findModelPipe(fixture.network, QStringLiteral("113"));
     HydraulicLinkPipe *pipe_122 = findModelPipe(fixture.network, QStringLiteral("122"));
-    context.expect(pipe_111 != nullptr, "step-4 pipe fixture must contain pipe 111");
-    context.expect(pipe_113 != nullptr, "step-4 pipe fixture must contain pipe 113");
-    context.expect(pipe_122 != nullptr, "step-4 pipe fixture must contain pipe 122");
+    context.expect(pipe_111 != nullptr, "pipe input-mapping fixture must contain pipe 111");
+    context.expect(pipe_113 != nullptr, "pipe input-mapping fixture must contain pipe 113");
+    context.expect(pipe_122 != nullptr, "pipe input-mapping fixture must contain pipe 122");
     if (pipe_111 == nullptr || pipe_113 == nullptr || pipe_122 == nullptr)
         return;
 
@@ -509,7 +509,7 @@ void testChezyManning(TestContext &context)
 
 namespace AowisEpanetTests
 {
-void registerUpstreamStep4Scenarios(ScenarioRegistry &registry)
+void registerInputMappingScenarios(ScenarioRegistry &registry)
 {
     registry.add(ScenarioDefinition{
         "conformance-upstream-junction-reservoir-inputs",

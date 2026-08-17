@@ -4,7 +4,7 @@
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
 #include "conformance/net1_fixture.h"
-#include "conformance/upstream_step3_scenarios.h"
+#include "conformance/hydraulic_behavior_scenarios.h"
 
 #include <QUuid>
 
@@ -461,7 +461,7 @@ Net1Fixture demandPatternFixture()
         fixture.network.patterns_time.first().id = QStringLiteral("Pat1");
 
     HydraulicPatternTime pattern;
-    pattern.id = QStringLiteral("Step3Pattern");
+    pattern.id = QStringLiteral("DEMAND_PATTERN");
     pattern.uuid = QUuid::createUuid();
     pattern.factors = {3.1, 3.2, 3.3, 3.4};
     fixture.network.patterns_time.append(pattern);
@@ -595,7 +595,7 @@ void testHydraulicStepping(TestContext &context)
 
 namespace AowisEpanetTests
 {
-void registerUpstreamStep3Scenarios(ScenarioRegistry &registry)
+void registerHydraulicBehaviorScenarios(ScenarioRegistry &registry)
 {
     registry.add(ScenarioDefinition{
         "conformance-upstream-dda-pda",

@@ -4,7 +4,7 @@
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
 #include "conformance/net1_fixture.h"
-#include "conformance/upstream_step6_scenarios.h"
+#include "conformance/valve_scenarios.h"
 
 #include <QUuid>
 
@@ -97,7 +97,7 @@ NativeHydraulicTimeline runNative(const Net1Fixture &fixture, NativeReferenceVar
     const NativeHydraulicTimeline timeline = AowisEpanetTests::runNativeEpanetReference(
         nativeConfiguration(variant, fixture.native_control_ids_by_index));
     context.expect(timeline.success, timeline.error.toStdString());
-    context.expect(!timeline.results.isEmpty(), "native step-6 timeline must contain at least one hydraulic result");
+    context.expect(!timeline.results.isEmpty(), "native valve-conformance timeline must contain at least one hydraulic result");
     return timeline;
 }
 
@@ -252,7 +252,7 @@ Net1Fixture gpvFixture()
         220.0, 0.26, 0.0, HydraulicLinkValveInitialStatus::Open);
 
     HydraulicCurveValveHeadloss curve;
-    curve.id = QStringLiteral("STEP6_GPV");
+    curve.id = QStringLiteral("GPV_HEADLOSS_CURVE");
     curve.uuid = QUuid::createUuid();
     const double flows[] = {0.0, 20.0, 40.0, 80.0};
     const double losses[] = {0.0, 0.4, 2.0, 8.0};
@@ -312,7 +312,7 @@ void testValveGpv(TestContext &context)
 
 namespace AowisEpanetTests
 {
-void registerUpstreamStep6Scenarios(ScenarioRegistry &registry)
+void registerValveScenarios(ScenarioRegistry &registry)
 {
     registry.add(ScenarioDefinition{"conformance-upstream-valve-prv",
         "Exercises PRV diameter, minor loss, Active status, pressure setting, and complete valve results.",

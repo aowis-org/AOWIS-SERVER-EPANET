@@ -2,7 +2,7 @@
 
 #include "conformance/conformance_test_framework.h"
 #include "conformance/net1_fixture.h"
-#include "conformance/upstream_step8b_scenarios.h"
+#include "conformance/negative_validation_scenarios.h"
 
 #include <QString>
 #include <QStringList>
@@ -208,28 +208,28 @@ void scenarioDisabledEntityPruning(TestContext &context)
     network.options_report.selection_links.uuids = {pipe->uuid};
 
     HydraulicNodeJunction disabled_junction;
-    disabled_junction.id = QStringLiteral("__DISABLED_JUNCTION_8B");
+    disabled_junction.id = QStringLiteral("__DISABLED_JUNCTION");
     disabled_junction.uuid = QUuid::createUuid();
     disabled_junction.metadata.enabled = false;
     disabled_junction.elevation_m = std::numeric_limits<double>::quiet_NaN();
     network.nodes_junctions.append(disabled_junction);
 
     HydraulicNodeReservoir disabled_reservoir;
-    disabled_reservoir.id = QStringLiteral("__DISABLED_RESERVOIR_8B");
+    disabled_reservoir.id = QStringLiteral("__DISABLED_RESERVOIR");
     disabled_reservoir.uuid = QUuid::createUuid();
     disabled_reservoir.metadata.enabled = false;
     disabled_reservoir.head_m = std::numeric_limits<double>::quiet_NaN();
     network.nodes_reservoirs.append(disabled_reservoir);
 
     HydraulicNodeTank disabled_tank;
-    disabled_tank.id = QStringLiteral("__DISABLED_TANK_8B");
+    disabled_tank.id = QStringLiteral("__DISABLED_TANK");
     disabled_tank.uuid = QUuid::createUuid();
     disabled_tank.metadata.enabled = false;
     disabled_tank.water_level_initial_m = std::numeric_limits<double>::quiet_NaN();
     network.nodes_tanks.append(disabled_tank);
 
     HydraulicLinkPipe disabled_pipe;
-    disabled_pipe.id = QStringLiteral("__DISABLED_PIPE_8B");
+    disabled_pipe.id = QStringLiteral("__DISABLED_PIPE");
     disabled_pipe.uuid = QUuid::createUuid();
     disabled_pipe.metadata.enabled = false;
     disabled_pipe.node_uuid_from = QUuid::createUuid();
@@ -238,7 +238,7 @@ void scenarioDisabledEntityPruning(TestContext &context)
     network.links_pipes.append(disabled_pipe);
 
     HydraulicLinkPump disabled_pump;
-    disabled_pump.id = QStringLiteral("__DISABLED_PUMP_8B");
+    disabled_pump.id = QStringLiteral("__DISABLED_PUMP");
     disabled_pump.uuid = QUuid::createUuid();
     disabled_pump.metadata.enabled = false;
     disabled_pump.node_uuid_from = QUuid::createUuid();
@@ -247,7 +247,7 @@ void scenarioDisabledEntityPruning(TestContext &context)
     network.links_pumps.append(disabled_pump);
 
     HydraulicLinkValve disabled_valve;
-    disabled_valve.id = QStringLiteral("__DISABLED_VALVE_8B");
+    disabled_valve.id = QStringLiteral("__DISABLED_VALVE");
     disabled_valve.uuid = QUuid::createUuid();
     disabled_valve.metadata.enabled = false;
     disabled_valve.node_uuid_from = QUuid::createUuid();
@@ -571,7 +571,7 @@ void scenarioStructuredDiagnosticDetails(TestContext &context)
 
 namespace AowisEpanetTests
 {
-void registerUpstreamStep8bScenarios(ScenarioRegistry &registry)
+void registerNegativeValidationScenarios(ScenarioRegistry &registry)
 {
     registry.add(ScenarioDefinition{
         "conformance-negative-duplicate-node-id",

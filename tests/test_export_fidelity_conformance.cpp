@@ -3,7 +3,7 @@
 
 #include "conformance/conformance_test_framework.h"
 #include "conformance/net1_fixture.h"
-#include "conformance/upstream_step8a_scenarios.h"
+#include "conformance/export_fidelity_scenarios.h"
 
 #include <QByteArray>
 #include <QFile>
@@ -77,7 +77,7 @@ HydraulicLinkValve replacePipeWithMetadataValve(NetworkHydraulic &network, const
     valve.minor_loss = 0.15;
     valve.setting = 3.0;
     valve.initial_status = HydraulicLinkValveInitialStatus::Open;
-    valve.metadata.comment = QStringLiteral("valve comment 8A");
+    valve.metadata.comment = QStringLiteral("valve export comment");
     valve.metadata.tag = QStringLiteral("valve-tag");
     network.links_valves.append(valve);
     return valve;
@@ -264,19 +264,19 @@ void scenarioGeneratedInpNativeReopen(TestContext &context)
 void scenarioTitlesCommentsTags(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
-    network.title_line_1 = QStringLiteral("8A title line one");
-    network.title_line_2 = QStringLiteral("8A title line two");
-    network.title_line_3 = QStringLiteral("8A title line three");
+    network.title_line_1 = QStringLiteral("export fidelity title line one");
+    network.title_line_2 = QStringLiteral("export fidelity title line two");
+    network.title_line_3 = QStringLiteral("export fidelity title line three");
 
-    network.nodes_junctions.first().metadata.comment = QStringLiteral("junction comment 8A");
+    network.nodes_junctions.first().metadata.comment = QStringLiteral("junction export comment");
     network.nodes_junctions.first().metadata.tag = QStringLiteral("junction-tag");
-    network.nodes_reservoirs.first().metadata.comment = QStringLiteral("reservoir comment 8A");
+    network.nodes_reservoirs.first().metadata.comment = QStringLiteral("reservoir export comment");
     network.nodes_reservoirs.first().metadata.tag = QStringLiteral("reservoir-tag");
-    network.nodes_tanks.first().metadata.comment = QStringLiteral("tank comment 8A");
+    network.nodes_tanks.first().metadata.comment = QStringLiteral("tank export comment");
     network.nodes_tanks.first().metadata.tag = QStringLiteral("tank-tag");
-    network.links_pipes.first().metadata.comment = QStringLiteral("pipe comment 8A");
+    network.links_pipes.first().metadata.comment = QStringLiteral("pipe export comment");
     network.links_pipes.first().metadata.tag = QStringLiteral("pipe-tag");
-    network.links_pumps.first().metadata.comment = QStringLiteral("pump comment 8A");
+    network.links_pumps.first().metadata.comment = QStringLiteral("pump export comment");
     network.links_pumps.first().metadata.tag = QStringLiteral("pump-tag");
     const HydraulicLinkValve valve = replacePipeWithMetadataValve(network, QStringLiteral("121"));
 
@@ -286,14 +286,14 @@ void scenarioTitlesCommentsTags(TestContext &context)
     std::array<char, EN_MAXMSG + 1> line_2{};
     std::array<char, EN_MAXMSG + 1> line_3{};
     checkEpanet(EN_gettitle(native.handle(), line_1.data(), line_2.data(), line_3.data()), "EN_gettitle");
-    context.expectEqual(std::string_view(line_1.data()), std::string_view("8A title line one"), comparison("title.line_1"));
-    context.expectEqual(std::string_view(line_2.data()), std::string_view("8A title line two"), comparison("title.line_2"));
-    context.expectEqual(std::string_view(line_3.data()), std::string_view("8A title line three"), comparison("title.line_3"));
+    context.expectEqual(std::string_view(line_1.data()), std::string_view("export fidelity title line one"), comparison("title.line_1"));
+    context.expectEqual(std::string_view(line_2.data()), std::string_view("export fidelity title line two"), comparison("title.line_2"));
+    context.expectEqual(std::string_view(line_3.data()), std::string_view("export fidelity title line three"), comparison("title.line_3"));
 
     const std::array<std::pair<QString, std::pair<std::string, std::string>>, 3> nodes = {{
-        {network.nodes_junctions.first().id, {"junction comment 8A", "junction-tag"}},
-        {network.nodes_reservoirs.first().id, {"reservoir comment 8A", "reservoir-tag"}},
-        {network.nodes_tanks.first().id, {"tank comment 8A", "tank-tag"}}
+        {network.nodes_junctions.first().id, {"junction export comment", "junction-tag"}},
+        {network.nodes_reservoirs.first().id, {"reservoir export comment", "reservoir-tag"}},
+        {network.nodes_tanks.first().id, {"tank export comment", "tank-tag"}}
     }};
     for (const std::pair<QString, std::pair<std::string, std::string>> &item : nodes)
     {
@@ -303,9 +303,9 @@ void scenarioTitlesCommentsTags(TestContext &context)
     }
 
     const std::array<std::pair<QString, std::pair<std::string, std::string>>, 3> links = {{
-        {network.links_pipes.first().id, {"pipe comment 8A", "pipe-tag"}},
-        {network.links_pumps.first().id, {"pump comment 8A", "pump-tag"}},
-        {valve.id, {"valve comment 8A", "valve-tag"}}
+        {network.links_pipes.first().id, {"pipe export comment", "pipe-tag"}},
+        {network.links_pumps.first().id, {"pump export comment", "pump-tag"}},
+        {valve.id, {"valve export comment", "valve-tag"}}
     }};
     for (const std::pair<QString, std::pair<std::string, std::string>> &item : links)
     {
@@ -318,13 +318,13 @@ void scenarioTitlesCommentsTags(TestContext &context)
 void scenarioPatternsCurves(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
-    network.patterns_time.first().comment = QStringLiteral("pattern comment 8A");
-    network.curves_pump_head.first().comment = QStringLiteral("pump head comment 8A");
+    network.patterns_time.first().comment = QStringLiteral("pattern export comment");
+    network.curves_pump_head.first().comment = QStringLiteral("pump head export comment");
 
     HydraulicCurveTankVolume volume;
-    volume.id = QStringLiteral("VOLUME_8A");
+    volume.id = QStringLiteral("EXPORT_VOLUME_CURVE");
     volume.uuid = QUuid::createUuid();
-    volume.comment = QStringLiteral("volume comment 8A");
+    volume.comment = QStringLiteral("volume curve export comment");
     HydraulicCurveTankVolumePoint volume_point_1;
     volume_point_1.water_level_m = 0.0;
     volume_point_1.volume_m3 = 0.0;
@@ -335,9 +335,9 @@ void scenarioPatternsCurves(TestContext &context)
     network.curves_tank_volume.append(volume);
 
     HydraulicCurvePumpEfficiency efficiency;
-    efficiency.id = QStringLiteral("EFFIC_8A");
+    efficiency.id = QStringLiteral("EXPORT_EFFICIENCY_CURVE");
     efficiency.uuid = QUuid::createUuid();
-    efficiency.comment = QStringLiteral("efficiency comment 8A");
+    efficiency.comment = QStringLiteral("efficiency curve export comment");
     HydraulicCurvePumpEfficiencyPoint efficiency_point_1;
     efficiency_point_1.flow_m3_per_h = 0.0;
     efficiency_point_1.efficiency_percent = 70.0;
@@ -348,9 +348,9 @@ void scenarioPatternsCurves(TestContext &context)
     network.curves_pump_efficiency.append(efficiency);
 
     HydraulicCurveValveHeadloss headloss;
-    headloss.id = QStringLiteral("HLOSS_8A");
+    headloss.id = QStringLiteral("EXPORT_HEADLOSS_CURVE");
     headloss.uuid = QUuid::createUuid();
-    headloss.comment = QStringLiteral("headloss comment 8A");
+    headloss.comment = QStringLiteral("headloss curve export comment");
     HydraulicCurveValveHeadlossPoint headloss_point_1;
     headloss_point_1.flow_m3_per_h = 0.0;
     headloss_point_1.head_loss_m = 0.0;
@@ -361,9 +361,9 @@ void scenarioPatternsCurves(TestContext &context)
     network.curves_valve_headloss.append(headloss);
 
     HydraulicCurveValveCharacteristic characteristic;
-    characteristic.id = QStringLiteral("VALVE_8A");
+    characteristic.id = QStringLiteral("EXPORT_VALVE_CURVE");
     characteristic.uuid = QUuid::createUuid();
-    characteristic.comment = QStringLiteral("valve curve comment 8A");
+    characteristic.comment = QStringLiteral("valve curve export comment");
     HydraulicCurveValveCharacteristicPoint characteristic_point_1;
     characteristic_point_1.position_percent = 0.0;
     characteristic_point_1.relative_flow_percent = 0.0;
@@ -377,9 +377,9 @@ void scenarioPatternsCurves(TestContext &context)
     network.curves_valve_characteristic.append(characteristic);
 
     HydraulicCurveGeneric generic;
-    generic.id = QStringLiteral("GENERIC_8A");
+    generic.id = QStringLiteral("EXPORT_GENERIC_CURVE");
     generic.uuid = QUuid::createUuid();
-    generic.comment = QStringLiteral("generic comment 8A");
+    generic.comment = QStringLiteral("generic curve export comment");
     HydraulicCurveGenericPoint generic_point_1;
     generic_point_1.x = 1.0;
     generic_point_1.y = 10.0;
@@ -395,7 +395,7 @@ void scenarioPatternsCurves(TestContext &context)
     NativeSavedProject native(network);
 
     const int pattern_index = patternIndex(native.handle(), network.patterns_time.first().id);
-    context.expectEqual(objectComment(native.handle(), EN_TIMEPAT, pattern_index), std::string_view("pattern comment 8A"), comparison("pattern.comment", "Pattern", network.patterns_time.first().id.toStdString()));
+    context.expectEqual(objectComment(native.handle(), EN_TIMEPAT, pattern_index), std::string_view("pattern export comment"), comparison("pattern.comment", "Pattern", network.patterns_time.first().id.toStdString()));
     int pattern_length = 0;
     checkEpanet(EN_getpatternlen(native.handle(), pattern_index, &pattern_length), "EN_getpatternlen");
     context.expectEqual(static_cast<std::int64_t>(pattern_length), static_cast<std::int64_t>(network.patterns_time.first().factors.size()), comparison("pattern.length"));
@@ -425,12 +425,12 @@ void scenarioPatternsCurves(TestContext &context)
     }
 
     const std::array<CurveExpectation, 6> curves = {{
-        {network.curves_pump_head.first().id, "pump head comment 8A", EN_PUMP_CURVE, pump_head_x, pump_head_y},
-        {volume.id, "volume comment 8A", EN_VOLUME_CURVE, {0.0, 10.0}, {0.0, 100.0}},
-        {efficiency.id, "efficiency comment 8A", EN_EFFIC_CURVE, {0.0, 30.0}, {70.0, 82.0}},
-        {headloss.id, "headloss comment 8A", EN_HLOSS_CURVE, {0.0, 30.0}, {0.0, 2.0}},
-        {characteristic.id, "valve curve comment 8A", EN_VALVE_CURVE, {0.0, 50.0, 100.0}, {0.0, 25.0, 100.0}},
-        {generic.id, "generic comment 8A", EN_GENERIC_CURVE, {1.0, 2.0, 3.0}, {10.0, 15.0, 22.0}}
+        {network.curves_pump_head.first().id, "pump head export comment", EN_PUMP_CURVE, pump_head_x, pump_head_y},
+        {volume.id, "volume curve export comment", EN_VOLUME_CURVE, {0.0, 10.0}, {0.0, 100.0}},
+        {efficiency.id, "efficiency curve export comment", EN_EFFIC_CURVE, {0.0, 30.0}, {70.0, 82.0}},
+        {headloss.id, "headloss curve export comment", EN_HLOSS_CURVE, {0.0, 30.0}, {0.0, 2.0}},
+        {characteristic.id, "valve curve export comment", EN_VALVE_CURVE, {0.0, 50.0, 100.0}, {0.0, 25.0, 100.0}},
+        {generic.id, "generic curve export comment", EN_GENERIC_CURVE, {1.0, 2.0, 3.0}, {10.0, 15.0, 22.0}}
     }};
 
     for (const CurveExpectation &curve : curves)
@@ -632,7 +632,7 @@ void scenarioReportOptions(TestContext &context)
 
 namespace AowisEpanetTests
 {
-void registerUpstreamStep8aScenarios(ScenarioRegistry &registry)
+void registerExportFidelityScenarios(ScenarioRegistry &registry)
 {
     registry.add(ScenarioDefinition{
         "conformance-export-native-reopen",

@@ -12,6 +12,8 @@ option(AOWIS_SERVER_EPANET_BUILD_SERVER "Build AOWIS EPANET REST server executab
 option(AOWIS_SERVER_EPANET_BUILD_SHARED_EPANET "Build EPANET as shared library" ON)
 option(AOWIS_SERVER_EPANET_FETCH_MODEL "Fetch AOWIS-SERVER-MODEL when it is not provided by a parent project" ${PROJECT_IS_TOP_LEVEL})
 option(AOWIS_SERVER_EPANET_BUILD_TESTS "Build AOWIS EPANET adapter integration tests" ${PROJECT_IS_TOP_LEVEL})
+option(AOWIS_SERVER_EPANET_ENABLE_UPSTREAM_BOOST_TESTS "Expose the original vendored EPANET Boost suite through the AOWIS CTest harness" OFF)
+option(AOWIS_SERVER_EPANET_ENABLE_COVERAGE "Instrument the AOWIS EPANET adapter and expose line/branch coverage reporting" OFF)
 
 set(AOWIS_SERVER_MODEL_SOURCE_DIR "" CACHE PATH "Optional local AOWIS-SERVER-MODEL source directory")
 set(AOWIS_SERVER_MODEL_GIT_REPOSITORY "https://github.com/aowis-org/AOWIS-SERVER-MODEL.git" CACHE STRING "Git repository used to fetch AOWIS-SERVER-MODEL")
@@ -95,6 +97,28 @@ endif()
 # This causes the library target to belong to the repository root, so Qt Creator
 # treats both include/ and src/ as normal project paths instead of Other Locations.
 include(src/lib/CMakeLists.txt)
+
+if(AOWIS_SERVER_EPANET_ENABLE_COVERAGE)
+    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        message(FATAL_ERROR
+            "AOWIS_SERVER_EPANET_ENABLE_COVERAGE currently requires GCC."
+        )
+    endif()
+
+    find_program(AOWIS_SERVER_EPANET_GCOVR_EXECUTABLE gcovr)
+    if(NOT AOWIS_SERVER_EPANET_GCOVR_EXECUTABLE)
+        message(FATAL_ERROR
+            "AOWIS_SERVER_EPANET_ENABLE_COVERAGE requires gcovr in PATH."
+        )
+    endif()
+
+    target_compile_options(aowis-server-epanet PRIVATE
+        -O0
+        -g
+        --coverage
+    )
+    target_link_options(aowis-server-epanet INTERFACE --coverage)
+endif()
 
 if(AOWIS_SERVER_EPANET_BUILD_SERVER)
     add_subdirectory(src/server)

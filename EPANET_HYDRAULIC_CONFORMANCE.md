@@ -22,9 +22,11 @@ An excluded field is not treated as covered. Water quality will receive its own 
 
 ## Current claim
 
-Roadmap steps 8A and 8B are implemented in the suite. 8A reopens generated AOWIS INP files with native EPANET and verifies titles, metadata, patterns/curves, coordinates/vertices, and report options. 8B adds deterministic preparation-time validation for identity collisions, broken and disabled references, missing patterns/curves, non-finite hydraulic inputs, unsupported configurations, disabled-entity pruning, and structured diagnostics before invalid data reaches EPANET. Step 7 remains complete for controls, timing, hydraulic solver options, report statistics, event identification, operational statistics/flow balance, warnings/errors, and cancellation/partial-result semantics.
+The hydraulic conformance suite covers model-to-EPANET mapping, native differential behavior, export/native-reopen fidelity, deterministic negative validation, fixed-seed generated-network stress, stable CTest label groups, an optional isolated execution of the original upstream Boost suite, reproducible adapter line/branch coverage reporting, and a machine-checked field-level audit against the current AOWIS hydraulic Model headers.
 
-Steps 5 and 6 remain complete for pumps and all seven valve types. Complete hydraulic conformance is still not claimed: roadmap 8C deterministic differential stress and 8D final proof/infrastructure remain.
+The default suite contains 161 executable hydraulic scenarios plus three framework/proof checks, for 164 CTest tests. The field audit currently inventories 457 fields across 57 hydraulic Model structs: 379 fields are in the completed hydraulic proof denominator, 42 are explicitly excluded as water-quality fields, 34 are explicitly excluded as non-EPANET application/cartographic metadata, and two are backend/runtime metadata that are not stable high-level hydraulic contract fields. Any added/removed Model struct or field that is not reflected in the audit policy fails the proof test.
+
+A complete hydraulic-conformance claim is permitted only when the default suite and the grouped proof commands below pass. Water quality remains explicitly outside this claim.
 
 ## Running the tests
 
@@ -60,9 +62,61 @@ Run all scenarios through the executable without CTest:
 ./build-linux-tests/tests/aowis-server-epanet-conformance-tests --all
 ```
 
+Grouped proof commands:
+
+```bash
+ctest --test-dir build-linux-tests -L conformance --output-on-failure
+ctest --test-dir build-linux-tests -L contract --output-on-failure
+ctest --test-dir build-linux-tests -L negative --output-on-failure
+ctest --test-dir build-linux-tests -L upstream --output-on-failure
+ctest --test-dir build-linux-tests -L proof --output-on-failure
+```
+
+`conformance` contains all 156 native-backed conformance scenarios, including the five export, twenty-three negative, and eight deterministic stress scenarios. `contract` contains the five wrapper contract/regression scenarios. `negative` contains the explicit invalid-input and reference-hardening scenarios. `proof` contains the scenario-manifest, upstream-inventory, and hydraulic field-audit checks. The `upstream` group always contains the source inventory and, when enabled as described below, the original upstream Boost suite.
+
+### Optional original upstream Boost suite
+
+The vendored EPANET Boost suite is intentionally not part of the default build because it adds Boost binary-library dependencies and includes native Toolkit/output/quality tests outside the AOWIS hydraulic denominator. Enable it explicitly:
+
+```bash
+./compile_linux_tests.sh -DAOWIS_SERVER_EPANET_ENABLE_UPSTREAM_BOOST_TESTS=ON
+ctest --test-dir build-linux-tests -L upstream --output-on-failure
+```
+
+The opt-in test configures EPANET in an isolated sub-build, builds and runs the upstream CTest suite, and also executes upstream `test_cstrhelper`, which upstream builds but does not register with CTest. Missing Boost components fail during AOWIS configuration rather than during the nested build.
+
+### Line and branch coverage
+
+Coverage is also opt-in and currently requires GCC plus `gcovr` in `PATH`:
+
+```bash
+./compile_linux_tests.sh \
+  -DAOWIS_SERVER_EPANET_ENABLE_COVERAGE=ON \
+  -DCMAKE_BUILD_TYPE=Debug
+cmake --build build-linux-tests --target aowis-server-epanet-coverage
+```
+
+The coverage target clears stale `.gcda` data, reruns the contract/conformance/framework proof labels, and writes adapter-only reports under `build-linux-tests/coverage/`:
+
+- `line-coverage.txt`
+- `branch-coverage.txt`
+- `coverage.html` plus the gcovr detail pages
+
+Coverage is filtered to `src/lib`; vendored EPANET and the test harness are not counted as AOWIS adapter coverage. The coverage target reports line and branch coverage but deliberately does not invent an arbitrary percentage gate.
+
+### Machine-checked field-level audit
+
+`tests/hydraulic_field_conformance_policy.txt` is the compact audit policy. `aowis-server-epanet-hydraulic-field-conformance-audit` expands it against the actual AOWIS hydraulic Model headers and writes `build-linux-tests/tests/hydraulic_field_conformance_audit.tsv`. The verifier fails when:
+
+- an audited Model header adds or removes a struct without an audit-policy update;
+- a struct adds, removes, or renames a field without an audit-policy update;
+- a field is classified more than once or not at all;
+- a completed field has no evidence scenario, or its evidence scenario is no longer registered;
+- an excluded field lacks an explicit exclusion reason.
+
 ## Current named scenarios
 
-Step 7 adds 86 independently registered scenarios. The test names are grouped by the following stable prefixes; every listed branch has its own CTest entry rather than being hidden inside one aggregate test:
+Controls, solver options, and operational behavior are covered by 86 independently registered scenarios. The test names are grouped by the following stable prefixes; every listed branch has its own CTest entry rather than being hidden inside one aggregate test:
 
 | Prefix/family | Independently named branches |
 |---|---|
@@ -77,7 +131,7 @@ Step 7 adds 86 independently registered scenarios. The test names are grouped by
 | `conformance-operational-*` | statistics, flow balance, warning diagnostics, error diagnostics, cancellation-before-results, cancellation-with-partial-results |
 | `contract-reject-pump-power-rule` | explicit unsupported pump `POWER` premise rejection |
 
-Step 8A adds five export-fidelity scenarios:
+Export fidelity is covered by five dedicated scenarios:
 
 | Scenario | What it establishes |
 |---|---|
@@ -88,7 +142,7 @@ Step 8A adds five export-fidelity scenarios:
 | `conformance-export-report-options` | Report statistic, general flags, selected entities, every typed node/link report field, limits/precision, and backend overrides (including F-Factor) survive export and native parsing |
 
 
-Step 8B adds twenty-three negative/hardening scenarios:
+Negative validation and disabled-reference hardening are covered by twenty-three dedicated scenarios:
 
 | Scenario family | What it establishes |
 |---|---|
@@ -101,6 +155,21 @@ Step 8B adds twenty-three negative/hardening scenarios:
 | `conformance-negative-invalid-*-numeric` | Non-finite pattern, curve, node, pipe, pump, valve, simple-control, solver-option, and typed-report inputs are rejected before EPANET receives them |
 | `conformance-negative-unsupported-configuration` | Unsupported hydraulic enum/configuration values return an explicit structured failure |
 | `conformance-negative-structured-diagnostics` | Validation diagnostics retain stage, operation, entity identity, unresolved UUID detail, and backend provenance |
+
+Deterministic generated-network differential stress is covered by eight dedicated scenarios:
+
+| Scenario | Generated topology / stress dimension |
+|---|---|
+| `conformance-stress-chain-small-hw` | 8-junction H-W chain |
+| `conformance-stress-chain-medium-dw` | 32-junction D-W chain |
+| `conformance-stress-branch-medium-hw` | 31-junction branching H-W tree |
+| `conformance-stress-ring-medium-cm` | 24-junction C-M ring with cross-chords |
+| `conformance-stress-grid-small-hw` | 4x4 H-W looped grid |
+| `conformance-stress-grid-medium-dw` | 7x7 D-W looped grid |
+| `conformance-stress-grid-large-hw` | 10x10 / 100-junction H-W grid |
+| `conformance-stress-dual-source-mesh-hw` | 6x8 dual-source H-W mesh with cross-grid chords and a patterned reservoir head |
+
+Each case uses a fixed seed, two alternating junction-demand patterns, a six-hour extended-period simulation, non-default pipe length/diameter/roughness/minor-loss values, and byte-identical regeneration checks. The native EPANET INP is written independently from the stress specification instead of being exported by AOWIS, so these tests exercise the model-to-EPANET builder rather than merely reopening an AOWIS-generated file.
 
 | CTest name | Kind | What it currently establishes |
 |---|---|---|
@@ -145,6 +214,7 @@ Step 8B adds twenty-three negative/hardening scenarios:
 | `aowis-server-epanet-conformance-upstream-valve-gpv` | Differential conformance | GPV non-linear head-loss curve interpolation, explicit Open initial status, non-default diameter/minor loss, and returned curve setting |
 | `aowis-server-epanet-test-scenario-manifest` | Framework | Every C++ scenario is individually registered in CTest and vice versa |
 | `aowis-server-epanet-upstream-test-inventory` | Framework | Every active vendored upstream source-level test has an explicit classification |
+| `aowis-server-epanet-hydraulic-field-conformance-audit` | Framework / final proof | Every field in every audited hydraulic Model struct is explicitly classified and every completed field points to registered evidence |
 
 ## Upstream EPANET inventory
 
@@ -172,7 +242,7 @@ Every matrix row advances through these states:
 
 | State | Required evidence |
 |---|---|
-| Inventory | The field or behavior has a row and an owning phase |
+| Inventory | The field or behavior has a row and an owning evidence area |
 | Contract | A wrapper-only assertion verifies a non-default relationship or explicit diagnostic |
 | Native compared | Native EPANET and the wrapper match at every applicable timestep with an independently normalized reference |
 | Golden checked | At least one independent expected value or physical invariant also passes |
@@ -180,48 +250,48 @@ Every matrix row advances through these states:
 
 `0.0 == 0.0` is not coverage unless zero is the meaningful expected behavior and a paired scenario proves the field changes under a non-default input.
 
-## Initial input matrix
+## Input coverage summary
 
-| ID | Contract area | Hydraulic fields or behavior | Native EPANET path | Planned phase | Current evidence | State |
-|---|---|---|---|---:|---|---|
-| I-OPTIONS-TIME | Duration and timing | duration, hydraulic/quality/report/pattern/rule timesteps, pattern/report start, start clock time | `EN_settimeparam` | 2, 7 | Every Model timing field has an independent native readback scenario; timer/time-of-day execution also verifies event timing | Complete |
-| I-OPTIONS-HYDRAULIC | Solver configuration | headloss formula, demand model and limits, accuracy, trials, damping, status and convergence checks, demand multiplier/default pattern, emitter exponent/backflow, specific gravity, viscosity, unbalanced behavior | `EN_setoption`, `EN_setdemandmodel` | 3, 4, 7 | Every supported solver-option branch has an independent native readback test; all three headloss formulas are covered across steps 4 and 7 | Complete |
-| I-OPTIONS-ENERGY | Energy configuration | global efficiency and price, global price pattern, demand charge | `EN_setoption` energy options | 5 | Global-efficiency/global-price-pattern/demand-charge differential scenario with independent native cost accumulation | Complete |
-| I-OPTIONS-REPORT | Report configuration | page, status, summary, messages, energy, node/link selection, typed fields, backend commands | `EN_setreport` and generated-INP/native reopen | 7, 8A | Report statistic, general flags, selected entities, every typed node/link field, precision/limits, and final backend overrides are verified through export/native parsing | Complete for 8A export scope |
-| I-PATTERN | Time patterns | IDs, factors, comments, default demand pattern, demand/head/speed/price references | pattern Toolkit APIs | 2, 3, 5, 8A | Demand/reservoir/pump/energy references are differential-tested; factor values and comments are additionally verified through generated-INP/native reopen | Complete |
-| I-CURVE-TANK | Tank volume curves | IDs, level points, volume points, comments, validation | curve Toolkit APIs | 4, 8A | Non-uniform tank volume behavior is differential-tested; curve type, points, and comment are verified through generated-INP/native reopen | Complete |
-| I-CURVE-PUMP | Pump head and efficiency curves | one-point, three-point, multipoint head curves, efficiency curves, comments | curve Toolkit APIs and pump curve properties | 5, 8A | Pump curve behavior is differential-tested; exported curve type, points, and comments are verified through native reopen | Complete |
-| I-CURVE-VALVE | Valve curves | GPV head-loss and PCV characteristic curves, comments | curve Toolkit APIs and valve curve properties | 6, 8A | Independent GPV/PCV behavior plus exported curve type, points, and comments are native-verified | Complete |
-| I-JUNCTION | Junction inputs | elevation, demand categories, constant/pattern mode, emitter, enabled state, coordinates | node and demand Toolkit APIs | 2, 4, 8A, 8B | Hydraulic inputs are native-compared; WGS84 coordinate export/native reopen is verified in 8A; generic disabled-node pruning is verified in 8B | Native compared plus coordinate export and disabled pruning |
-| I-RESERVOIR | Reservoir inputs | head, constant/pattern mode, enabled state, coordinates | node Toolkit APIs | 2, 4, 8A, 8B | Hydraulic head modes are native-compared; WGS84 coordinate export/native reopen is verified in 8A; generic disabled-node pruning is verified in 8B | Native compared plus coordinate export and disabled pruning |
-| I-TANK | Tank inputs | elevation, levels, diameter, volume forms, curve, overflow, enabled state, coordinates | tank node Toolkit APIs | 3, 4, 8A, 8B | All tank hydraulic geometry modes and overflow are native-compared; WGS84 coordinate export/native reopen is verified in 8A; generic disabled-node pruning is verified in 8B | Native compared plus coordinate export and disabled pruning |
-| I-PIPE | Pipe inputs | endpoints, length, diameter, formula-specific roughness, minor loss, status/check valve, leakage, vertices, enabled state | link Toolkit APIs | 2, 3, 4, 8A, 8B | Hydraulic inputs are native-compared; ordered WGS84 vertices survive generated-INP/native reopen in 8A; generic disabled-link pruning is verified in 8B | Native compared plus vertex export and disabled pruning |
-| I-PUMP | Pump inputs | endpoints, definition, curves, power, status, speed, speed pattern, efficiency, energy price/pattern, vertices, enabled state | pump link Toolkit APIs | 2, 5, 8A, 8B | All hydraulic pump modes are native-compared; common link metadata and ordered WGS84 vertex export/native reopen are verified in 8A; generic disabled-link pruning is verified in 8B | Native compared plus vertex export and disabled pruning |
-| I-VALVE | Valve inputs | all seven types, endpoints, diameter, minor loss, status, setting, GPV/PCV curves, vertices, enabled state | valve link Toolkit APIs | 3, 6, 8A, 8B | All seven valve types and curve behaviors are native-compared; common valve metadata and ordered WGS84 vertex export/native reopen are verified in 8A; generic disabled-link pruning is verified in 8B | Native compared plus vertex export and disabled pruning |
-| I-CONTROL-SIMPLE | Simple controls | low/high level, timer, time of day, open/close/setting, enabled state | control Toolkit APIs | 3, 7 | Every simple-control type, action, and enabled-state branch has its own native readback/execution scenario | Complete |
-| I-CONTROL-RULE | Structured rules | IF/AND/OR, object/variable/operator/value/status, THEN/ELSE, priority, source text, enabled state | rule Toolkit APIs | 3, 7 | IF/AND/OR; THEN/ELSE; status/setting/ACTIVE actions; preserved source text; priority conflict resolution; disabled rules; every supported object-variable and comparison operator; explicit POWER rejection | Complete |
-| I-PREPARATION | Snapshot preparation | disabled entity removal, control retention, invalid/disabled references, selected report entities | adapter preparation plus native counts | 7, 8A, 8B | 8B verifies generic disabled-node/link pruning, pruning from selected report entities, explicit rejection of enabled references to disabled entities, and deterministic broken-reference rejection before EPANET construction | Complete for 8B preparation scope |
-| I-METADATA | Export and geometry fidelity | titles, comments, tags, generic curves, coordinates, vertices, map positions | metadata, coordinate, vertex, and INP APIs | 8 | 8A native-reopen verifies titles, node/link/pattern/curve comments, node/link tags, generic curves, WGS84 coordinates, and ordered vertices. Optional GUI map-position semantics are intentionally not substituted for EPANET coordinates and remain for the final field-level audit. | Native verified for 8A scope |
+| ID | Contract area | Hydraulic fields or behavior | Native EPANET path | Evidence areas | Current evidence | State |
+|---|---|---|---|---|---|---|
+| I-OPTIONS-TIME | Duration and timing | duration, hydraulic/quality/report/pattern/rule timesteps, pattern/report start, start clock time | `EN_settimeparam` | timing options; controls | Every Model timing field has an independent native readback scenario; timer/time-of-day execution also verifies event timing | Complete |
+| I-OPTIONS-HYDRAULIC | Solver configuration | headloss formula, demand model and limits, accuracy, trials, damping, status and convergence checks, demand multiplier/default pattern, emitter exponent/backflow, specific gravity, viscosity, unbalanced behavior | `EN_setoption`, `EN_setdemandmodel` | hydraulic options; input mapping | Every supported solver-option branch has an independent native readback test; all three headloss formulas are covered by the input-mapping and solver-option scenarios | Complete |
+| I-OPTIONS-ENERGY | Energy configuration | global efficiency and price, global price pattern, demand charge | `EN_setoption` energy options | pump energy | Global-efficiency/global-price-pattern/demand-charge differential scenario with independent native cost accumulation | Complete |
+| I-OPTIONS-REPORT | Report configuration | page, status, summary, messages, energy, node/link selection, typed fields, backend commands | `EN_setreport` and generated-INP/native reopen | report options; export fidelity | Report statistic, general flags, selected entities, every typed node/link field, precision/limits, and final backend overrides are verified through export/native parsing | Complete |
+| I-PATTERN | Time patterns | IDs, factors, comments, default demand pattern, demand/head/speed/price references | pattern Toolkit APIs | hydraulic behavior; pump; export fidelity | Demand/reservoir/pump/energy references are differential-tested; factor values and comments are additionally verified through generated-INP/native reopen | Complete |
+| I-CURVE-TANK | Tank volume curves | IDs, level points, volume points, comments, validation | curve Toolkit APIs | input mapping; export fidelity | Non-uniform tank volume behavior is differential-tested; curve type, points, and comment are verified through generated-INP/native reopen | Complete |
+| I-CURVE-PUMP | Pump head and efficiency curves | one-point, three-point, multipoint head curves, efficiency curves, comments | curve Toolkit APIs and pump curve properties | pump; export fidelity | Pump curve behavior is differential-tested; exported curve type, points, and comments are verified through native reopen | Complete |
+| I-CURVE-VALVE | Valve curves | GPV head-loss and PCV characteristic curves, comments | curve Toolkit APIs and valve curve properties | valve; export fidelity | Independent GPV/PCV behavior plus exported curve type, points, and comments are native-verified | Complete |
+| I-JUNCTION | Junction inputs | elevation, demand categories, constant/pattern mode, emitter, enabled state, coordinates | node and demand Toolkit APIs | hydraulic behavior; input mapping; export fidelity; negative validation | Hydraulic inputs are native-compared; WGS84 coordinate export/native reopen and generic disabled-node pruning are verified explicitly | Complete |
+| I-RESERVOIR | Reservoir inputs | head, constant/pattern mode, enabled state, coordinates | node Toolkit APIs | hydraulic behavior; input mapping; export fidelity; negative validation | Hydraulic head modes are native-compared; WGS84 coordinate export/native reopen and generic disabled-node pruning are verified explicitly | Complete |
+| I-TANK | Tank inputs | elevation, levels, diameter, volume forms, curve, overflow, enabled state, coordinates | tank node Toolkit APIs | hydraulic behavior; input mapping; export fidelity; negative validation | All tank hydraulic geometry modes and overflow are native-compared; WGS84 coordinate export/native reopen and generic disabled-node pruning are verified explicitly | Complete |
+| I-PIPE | Pipe inputs | endpoints, length, diameter, formula-specific roughness, minor loss, status/check valve, leakage, vertices, enabled state | link Toolkit APIs | hydraulic behavior; input mapping; export fidelity; negative validation | Hydraulic inputs are native-compared; ordered WGS84 vertices survive generated-INP/native reopen; generic disabled-link pruning is verified explicitly | Complete |
+| I-PUMP | Pump inputs | endpoints, definition, curves, power, status, speed, speed pattern, efficiency, energy price/pattern, vertices, enabled state | pump link Toolkit APIs | pump; export fidelity; negative validation | All hydraulic pump modes are native-compared; common link metadata and ordered WGS84 vertex export/native reopen plus generic disabled-link pruning are verified explicitly | Complete |
+| I-VALVE | Valve inputs | all seven types, endpoints, diameter, minor loss, status, setting, GPV/PCV curves, vertices, enabled state | valve link Toolkit APIs | hydraulic behavior; valve; export fidelity; negative validation | All seven valve types and curve behaviors are native-compared; common valve metadata and ordered WGS84 vertex export/native reopen plus generic disabled-link pruning are verified explicitly | Complete |
+| I-CONTROL-SIMPLE | Simple controls | low/high level, timer, time of day, open/close/setting, enabled state | control Toolkit APIs | hydraulic behavior; controls/options/operations | Every simple-control type, action, and enabled-state branch has its own native readback/execution scenario | Complete |
+| I-CONTROL-RULE | Structured rules | IF/AND/OR, object/variable/operator/value/status, THEN/ELSE, priority, source text, enabled state | rule Toolkit APIs | hydraulic behavior; controls/options/operations | IF/AND/OR; THEN/ELSE; status/setting/ACTIVE actions; preserved source text; priority conflict resolution; disabled rules; every supported object-variable and comparison operator; explicit POWER rejection | Complete |
+| I-PREPARATION | Snapshot preparation | disabled entity removal, control retention, invalid/disabled references, selected report entities | adapter preparation plus native counts | controls/options/operations; export fidelity; negative validation | Negative validation verifies generic disabled-node/link pruning, pruning from selected report entities, explicit rejection of enabled references to disabled entities, and deterministic broken-reference rejection before EPANET construction | Complete |
+| I-METADATA | Export and geometry fidelity | titles, comments, tags, generic curves, coordinates, vertices; map-position fields are explicitly non-EPANET | metadata, coordinate, vertex, and INP APIs | export fidelity; field audit | Native-reopen scenarios verify titles, node/link/pattern/curve comments, node/link tags, generic curves, WGS84 coordinates, and ordered vertices. The field audit explicitly classifies optional GUI map-position semantics as non-EPANET. | Complete |
 
-## Initial result matrix
+## Result coverage summary
 
 Water-quality members are intentionally omitted from this hydraulic matrix.
 
-| ID | Result family | Fields requiring native comparison | Planned phase | Current evidence | State |
-|---|---|---|---:|---|---|
-| R-TIMELINE | Timeline | validity, status, elapsed time, timestep sequence, cancellation, partial-result behavior | 2, 7 | Full native Net1 timeline plus independent cancellation-before-results and mid-run partial-result scenarios | Complete |
-| R-EVENT | Next event | type, time until event, tank ID/UUID, control ID/UUID | 2, 7 | Full Net1 event sequence plus dedicated next-control-event timing and stable control ID/UUID scenarios | Complete |
-| R-JUNCTION | Junction | ID/UUID, requested demand, delivered demand, deficit, total demand, emitter flow, leakage flow, head, pressure head, control membership | 2, 3, 4 | Net1 plus DDA/PDA, leakage, emitter, and multi-category demand scenarios compare every applicable junction result | Native compared (expanded) |
-| R-RESERVOIR | Reservoir | ID/UUID, net demand, head, pressure head, control membership | 2, 4 | Net1 plus patterned-head reservoir scenario compare every reservoir result across events | Native compared (expanded) |
-| R-TANK | Tank | ID/UUID, net demand, head, pressure head, level, volume, mixing-zone volume, control membership | 2, 3, 4 | Net1, overflow, and all AOWIS tank geometry input modes exercise tank result mapping | Native compared (expanded) |
-| R-PIPE | Pipe | ID/UUID, flow, leakage, velocity, head loss, unit head loss, formula-specific roughness, friction factor, open state, control membership | 2, 3, 4 | Net1 plus leakage, non-default pipe inputs, check-valve/closed status, and H-W/D-W/C-M formula scenarios | Native compared (expanded) |
-| R-PUMP | Pump | ID/UUID, flow, velocity, head gain, open state, operating state, speed, efficiency, power, control membership | 2, 5 | Every pump result field plus all four EPANET operating states, patterned speed, efficiency modes, and constant-power behavior | Complete |
-| R-VALVE | Valve | ID/UUID, flow, velocity, head loss, open state, active state, setting, control membership | 3, 6 | All seven EPANET/AOWIS valve types are independently native-compared, including regulating, sustaining, fixed-drop, flow-control, throttling, GPV-curve, and PCV-position-curve behavior | Complete |
-| R-STATISTICS | Hydraulic statistics | iterations, relative error, maximum head error, maximum flow change, deficient nodes, demand reduction, leakage loss | 3, 7 | Full native comparison plus dedicated statistics-population scenario; DDA/PDA/leakage cases cover the nonzero specialized fields | Complete |
-| R-PUMP-ENERGY | Per-pump energy | pump ID/UUID, time online, average efficiency, average kW per flow unit, average power, peak power, average daily cost | 5 | Independently accumulated native summaries with global and pump-specific patterned prices plus contracts | Complete |
-| R-SYSTEM-ENERGY | System energy | energy cost per day, peak power, demand charge per day, total cost per day | 5 | Independently accumulated patterned-cost and demand-charge differential scenarios plus contracts | Complete |
-| R-FLOW-BALANCE | Run flow balance | total inflow/outflow, consumer demand, demand deficit, emitter flow, leakage flow, storage flow, balance ratio | 3, 4, 7 | Full native comparison plus dedicated balance sanity scenario and nonzero demand-deficit/leakage coverage | Complete |
-| R-DIAGNOSTICS | Diagnostics | stage, operation, entity, property, backend operation/code/message, warning/error validity | 7, 8B | Operational warning/error branches remain covered; 8B additionally verifies deterministic preparation-time stage/operation/entity/message/details provenance and diagnostic preservation for invalid input; final field-level completeness remains an 8D audit item | Expanded; final field audit remains 8D |
+| ID | Result family | Fields requiring native comparison | Evidence areas | Current evidence | State |
+|---|---|---|---|---|
+| R-TIMELINE | Timeline | validity, status, elapsed time, timestep sequence, cancellation, partial-result behavior | Net1; operations | Full native Net1 timeline plus independent cancellation-before-results and mid-run partial-result scenarios | Complete |
+| R-EVENT | Next event | type, time until event, tank ID/UUID, control ID/UUID | Net1; operations | Full Net1 event sequence plus dedicated next-control-event timing and stable control ID/UUID scenarios | Complete |
+| R-JUNCTION | Junction | ID/UUID, requested demand, delivered demand, deficit, total demand, emitter flow, leakage flow, head, pressure head, control membership | Net1; hydraulic behavior; input mapping | Net1 plus DDA/PDA, leakage, emitter, and multi-category demand scenarios compare every applicable junction result | Complete |
+| R-RESERVOIR | Reservoir | ID/UUID, net demand, head, pressure head, control membership | Net1; input mapping | Net1 plus patterned-head reservoir scenario compare every reservoir result across events | Complete |
+| R-TANK | Tank | ID/UUID, net demand, head, pressure head, level, volume, mixing-zone volume, control membership | Net1; hydraulic behavior; input mapping | Net1, overflow, and all AOWIS tank geometry input modes exercise tank result mapping | Complete |
+| R-PIPE | Pipe | ID/UUID, flow, leakage, velocity, head loss, unit head loss, formula-specific roughness, friction factor, open state, control membership | Net1; hydraulic behavior; input mapping | Net1 plus leakage, non-default pipe inputs, check-valve/closed status, and H-W/D-W/C-M formula scenarios | Complete |
+| R-PUMP | Pump | ID/UUID, flow, velocity, head gain, open state, operating state, speed, efficiency, power, control membership | pump | Every pump result field plus all four EPANET operating states, patterned speed, efficiency modes, and constant-power behavior | Complete |
+| R-VALVE | Valve | ID/UUID, flow, velocity, head loss, open state, active state, setting, control membership | hydraulic behavior; valve | All seven EPANET/AOWIS valve types are independently native-compared, including regulating, sustaining, fixed-drop, flow-control, throttling, GPV-curve, and PCV-position-curve behavior | Complete |
+| R-STATISTICS | Hydraulic statistics | iterations, relative error, maximum head error, maximum flow change, deficient nodes, demand reduction, leakage loss | hydraulic behavior; operations | Full native comparison plus dedicated statistics-population scenario; DDA/PDA/leakage cases cover the nonzero specialized fields | Complete |
+| R-PUMP-ENERGY | Per-pump energy | pump ID/UUID, time online, average efficiency, average kW per flow unit, average power, peak power, average daily cost | pump | Independently accumulated native summaries with global and pump-specific patterned prices plus contracts | Complete |
+| R-SYSTEM-ENERGY | System energy | energy cost per day, peak power, demand charge per day, total cost per day | pump | Independently accumulated patterned-cost and demand-charge differential scenarios plus contracts | Complete |
+| R-FLOW-BALANCE | Run flow balance | total inflow/outflow, consumer demand, demand deficit, emitter flow, leakage flow, storage flow, balance ratio | hydraulic behavior; input mapping; operations | Full native comparison plus dedicated balance sanity scenario and nonzero demand-deficit/leakage coverage | Complete |
+| R-DIAGNOSTICS | Diagnostics | stage, operation, entity, property, backend operation/code/message, warning/error validity | operations; negative validation; field audit | Operational warning/error branches and deterministic preparation-time diagnostics are covered; native warning backend provenance is asserted and the field audit classifies backend-local numeric indices separately from the stable high-level contract. | Complete |
 
 ## Numeric tolerance catalog
 
@@ -261,6 +331,8 @@ Numeric and exact field failures identify:
 
 ## Completion rule
 
-A hydraulic-complete claim is allowed only when every included row is `Complete`, every supported Model field has a field-level child row, every numeric result is exercised non-default, every useful upstream candidate has a disposition and scenario, and both upstream EPANET tests and wrapper conformance tests pass.
+A hydraulic-complete claim is allowed only when every included summary row is `Complete`, the machine field audit accounts for every field in every audited hydraulic Model struct, every completed field points to registered evidence, every excluded field has an explicit reason, every numeric result is exercised non-default where meaningful, every useful upstream candidate has a disposition and scenario, and the default CTest suite passes.
 
-The next implementation step is roadmap 8C: deterministic fixed-seed generated-network differential stress across multiple sizes and topologies.
+The original upstream Boost suite and coverage reports are optional independent proof layers: enable and run them for release/audit evidence when their external dependencies are available. They do not silently change the hydraulic denominator.
+
+After a clean full-suite acceptance run, this document permits the scoped hydraulic-conformance claim stated above. Water quality remains the next conformance expansion and is intentionally outside the hydraulic proof described here.
