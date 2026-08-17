@@ -7,6 +7,7 @@
 #include "upstream_step6_scenarios.h"
 #include "upstream_step7_scenarios.h"
 #include "upstream_step8a_scenarios.h"
+#include "upstream_step8b_scenarios.h"
 
 #include <iostream>
 
@@ -21,5 +22,7 @@ int main(int argc, char *argv[])
     AowisEpanetTests::registerUpstreamStep6Scenarios(registry);
     AowisEpanetTests::registerUpstreamStep7Scenarios(registry);
     AowisEpanetTests::registerUpstreamStep8aScenarios(registry);
+    // Keep Step 8B registration explicit so the executable registry matches CTest.
+    AowisEpanetTests::registerUpstreamStep8bScenarios(registry);
     return AowisEpanetTests::runTestProgram(argc, argv, registry, std::cout, std::cerr);
 }

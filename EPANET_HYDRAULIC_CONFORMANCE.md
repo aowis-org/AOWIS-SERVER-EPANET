@@ -22,9 +22,9 @@ An excluded field is not treated as covered. Water quality will receive its own 
 
 ## Current claim
 
-Roadmap step 8A is implemented in the suite. The generated AOWIS INP is reopened with native EPANET and hydraulically exercised; title lines, common node/link comments and tags, pattern data/comments, all supported curve families including generic curves, WGS84 coordinates, link vertices, report selections, and typed report fields are verified through the generated INP/native-reopen path. Step 7 remains complete for controls, timing, hydraulic solver options, report statistics, event identification, operational statistics/flow balance, warnings/errors, and cancellation/partial-result semantics.
+Roadmap steps 8A and 8B are implemented in the suite. 8A reopens generated AOWIS INP files with native EPANET and verifies titles, metadata, patterns/curves, coordinates/vertices, and report options. 8B adds deterministic preparation-time validation for identity collisions, broken and disabled references, missing patterns/curves, non-finite hydraulic inputs, unsupported configurations, disabled-entity pruning, and structured diagnostics before invalid data reaches EPANET. Step 7 remains complete for controls, timing, hydraulic solver options, report statistics, event identification, operational statistics/flow balance, warnings/errors, and cancellation/partial-result semantics.
 
-Steps 5 and 6 remain complete for pumps and all seven valve types. Complete hydraulic conformance is still not claimed: roadmap 8B negative validation/disabled-reference hardening, 8C deterministic differential stress, and 8D final proof/infrastructure remain.
+Steps 5 and 6 remain complete for pumps and all seven valve types. Complete hydraulic conformance is still not claimed: roadmap 8C deterministic differential stress and 8D final proof/infrastructure remain.
 
 ## Running the tests
 
@@ -86,6 +86,21 @@ Step 8A adds five export-fidelity scenarios:
 | `conformance-export-patterns-curves` | Pattern factors/comments plus tank-volume, pump-head, pump-efficiency, GPV head-loss, PCV characteristic, and generic curve type/data/comments survive native reopen |
 | `conformance-export-coordinates-vertices` | WGS84 node coordinates and ordered link vertices survive native reopen |
 | `conformance-export-report-options` | Report statistic, general flags, selected entities, every typed node/link report field, limits/precision, and backend overrides (including F-Factor) survive export and native parsing |
+
+
+Step 8B adds twenty-three negative/hardening scenarios:
+
+| Scenario family | What it establishes |
+|---|---|
+| `conformance-negative-duplicate-*` | Node/link/curve IDs are unique in their EPANET namespaces and UUIDs are globally unique across hydraulic model entities |
+| `conformance-negative-broken-node-reference` | Enabled links cannot reference absent endpoint UUIDs |
+| `conformance-negative-disabled-node-reference` | Enabled links cannot reference disabled endpoint nodes |
+| `conformance-negative-disabled-entity-pruning` | Unreferenced disabled hydraulic entities (including stale invalid values and report selections) are intentionally omitted while the remaining network stays runnable |
+| `conformance-negative-disabled-control-link-reference` / `-disabled-rule-link-reference` | Simple controls and structured rules referencing disabled links fail explicitly as disabled-reference errors |
+| `conformance-negative-missing-pattern` / `-missing-curve` / `-missing-valve-curve` | Missing demand patterns, pump curves, and GPV valve curves are rejected before backend construction |
+| `conformance-negative-invalid-*-numeric` | Non-finite pattern, curve, node, pipe, pump, valve, simple-control, solver-option, and typed-report inputs are rejected before EPANET receives them |
+| `conformance-negative-unsupported-configuration` | Unsupported hydraulic enum/configuration values return an explicit structured failure |
+| `conformance-negative-structured-diagnostics` | Validation diagnostics retain stage, operation, entity identity, unresolved UUID detail, and backend provenance |
 
 | CTest name | Kind | What it currently establishes |
 |---|---|---|
@@ -177,15 +192,15 @@ Every matrix row advances through these states:
 | I-CURVE-TANK | Tank volume curves | IDs, level points, volume points, comments, validation | curve Toolkit APIs | 4, 8A | Non-uniform tank volume behavior is differential-tested; curve type, points, and comment are verified through generated-INP/native reopen | Complete |
 | I-CURVE-PUMP | Pump head and efficiency curves | one-point, three-point, multipoint head curves, efficiency curves, comments | curve Toolkit APIs and pump curve properties | 5, 8A | Pump curve behavior is differential-tested; exported curve type, points, and comments are verified through native reopen | Complete |
 | I-CURVE-VALVE | Valve curves | GPV head-loss and PCV characteristic curves, comments | curve Toolkit APIs and valve curve properties | 6, 8A | Independent GPV/PCV behavior plus exported curve type, points, and comments are native-verified | Complete |
-| I-JUNCTION | Junction inputs | elevation, demand categories, constant/pattern mode, emitter, enabled state, coordinates | node and demand Toolkit APIs | 2, 4, 8A | Hydraulic inputs are native-compared; WGS84 coordinate export/native reopen is verified in 8A; enabled state remains 8B preparation work | Native compared plus coordinate export |
-| I-RESERVOIR | Reservoir inputs | head, constant/pattern mode, enabled state, coordinates | node Toolkit APIs | 2, 4, 8A | Hydraulic head modes are native-compared; WGS84 coordinate export/native reopen is verified in 8A; enabled state remains 8B | Native compared plus coordinate export |
-| I-TANK | Tank inputs | elevation, levels, diameter, volume forms, curve, overflow, enabled state, coordinates | tank node Toolkit APIs | 3, 4, 8A | All tank hydraulic geometry modes and overflow are native-compared; WGS84 coordinate export/native reopen is verified in 8A; enabled state remains 8B | Native compared plus coordinate export |
-| I-PIPE | Pipe inputs | endpoints, length, diameter, formula-specific roughness, minor loss, status/check valve, leakage, vertices, enabled state | link Toolkit APIs | 2, 3, 4, 8A | Hydraulic inputs are native-compared; ordered WGS84 vertices survive generated-INP/native reopen in 8A; enabled state remains 8B | Native compared plus vertex export |
-| I-PUMP | Pump inputs | endpoints, definition, curves, power, status, speed, speed pattern, efficiency, energy price/pattern, vertices, enabled state | pump link Toolkit APIs | 2, 5, 8A | All hydraulic pump modes are native-compared; common link metadata and ordered WGS84 vertex export/native reopen are verified in 8A; enabled state remains 8B | Native compared plus vertex export |
-| I-VALVE | Valve inputs | all seven types, endpoints, diameter, minor loss, status, setting, GPV/PCV curves, vertices, enabled state | valve link Toolkit APIs | 3, 6, 8A | All seven valve types and curve behaviors are native-compared; common valve metadata and ordered WGS84 vertex export/native reopen are verified in 8A; enabled state remains 8B | Native compared plus vertex export |
+| I-JUNCTION | Junction inputs | elevation, demand categories, constant/pattern mode, emitter, enabled state, coordinates | node and demand Toolkit APIs | 2, 4, 8A, 8B | Hydraulic inputs are native-compared; WGS84 coordinate export/native reopen is verified in 8A; generic disabled-node pruning is verified in 8B | Native compared plus coordinate export and disabled pruning |
+| I-RESERVOIR | Reservoir inputs | head, constant/pattern mode, enabled state, coordinates | node Toolkit APIs | 2, 4, 8A, 8B | Hydraulic head modes are native-compared; WGS84 coordinate export/native reopen is verified in 8A; generic disabled-node pruning is verified in 8B | Native compared plus coordinate export and disabled pruning |
+| I-TANK | Tank inputs | elevation, levels, diameter, volume forms, curve, overflow, enabled state, coordinates | tank node Toolkit APIs | 3, 4, 8A, 8B | All tank hydraulic geometry modes and overflow are native-compared; WGS84 coordinate export/native reopen is verified in 8A; generic disabled-node pruning is verified in 8B | Native compared plus coordinate export and disabled pruning |
+| I-PIPE | Pipe inputs | endpoints, length, diameter, formula-specific roughness, minor loss, status/check valve, leakage, vertices, enabled state | link Toolkit APIs | 2, 3, 4, 8A, 8B | Hydraulic inputs are native-compared; ordered WGS84 vertices survive generated-INP/native reopen in 8A; generic disabled-link pruning is verified in 8B | Native compared plus vertex export and disabled pruning |
+| I-PUMP | Pump inputs | endpoints, definition, curves, power, status, speed, speed pattern, efficiency, energy price/pattern, vertices, enabled state | pump link Toolkit APIs | 2, 5, 8A, 8B | All hydraulic pump modes are native-compared; common link metadata and ordered WGS84 vertex export/native reopen are verified in 8A; generic disabled-link pruning is verified in 8B | Native compared plus vertex export and disabled pruning |
+| I-VALVE | Valve inputs | all seven types, endpoints, diameter, minor loss, status, setting, GPV/PCV curves, vertices, enabled state | valve link Toolkit APIs | 3, 6, 8A, 8B | All seven valve types and curve behaviors are native-compared; common valve metadata and ordered WGS84 vertex export/native reopen are verified in 8A; generic disabled-link pruning is verified in 8B | Native compared plus vertex export and disabled pruning |
 | I-CONTROL-SIMPLE | Simple controls | low/high level, timer, time of day, open/close/setting, enabled state | control Toolkit APIs | 3, 7 | Every simple-control type, action, and enabled-state branch has its own native readback/execution scenario | Complete |
 | I-CONTROL-RULE | Structured rules | IF/AND/OR, object/variable/operator/value/status, THEN/ELSE, priority, source text, enabled state | rule Toolkit APIs | 3, 7 | IF/AND/OR; THEN/ELSE; status/setting/ACTIVE actions; preserved source text; priority conflict resolution; disabled rules; every supported object-variable and comparison operator; explicit POWER rejection | Complete |
-| I-PREPARATION | Snapshot preparation | disabled entity removal, control retention, invalid/disabled references, selected report entities | adapter preparation plus native counts | 7, 8 | Selected report entities are native-reopen verified in 8A; disabled entities and invalid/disabled references remain 8B | Partial |
+| I-PREPARATION | Snapshot preparation | disabled entity removal, control retention, invalid/disabled references, selected report entities | adapter preparation plus native counts | 7, 8A, 8B | 8B verifies generic disabled-node/link pruning, pruning from selected report entities, explicit rejection of enabled references to disabled entities, and deterministic broken-reference rejection before EPANET construction | Complete for 8B preparation scope |
 | I-METADATA | Export and geometry fidelity | titles, comments, tags, generic curves, coordinates, vertices, map positions | metadata, coordinate, vertex, and INP APIs | 8 | 8A native-reopen verifies titles, node/link/pattern/curve comments, node/link tags, generic curves, WGS84 coordinates, and ordered vertices. Optional GUI map-position semantics are intentionally not substituted for EPANET coordinates and remain for the final field-level audit. | Native verified for 8A scope |
 
 ## Initial result matrix
@@ -206,7 +221,7 @@ Water-quality members are intentionally omitted from this hydraulic matrix.
 | R-PUMP-ENERGY | Per-pump energy | pump ID/UUID, time online, average efficiency, average kW per flow unit, average power, peak power, average daily cost | 5 | Independently accumulated native summaries with global and pump-specific patterned prices plus contracts | Complete |
 | R-SYSTEM-ENERGY | System energy | energy cost per day, peak power, demand charge per day, total cost per day | 5 | Independently accumulated patterned-cost and demand-charge differential scenarios plus contracts | Complete |
 | R-FLOW-BALANCE | Run flow balance | total inflow/outflow, consumer demand, demand deficit, emitter flow, leakage flow, storage flow, balance ratio | 3, 4, 7 | Full native comparison plus dedicated balance sanity scenario and nonzero demand-deficit/leakage coverage | Complete |
-| R-DIAGNOSTICS | Diagnostics | stage, operation, entity, property, backend operation/code/message, warning/error validity | 7, 8 | Dedicated warning and pre-simulation error scenarios plus explicit unsupported pump-POWER diagnostic; deeper report/metadata fidelity remains phase 8 | Native/contract covered for operational warning/error branches |
+| R-DIAGNOSTICS | Diagnostics | stage, operation, entity, property, backend operation/code/message, warning/error validity | 7, 8B | Operational warning/error branches remain covered; 8B additionally verifies deterministic preparation-time stage/operation/entity/message/details provenance and diagnostic preservation for invalid input; final field-level completeness remains an 8D audit item | Expanded; final field audit remains 8D |
 
 ## Numeric tolerance catalog
 
@@ -248,4 +263,4 @@ Numeric and exact field failures identify:
 
 A hydraulic-complete claim is allowed only when every included row is `Complete`, every supported Model field has a field-level child row, every numeric result is exercised non-default, every useful upstream candidate has a disposition and scenario, and both upstream EPANET tests and wrapper conformance tests pass.
 
-The next implementation step is roadmap 8B: negative validation and disabled-reference hardening (duplicate IDs/UUIDs, broken references, disabled entities, missing patterns/curves, invalid numerics, unsupported configurations, and structured diagnostics).
+The next implementation step is roadmap 8C: deterministic fixed-seed generated-network differential stress across multiple sizes and topologies.

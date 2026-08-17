@@ -1,4 +1,5 @@
 #include "epanet_network_preparer.h"
+#include "epanet_network_validator.h"
 #include "epanet_status_helpers.h"
 
 #include <QList>
@@ -72,6 +73,10 @@ void removeDisabledReportSelections(HydraulicSimulationReportSelection &selectio
 
 HydraulicSimulationStatus prepareEpanetNetwork(const NetworkHydraulic &source, NetworkHydraulic &prepared)
 {
+    HydraulicSimulationStatus status = validateEpanetNetwork(source);
+    if (!status.success)
+        return status;
+
     prepared = source;
 
     prepared.nodes_junctions = enabledEntities(source.nodes_junctions);

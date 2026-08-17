@@ -132,6 +132,29 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-export-patterns-curves
     conformance-export-coordinates-vertices
     conformance-export-report-options
+    conformance-negative-duplicate-node-id
+    conformance-negative-duplicate-link-id
+    conformance-negative-duplicate-uuid
+    conformance-negative-duplicate-curve-id
+    conformance-negative-broken-node-reference
+    conformance-negative-disabled-node-reference
+    conformance-negative-disabled-entity-pruning
+    conformance-negative-disabled-control-link-reference
+    conformance-negative-disabled-rule-link-reference
+    conformance-negative-missing-pattern
+    conformance-negative-missing-curve
+    conformance-negative-missing-valve-curve
+    conformance-negative-invalid-pattern-numeric
+    conformance-negative-invalid-curve-numeric
+    conformance-negative-invalid-pipe-numeric
+    conformance-negative-invalid-node-numeric
+    conformance-negative-invalid-pump-numeric
+    conformance-negative-invalid-valve-numeric
+    conformance-negative-invalid-control-numeric
+    conformance-negative-invalid-solver-numeric
+    conformance-negative-invalid-report-numeric
+    conformance-negative-unsupported-configuration
+    conformance-negative-structured-diagnostics
 )
 
 set(AOWIS_SERVER_EPANET_TEST_SCENARIOS
@@ -157,6 +180,7 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/upstream_step6_scenarios.h
     conformance/upstream_step7_scenarios.h
     conformance/upstream_step8a_scenarios.h
+    conformance/upstream_step8b_scenarios.h
     test_net1_conformance.cpp
     test_result_contract.cpp
     test_upstream_step3_conformance.cpp
@@ -165,6 +189,7 @@ add_executable(aowis-server-epanet-conformance-tests
     test_upstream_step6_conformance.cpp
     test_upstream_step7_conformance.cpp
     test_upstream_step8a_conformance.cpp
+    test_upstream_step8b_conformance.cpp
 )
 
 target_link_libraries(aowis-server-epanet-conformance-tests

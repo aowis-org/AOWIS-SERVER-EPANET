@@ -1431,17 +1431,32 @@ void testErrorDiagnostics(TestContext &context)
         "pre-simulation rule-mapping error must invalidate numerical results");
     context.expect(run.result_timeline.results.isEmpty(), "pre-simulation rule-mapping error must return no hydraulic results");
 
+    context.expect(run.result_timeline.status.stage == HydraulicSimulationStatusStage::BuildNetwork,
+        "broken rule reference must be rejected during network prevalidation");
+    context.expect(run.result_timeline.status.operation == HydraulicSimulationStatusOperation::ResolveEntity,
+        "broken rule reference must identify entity resolution as the failing operation");
+    context.expect(run.result_timeline.status.entity.type == HydraulicSimulationStatusEntityType::Rule,
+        "broken rule reference status must identify the control rule");
+    context.expect(run.result_timeline.status.entity.id == rule.id,
+        "broken rule reference status must retain the control-rule ID");
+    context.expect(run.result_timeline.status.entity.uuid == rule.uuid,
+        "broken rule reference status must retain the control-rule UUID");
+
     bool found_error = false;
     for (const HydraulicSimulationDiagnostic &diagnostic : run.result_timeline.diagnostics)
     {
         if (diagnostic.severity == HydraulicSimulationDiagnosticSeverity::Error
-            && diagnostic.stage == HydraulicSimulationStatusStage::AddRule)
+            && diagnostic.stage == HydraulicSimulationStatusStage::BuildNetwork
+            && diagnostic.operation == HydraulicSimulationStatusOperation::ResolveEntity
+            && diagnostic.entity.type == HydraulicSimulationStatusEntityType::Rule
+            && diagnostic.entity.id == rule.id
+            && diagnostic.entity.uuid == rule.uuid)
         {
             found_error = true;
             break;
         }
     }
-    context.expect(found_error, "rule-mapping error must retain a structured error diagnostic");
+    context.expect(found_error, "prevalidated rule-reference error must retain a structured rule diagnostic");
 }
 
 void testCancellationBeforeResults(TestContext &context)
