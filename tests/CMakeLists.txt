@@ -154,6 +154,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-negative-invalid-solver-numeric
     conformance-negative-invalid-report-numeric
     conformance-negative-unsupported-configuration
+    conformance-negative-multiple-diagnostics
     conformance-negative-structured-diagnostics
     conformance-stress-chain-small-hw
     conformance-stress-chain-medium-dw

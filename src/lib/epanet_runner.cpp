@@ -12,6 +12,7 @@
 #include <utility>
 
 #include <QDateTime>
+#include <QList>
 
 namespace
 {
@@ -170,7 +171,11 @@ EpanetResultRun finishRun(EpanetResultRun result, const HydraulicSimulationStatu
 
 HydraulicSimulationStatus prepareProject(const NetworkHydraulic &request, NetworkHydraulic &prepared_request, EpanetProject &project, EpanetReportCollector &report_collector, EpanetIndexRegistry &indices)
 {
-    HydraulicSimulationStatus status = prepareEpanetNetwork(request, prepared_request);
+    QList<HydraulicSimulationStatus> validation_failures;
+    HydraulicSimulationStatus status = prepareEpanetNetwork(request, prepared_request, &validation_failures);
+    for (const HydraulicSimulationStatus &validation_failure : validation_failures)
+        project.appendDiagnostic(diagnosticFromStatus(validation_failure));
+
     if (!status.success)
         return status;
 

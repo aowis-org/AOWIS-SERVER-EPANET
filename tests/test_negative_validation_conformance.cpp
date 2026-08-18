@@ -544,6 +544,55 @@ void scenarioUnsupportedConfiguration(TestContext &context)
     context.expect(!run.result_timeline.diagnostics.isEmpty(), "unsupported configuration must produce a structured diagnostic");
 }
 
+bool hasErrorDiagnosticForEntity(
+    const EpanetResultRun &run,
+    HydraulicSimulationStatusEntityType entity_type,
+    const QUuid &entity_uuid)
+{
+    for (const HydraulicSimulationDiagnostic &diagnostic : run.result_timeline.diagnostics)
+    {
+        if (diagnostic.severity == HydraulicSimulationDiagnosticSeverity::Error
+            && diagnostic.entity.type == entity_type
+            && diagnostic.entity.uuid == entity_uuid)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void scenarioMultipleValidationDiagnostics(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    context.expect(!network.nodes_junctions.isEmpty(), "multiple-diagnostic fixture requires a junction");
+    context.expect(!network.nodes_reservoirs.isEmpty(), "multiple-diagnostic fixture requires a reservoir");
+    context.expect(!network.links_pipes.isEmpty(), "multiple-diagnostic fixture requires a pipe");
+    context.expect(!network.links_pumps.isEmpty(), "multiple-diagnostic fixture requires a pump");
+    if (network.nodes_junctions.isEmpty() || network.nodes_reservoirs.isEmpty() || network.links_pipes.isEmpty() || network.links_pumps.isEmpty())
+        return;
+
+    HydraulicNodeJunction &junction = network.nodes_junctions.first();
+    HydraulicNodeReservoir &reservoir = network.nodes_reservoirs.first();
+    HydraulicLinkPipe &pipe = network.links_pipes.first();
+    HydraulicLinkPump &pump = network.links_pumps.first();
+
+    reservoir.id = junction.id;
+    pipe.node_uuid_from = QUuid::createUuid();
+    junction.coordinate_wgs84.longitude_deg = std::numeric_limits<double>::quiet_NaN();
+    pump.initial_speed = std::numeric_limits<double>::quiet_NaN();
+
+    const EpanetResultRun run = EpanetRunner().run(network);
+
+    context.expect(!run.result_timeline.status.success, "network with multiple invalid entities must fail validation");
+    context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Invalid, "preflight validation failure must keep result validity invalid");
+    context.expect(run.result_timeline.results.isEmpty(), "preflight validation failure must not attempt hydraulics");
+    context.expect(run.result_timeline.diagnostics.size() >= 4, "identity, reference, and numeric validation failures must all be retained");
+    context.expect(hasErrorDiagnosticForEntity(run, HydraulicSimulationStatusEntityType::Reservoir, reservoir.uuid), "reservoir identity error must be retained");
+    context.expect(hasErrorDiagnosticForEntity(run, HydraulicSimulationStatusEntityType::Pipe, pipe.uuid), "pipe reference error must be retained");
+    context.expect(hasErrorDiagnosticForEntity(run, HydraulicSimulationStatusEntityType::Junction, junction.uuid), "junction numeric error must be retained");
+    context.expect(hasErrorDiagnosticForEntity(run, HydraulicSimulationStatusEntityType::Pump, pump.uuid), "pump numeric error must be retained");
+}
+
 void scenarioStructuredDiagnosticDetails(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
@@ -683,6 +732,11 @@ void registerNegativeValidationScenarios(ScenarioRegistry &registry)
         "Reject an unsupported hydraulic configuration with an explicit structured status.",
         {"conformance", "hydraulic", "negative"},
         &scenarioUnsupportedConfiguration});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-multiple-diagnostics",
+        "Collect all independently detectable preflight validation errors while retaining the first failure as the primary status.",
+        {"conformance", "hydraulic", "negative"},
+        &scenarioMultipleValidationDiagnostics});
     registry.add(ScenarioDefinition{
         "conformance-negative-structured-diagnostics",
         "Preserve stage, operation, entity, unresolved UUID detail, and backend provenance for validation errors.",

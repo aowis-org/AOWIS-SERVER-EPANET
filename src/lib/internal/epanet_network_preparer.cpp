@@ -71,9 +71,12 @@ void removeDisabledReportSelections(HydraulicSimulationReportSelection &selectio
 
 }
 
-HydraulicSimulationStatus prepareEpanetNetwork(const NetworkHydraulic &source, NetworkHydraulic &prepared)
+HydraulicSimulationStatus prepareEpanetNetwork(
+    const NetworkHydraulic &source,
+    NetworkHydraulic &prepared,
+    QList<HydraulicSimulationStatus> *validation_failures)
 {
-    HydraulicSimulationStatus status = validateEpanetNetwork(source);
+    HydraulicSimulationStatus status = validateEpanetNetwork(source, validation_failures);
     if (!status.success)
         return status;
 
