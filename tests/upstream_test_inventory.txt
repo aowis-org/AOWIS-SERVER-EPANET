@@ -28,7 +28,7 @@ external/epanet/tests/test_net_builder.cpp|test_save_net2|boost-case|wrapper-can
 external/epanet/tests/test_net_builder.cpp|test_reopen_net2|boost-case|wrapper-candidate|export-validation|Reopening the generated small network verifies INP persistence and hydraulic equivalence.
 external/epanet/tests/test_node.cpp|test_adddelete_node|boost-case|native-only|none|Mutable Toolkit node CRUD is not an EpanetRunner operation.
 external/epanet/tests/test_node.cpp|test_node_validate_id|boost-case|wrapper-candidate|export-validation|Invalid node IDs must produce an explicit adapter diagnostic.
-external/epanet/tests/test_node.cpp|test_junc_props|boost-case|wrapper-candidate|input-mapping|Junction elevation, demand, pattern, emitter, and initial quality inputs map to AOWIS, quality execution remains a later conformance phase.
+external/epanet/tests/test_node.cpp|test_junc_props|boost-case|wrapper-candidate|input-mapping|Junction elevation, demand, pattern, emitter, and initial quality inputs map to AOWIS, and Q2 now executes typed quality results on the separate quality timeline.
 external/epanet/tests/test_node.cpp|test_tank_props|boost-case|wrapper-candidate|input-mapping|Tank elevation, levels, diameter, and volume map to AOWIS tank inputs.
 external/epanet/tests/test_node.cpp|test_junc_props|boost-case|wrapper-candidate|net1|The after-step demand, head, and pressure values are Net1 hydraulic golden results. Quality is excluded.
 external/epanet/tests/test_node.cpp|test_tank_props|boost-case|wrapper-candidate|net1|The after-step tank demand, head, and pressure values are Net1 hydraulic golden results. Quality is excluded.
@@ -56,10 +56,10 @@ external/epanet/tests/test_project.cpp|test_getcount|boost-case|wrapper-candidat
 external/epanet/tests/test_project.cpp|test_setdemandpattern|boost-case|wrapper-candidate|hydraulic-behavior|Demand-to-pattern assignments are typed AOWIS inputs.
 external/epanet/tests/test_project.cpp|test_addpattern|boost-case|native-only|none|Adding a pattern to an open Toolkit project is CRUD rather than model-driven translation.
 external/epanet/tests/test_project.cpp|test_add_control|boost-case|wrapper-candidate|hydraulic-behavior|Level controls and their hydraulic effect map directly to AOWIS simple controls.
-external/epanet/tests/test_quality.cpp|test_solveQ|boost-case|not-applicable|none|Water quality is explicitly excluded from the current conformance scope.
-external/epanet/tests/test_quality.cpp|test_qual_step|boost-case|not-applicable|none|Water quality is explicitly excluded from the current conformance scope.
-external/epanet/tests/test_quality.cpp|test_progressive_step|boost-case|not-applicable|none|Water quality is explicitly excluded from the current conformance scope.
-external/epanet/tests/test_report.cpp|test_rprt_anlysstats|boost-case|wrapper-candidate|controls-options-operations|Hydraulic iterations and error statistics map to wrapper results. Quality mass balance is excluded.
+external/epanet/tests/test_quality.cpp|test_solveQ|boost-case|wrapper-candidate|quality-execution|AOWIS executes the equivalent saved-hydraulics quality analysis through the explicit Toolkit lifecycle and native differential scenarios.
+external/epanet/tests/test_quality.cpp|test_qual_step|boost-case|wrapper-candidate|quality-execution|Q2 mirrors EN_stepQ semantics and returns every configured quality timestep in a separate timeline.
+external/epanet/tests/test_quality.cpp|test_progressive_step|boost-case|native-only|none|Progressive interleaved hydraulic and quality stepping is not the high-level runner lifecycle, AOWIS completes and saves hydraulics before quality execution.
+external/epanet/tests/test_report.cpp|test_rprt_anlysstats|boost-case|wrapper-candidate|controls-options-operations|Hydraulic iterations and error statistics map to hydraulic results, quality mass balance is returned on the separate quality timeline.
 external/epanet/tests/test_units.cpp|test_pressure_units|boost-case|native-only|none|Changing native pressure display units is not exposed by the canonical metric AOWIS wrapper.
 external/epanet/tests/test_units.cpp|test_pda_unit_change|boost-case|native-only|none|Changing native project units and converting existing PDA pressure limits is not an AOWIS wrapper operation.
 external/epanet/tests/test_units.cpp|test_rule_unit_change|boost-case|native-only|none|Changing native project units and rewriting existing rule/control quantities is not exposed by the canonical metric wrapper.

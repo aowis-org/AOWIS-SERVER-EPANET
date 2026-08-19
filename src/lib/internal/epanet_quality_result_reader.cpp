@@ -127,9 +127,12 @@ HydraulicSimulationStatus EpanetQualityResultReader::readNodesJunctions(WaterQua
             return status;
         assignQualityValue(this->network.options_quality.analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
 
-        status = readNodeValue(this->project, index, EN_SOURCEMASS, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::SourceMass, QStringLiteral("Failed to get junction source mass flow"), value.source_mass_flow_mg_per_min);
-        if (!status.success)
-            return status;
+        if (junction.quality_source.type != HydraulicNodeQualitySourceType::None)
+        {
+            status = readNodeValue(this->project, index, EN_SOURCEMASS, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::SourceMass, QStringLiteral("Failed to get junction source mass flow"), value.source_mass_flow_mg_per_min);
+            if (!status.success)
+                return status;
+        }
 
         result.nodes_junctions.append(value);
     }
@@ -154,9 +157,12 @@ HydraulicSimulationStatus EpanetQualityResultReader::readNodesReservoirs(WaterQu
             return status;
         assignQualityValue(this->network.options_quality.analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
 
-        status = readNodeValue(this->project, index, EN_SOURCEMASS, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, HydraulicSimulationStatusProperty::SourceMass, QStringLiteral("Failed to get reservoir source mass flow"), value.source_mass_flow_mg_per_min);
-        if (!status.success)
-            return status;
+        if (reservoir.quality_source.type != HydraulicNodeQualitySourceType::None)
+        {
+            status = readNodeValue(this->project, index, EN_SOURCEMASS, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, HydraulicSimulationStatusProperty::SourceMass, QStringLiteral("Failed to get reservoir source mass flow"), value.source_mass_flow_mg_per_min);
+            if (!status.success)
+                return status;
+        }
 
         result.nodes_reservoirs.append(value);
     }
@@ -181,9 +187,12 @@ HydraulicSimulationStatus EpanetQualityResultReader::readNodesTanks(WaterQuality
             return status;
         assignQualityValue(this->network.options_quality.analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
 
-        status = readNodeValue(this->project, index, EN_SOURCEMASS, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, HydraulicSimulationStatusProperty::SourceMass, QStringLiteral("Failed to get tank source mass flow"), value.source_mass_flow_mg_per_min);
-        if (!status.success)
-            return status;
+        if (tank.quality_source.type != HydraulicNodeQualitySourceType::None)
+        {
+            status = readNodeValue(this->project, index, EN_SOURCEMASS, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, HydraulicSimulationStatusProperty::SourceMass, QStringLiteral("Failed to get tank source mass flow"), value.source_mass_flow_mg_per_min);
+            if (!status.success)
+                return status;
+        }
 
         result.nodes_tanks.append(value);
     }

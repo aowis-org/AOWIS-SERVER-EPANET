@@ -138,6 +138,12 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-quality-input-source-trace
     conformance-quality-input-tank-mixing-models
     conformance-quality-input-reactions
+    conformance-quality-execution-none
+    conformance-quality-execution-chemical
+    conformance-quality-execution-water-age
+    conformance-quality-execution-source-trace
+    conformance-quality-execution-independent-timeline
+    conformance-quality-execution-cancellation-partial
     conformance-negative-duplicate-node-id
     conformance-negative-duplicate-link-id
     conformance-negative-duplicate-uuid
@@ -203,6 +209,7 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/valve_scenarios.h
     conformance/controls_options_operations_scenarios.h
     conformance/export_fidelity_scenarios.h
+    conformance/quality_execution_scenarios.h
     conformance/negative_validation_scenarios.h
     conformance/deterministic_stress_scenarios.h
     test_net1_conformance.cpp
@@ -213,6 +220,7 @@ add_executable(aowis-server-epanet-conformance-tests
     test_valve_conformance.cpp
     test_controls_options_operations_conformance.cpp
     test_export_fidelity_conformance.cpp
+    test_quality_execution_conformance.cpp
     test_negative_validation_conformance.cpp
     test_deterministic_stress_conformance.cpp
 )

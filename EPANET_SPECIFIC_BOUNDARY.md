@@ -7,7 +7,7 @@ The shared model no longer exposes EPANET-prefixed domain types. EPANET names ar
 - Repository, CMake target, include path, and server executable names containing `epanet`.
 - `EpanetRunner` and `EpanetSimulationManager`, because selecting either explicitly selects the EPANET backend.
 - `EpanetProject`, because it owns the native `EN_Project` handle.
-- `EpanetNetworkBuilder`, `EpanetHydraulicSolver`, `EpanetResultReader`, `EpanetQualityResultReader`, `EpanetIndexRegistry`, and `EpanetReportCollector`, because they translate to or operate on the native EPANET API.
+- `EpanetNetworkBuilder`, `EpanetHydraulicSolver`, `EpanetQualitySolver`, `EpanetResultReader`, `EpanetQualityResultReader`, `EpanetIndexRegistry`, and `EpanetReportCollector`, because they translate to or operate on the native EPANET API.
 - `EpanetResolvers`, because it resolves generic tank input forms into the geometry required by EPANET.
 - `EpanetResultRun`, because it combines separate hydraulic and water-quality result timelines with EPANET-native report lines.
 - `makeEpanetStatus`, `makeEpanetError`, and `makeEpanetSuccess`, because they are backend-adapter helpers that populate the generic status structure.
@@ -86,7 +86,9 @@ EPANET reaction orders are network-wide. AOWIS stores each reaction coefficient 
 
 Water-quality results are intentionally separate from `HydraulicSimulationResultTimeline`. Hydraulic events and water-quality steps do not have to occur at the same times, so quality values are not embedded in hydraulic timestep results. `WaterQualitySimulationResultTimeline` carries its own analysis mode, status, validity, diagnostics, simulation start time, and timestep results. Its initial validity is `NotRun`, which distinguishes a quality analysis that has not executed from one that executed and failed.
 
-`EpanetQualityResultReader` is the dedicated backend reader for node quality, source mass flow, link quality, and quality mass balance. Q1 configures the complete quality input state, but the runner still does not execute the EPANET quality lifecycle. Until Q2 adds that lifecycle, hydraulic execution remains unchanged and the quality timeline remains `NotRun`.
+`EpanetQualitySolver` executes the saved-hydraulics quality lifecycle with `EN_openQ`, `EN_initQ`, `EN_runQ`, `EN_stepQ`, and `EN_closeQ`. `EN_stepQ` is used deliberately so the AOWIS quality timeline contains every configured quality timestep rather than only hydraulic-event samples. `EpanetQualityResultReader` reads node quality, source mass flow for configured sources, link quality, and quality mass balance at each returned timestep. Chemical, water-age, and source-trace analyses populate their quantity-specific result fields; analysis `None` skips the quality lifecycle and leaves the timeline `NotRun`.
+
+Hydraulic and quality validity are finalized independently. A failure or cancellation after hydraulics have completed does not downgrade an already-valid hydraulic timeline. Cancellation during quality stepping preserves completed quality samples and marks only the quality timeline partial. Quality warnings and errors are kept on the quality timeline rather than being used to invalidate hydraulic results.
 
 ## Enabled-state preparation
 

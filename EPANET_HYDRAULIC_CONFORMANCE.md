@@ -284,6 +284,17 @@ These rows are a separate quality-input proof layer and do not change the hydrau
 | QI-TANK | Tank quality configuration | all four mixing models, two-compartment fraction, tank bulk reaction override/default | `EN_MIXMODEL`, `EN_MIXFRACTION`, `EN_TANK_KBULK` | `conformance-quality-input-tank-mixing-models`, `-chemical`, `-reactions` | Complete |
 | QI-REACTION | Reaction configuration | pipe/tank global effective coefficients, per-entity overrides, bulk/wall/tank orders, limiting concentration, roughness correlation for H-W/D-W/C-M | `EN_BULKORDER`, `EN_WALLORDER`, `EN_TANKORDER`, `EN_CONCENLIMIT`, `EN_KBULK`, `EN_KWALL`, `EN_TANK_KBULK` | `conformance-quality-input-chemical`, `-reactions`, invalid-quality validation | Complete |
 
+## Water-quality execution proof layer
+
+Quality execution is kept on its own timestep/result timeline and does not change the hydraulic result matrix below. Q2 runs saved hydraulics through the native EPANET quality lifecycle and compares AOWIS results against an independently stepped native project generated from the same AOWIS configuration.
+
+| ID | Quality execution family | Behavior | Native EPANET path | Evidence | State |
+|---|---|---|---|---|---|
+| QE-LIFECYCLE | Quality lifecycle | disabled mode skips execution; chemical, age, and trace execute and close cleanly | `EN_openQ`, `EN_initQ`, `EN_runQ`, `EN_stepQ`, `EN_closeQ` | `conformance-quality-execution-none`, `-chemical`, `-water-age`, `-source-trace` | Complete |
+| QE-TIMELINE | Independent quality timestep | quality samples occur at every quality step even when hydraulics are coarser | `EN_runQ`, `EN_stepQ` | `conformance-quality-execution-independent-timeline` | Complete |
+| QE-RESULTS | Typed node/link results | junction, reservoir, tank, pipe, pump, valve quality; configured-source mass flow; mass balance | `EN_QUALITY`, `EN_SOURCEMASS`, `EN_LINKQUAL`, `EN_MASSBALANCE` | chemical/age/trace native differential scenarios | Complete |
+| QE-CANCEL | Cancellation | preserves completed hydraulics and already-produced quality samples | stepwise quality lifecycle | `conformance-quality-execution-cancellation-partial` | Complete |
+
 ## Result coverage summary
 
 Water-quality members are intentionally omitted from this hydraulic matrix.
