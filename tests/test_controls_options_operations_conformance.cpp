@@ -421,7 +421,7 @@ void testSimpleAction(TestContext &context, HydraulicControlActionType action, d
     else if (action == HydraulicControlActionType::Close)
         context.expect(!pump.open, "zero-time CLOSE control must close the pump");
     else
-        context.expectNear(pump.speed, 0.83, NumericTolerance{1.0e-9, 1.0e-9}, comparison("pump.speed", 0, "Pump", "9"));
+        context.expectNear(pump.speed_ratio, 0.83, NumericTolerance{1.0e-9, 1.0e-9}, comparison("pump.speed_ratio", 0, "Pump", "9"));
 }
 
 void testActionOpen(TestContext &context)
@@ -770,7 +770,7 @@ void testRuleActiveAction(TestContext &context)
     valve.setting = 20.0;
     valve.initial_status = HydraulicLinkValveInitialStatus::Active;
     valve.diameter_mm = 450.0;
-    valve.minor_loss = 0.15;
+    valve.minor_loss_coefficient = 0.15;
     network.links_valves.append(valve);
 
     QList<HydraulicControlRulePremise> premises;

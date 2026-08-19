@@ -329,8 +329,8 @@ void appendPipe(NetworkHydraulic &network, const QUuid &from_uuid, const QUuid &
     pipe.node_uuid_to = to_uuid;
     pipe.length_calculated_m = std::max(25.0, straight_length_m * randomReal(generator, 1.04, 1.22));
     pipe.diameter_mm = choosePipeDiameterMm(pipe_class, pipe.length_calculated_m, generator);
-    pipe.roughness_hw = randomReal(generator, 122.0, 140.0);
-    pipe.minor_loss = 0.0;
+    pipe.roughness_hazen_williams = randomReal(generator, 122.0, 140.0);
+    pipe.minor_loss_coefficient = 0.0;
     pipe.initial_status = HydraulicLinkPipeInitialStatus::Open;
     network.links_pipes.append(pipe);
     pipe_index++;
@@ -402,13 +402,13 @@ void appendScaledJunctions(NetworkHydraulic &network, QVector<GeneratedJunction>
     }
 }
 
-void appendReservoir(NetworkHydraulic &network, const QVector<GeneratedJunction> &junctions, double x_m, double y_m, double head_m, int reservoir_index, int &pipe_index, std::mt19937_64 &generator)
+void appendReservoir(NetworkHydraulic &network, const QVector<GeneratedJunction> &junctions, double x_m, double y_m, double hydraulic_head_m, int reservoir_index, int &pipe_index, std::mt19937_64 &generator)
 {
     HydraulicNodeReservoir reservoir;
     reservoir.uuid = QUuid::createUuid();
     reservoir.id = entityId(QStringLiteral("R"), reservoir_index, 2);
     setCoordinate(reservoir.coordinate_wgs84, x_m, y_m);
-    reservoir.head_m = head_m + randomReal(generator, -2.0, 2.0);
+    reservoir.hydraulic_head_m = hydraulic_head_m + randomReal(generator, -2.0, 2.0);
     network.nodes_reservoirs.append(reservoir);
 
     const int nearest_junction_index = findNearestJunction(junctions, x_m, y_m);

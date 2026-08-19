@@ -35,7 +35,7 @@ struct NativeJunctionResult
     double total_demand_m3_per_h = 0.0;
     double emitter_flow_m3_per_h = 0.0;
     double leakage_flow_m3_per_h = 0.0;
-    double head_m = 0.0;
+    double hydraulic_head_m = 0.0;
     double pressure_head_m = 0.0;
     bool appears_in_control = false;
 };
@@ -44,7 +44,7 @@ struct NativeReservoirResult
 {
     QString id;
     double net_demand_m3_per_h = 0.0;
-    double head_m = 0.0;
+    double hydraulic_head_m = 0.0;
     double pressure_head_m = 0.0;
     bool appears_in_control = false;
 };
@@ -53,7 +53,7 @@ struct NativeTankResult
 {
     QString id;
     double net_demand_m3_per_h = 0.0;
-    double head_m = 0.0;
+    double hydraulic_head_m = 0.0;
     double pressure_head_m = 0.0;
     double water_level_m = 0.0;
     double volume_m3 = 0.0;
@@ -68,7 +68,7 @@ struct NativePipeResult
     double leakage_flow_m3_per_h = 0.0;
     double velocity_m_per_s = 0.0;
     double head_loss_m = 0.0;
-    double unit_head_loss_m_per_km = 0.0;
+    double head_loss_gradient_m_per_km = 0.0;
     double friction_factor = 0.0;
     bool open = true;
     double roughness = 0.0;
@@ -83,7 +83,7 @@ struct NativePumpResult
     double head_gain_m = 0.0;
     bool open = true;
     NativePumpState state = NativePumpState::Closed;
-    double speed = 0.0;
+    double speed_ratio = 0.0;
     double efficiency_percent = 0.0;
     double power_kw = 0.0;
     bool appears_in_control = false;
@@ -93,7 +93,7 @@ struct NativeValveResult
 {
     QString id;
     double diameter_mm = 0.0;
-    double minor_loss = 0.0;
+    double minor_loss_coefficient = 0.0;
     bool initially_open = true;
     bool initially_active = false;
     double initial_setting = 0.0;

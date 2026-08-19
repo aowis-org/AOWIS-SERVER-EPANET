@@ -125,7 +125,7 @@ std::string_view quantityName(HydraulicQuantity quantity)
     case HydraulicQuantity::FlowM3PerHour:
         return "flow_m3_per_h";
     case HydraulicQuantity::HeadMetres:
-        return "head_m";
+        return "hydraulic_head_m";
     case HydraulicQuantity::PressureHeadMetres:
         return "pressure_head_m";
     case HydraulicQuantity::LengthMetres:

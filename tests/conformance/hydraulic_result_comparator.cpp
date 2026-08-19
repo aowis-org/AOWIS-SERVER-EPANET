@@ -236,8 +236,8 @@ void compareJunctions(const NativeHydraulicResult &expected, const HydraulicSimu
             HydraulicQuantity::FlowM3PerHour, comparison("emitter_flow_m3_per_h", expected.time_elapsed_s, "Junction", id));
         context.expectNear(actual_junction->leakage_flow_m3_per_h, expected_junction.leakage_flow_m3_per_h,
             HydraulicQuantity::FlowM3PerHour, comparison("leakage_flow_m3_per_h", expected.time_elapsed_s, "Junction", id));
-        context.expectNear(actual_junction->head_m, expected_junction.head_m,
-            HydraulicQuantity::HeadMetres, comparison("head_m", expected.time_elapsed_s, "Junction", id));
+        context.expectNear(actual_junction->hydraulic_head_m, expected_junction.hydraulic_head_m,
+            HydraulicQuantity::HeadMetres, comparison("hydraulic_head_m", expected.time_elapsed_s, "Junction", id));
         context.expectNear(actual_junction->pressure_head_m, expected_junction.pressure_head_m,
             HydraulicQuantity::PressureHeadMetres, comparison("pressure_head_m", expected.time_elapsed_s, "Junction", id));
         context.expectEqual(actual_junction->appears_in_control, expected_junction.appears_in_control,
@@ -269,8 +269,8 @@ void compareReservoirs(const NativeHydraulicResult &expected, const HydraulicSim
             comparison("id", expected.time_elapsed_s, "Reservoir", id));
         context.expectNear(actual_reservoir->net_demand_m3_per_h, expected_reservoir.net_demand_m3_per_h,
             HydraulicQuantity::FlowM3PerHour, comparison("net_demand_m3_per_h", expected.time_elapsed_s, "Reservoir", id));
-        context.expectNear(actual_reservoir->head_m, expected_reservoir.head_m,
-            HydraulicQuantity::HeadMetres, comparison("head_m", expected.time_elapsed_s, "Reservoir", id));
+        context.expectNear(actual_reservoir->hydraulic_head_m, expected_reservoir.hydraulic_head_m,
+            HydraulicQuantity::HeadMetres, comparison("hydraulic_head_m", expected.time_elapsed_s, "Reservoir", id));
         context.expectNear(actual_reservoir->pressure_head_m, expected_reservoir.pressure_head_m,
             HydraulicQuantity::PressureHeadMetres, comparison("pressure_head_m", expected.time_elapsed_s, "Reservoir", id));
         context.expectEqual(actual_reservoir->appears_in_control, expected_reservoir.appears_in_control,
@@ -302,8 +302,8 @@ void compareTanks(const NativeHydraulicResult &expected, const HydraulicSimulati
             comparison("id", expected.time_elapsed_s, "Tank", id));
         context.expectNear(actual_tank->net_demand_m3_per_h, expected_tank.net_demand_m3_per_h,
             HydraulicQuantity::FlowM3PerHour, comparison("net_demand_m3_per_h", expected.time_elapsed_s, "Tank", id));
-        context.expectNear(actual_tank->head_m, expected_tank.head_m,
-            HydraulicQuantity::HeadMetres, comparison("head_m", expected.time_elapsed_s, "Tank", id));
+        context.expectNear(actual_tank->hydraulic_head_m, expected_tank.hydraulic_head_m,
+            HydraulicQuantity::HeadMetres, comparison("hydraulic_head_m", expected.time_elapsed_s, "Tank", id));
         context.expectNear(actual_tank->pressure_head_m, expected_tank.pressure_head_m,
             HydraulicQuantity::PressureHeadMetres, comparison("pressure_head_m", expected.time_elapsed_s, "Tank", id));
         context.expectNear(actual_tank->water_level_m, expected_tank.water_level_m,
@@ -323,25 +323,25 @@ void comparePipeRoughness(const NativePipeResult &expected, const HydraulicSimul
     switch (formula)
     {
     case HydraulicHeadlossFormula::HazenWilliams:
-        context.expect(actual.roughness_hw.has_value(), "Hazen-Williams pipe result is missing roughness");
-        context.expect(!actual.roughness_dw_mm.has_value() && !actual.roughness_cm.has_value(), "Hazen-Williams pipe result populated the wrong roughness fields");
-        if (actual.roughness_hw.has_value())
-            context.expectNear(actual.roughness_hw.value(), expected.roughness, HydraulicQuantity::Setting,
-                comparison("roughness_hw", time_s, "Pipe", id));
+        context.expect(actual.roughness_hazen_williams.has_value(), "Hazen-Williams pipe result is missing roughness");
+        context.expect(!actual.roughness_darcy_weisbach_mm.has_value() && !actual.roughness_chezy_manning.has_value(), "Hazen-Williams pipe result populated the wrong roughness fields");
+        if (actual.roughness_hazen_williams.has_value())
+            context.expectNear(actual.roughness_hazen_williams.value(), expected.roughness, HydraulicQuantity::Setting,
+                comparison("roughness_hazen_williams", time_s, "Pipe", id));
         break;
     case HydraulicHeadlossFormula::DarcyWeisbach:
-        context.expect(actual.roughness_dw_mm.has_value(), "Darcy-Weisbach pipe result is missing roughness");
-        context.expect(!actual.roughness_hw.has_value() && !actual.roughness_cm.has_value(), "Darcy-Weisbach pipe result populated the wrong roughness fields");
-        if (actual.roughness_dw_mm.has_value())
-            context.expectNear(actual.roughness_dw_mm.value(), expected.roughness, HydraulicQuantity::Setting,
-                comparison("roughness_dw_mm", time_s, "Pipe", id));
+        context.expect(actual.roughness_darcy_weisbach_mm.has_value(), "Darcy-Weisbach pipe result is missing roughness");
+        context.expect(!actual.roughness_hazen_williams.has_value() && !actual.roughness_chezy_manning.has_value(), "Darcy-Weisbach pipe result populated the wrong roughness fields");
+        if (actual.roughness_darcy_weisbach_mm.has_value())
+            context.expectNear(actual.roughness_darcy_weisbach_mm.value(), expected.roughness, HydraulicQuantity::Setting,
+                comparison("roughness_darcy_weisbach_mm", time_s, "Pipe", id));
         break;
     case HydraulicHeadlossFormula::ChezyManning:
-        context.expect(actual.roughness_cm.has_value(), "Chezy-Manning pipe result is missing roughness");
-        context.expect(!actual.roughness_hw.has_value() && !actual.roughness_dw_mm.has_value(), "Chezy-Manning pipe result populated the wrong roughness fields");
-        if (actual.roughness_cm.has_value())
-            context.expectNear(actual.roughness_cm.value(), expected.roughness, HydraulicQuantity::Setting,
-                comparison("roughness_cm", time_s, "Pipe", id));
+        context.expect(actual.roughness_chezy_manning.has_value(), "Chezy-Manning pipe result is missing roughness");
+        context.expect(!actual.roughness_hazen_williams.has_value() && !actual.roughness_darcy_weisbach_mm.has_value(), "Chezy-Manning pipe result populated the wrong roughness fields");
+        if (actual.roughness_chezy_manning.has_value())
+            context.expectNear(actual.roughness_chezy_manning.value(), expected.roughness, HydraulicQuantity::Setting,
+                comparison("roughness_chezy_manning", time_s, "Pipe", id));
         break;
     }
 }
@@ -376,8 +376,8 @@ void comparePipes(const NativeHydraulicResult &expected, const HydraulicSimulati
             HydraulicQuantity::VelocityMetresPerSecond, comparison("velocity_m_per_s", expected.time_elapsed_s, "Pipe", id));
         context.expectNear(actual_pipe->head_loss_m, expected_pipe.head_loss_m,
             HydraulicQuantity::HeadMetres, comparison("head_loss_m", expected.time_elapsed_s, "Pipe", id));
-        context.expectNear(actual_pipe->unit_head_loss_m_per_km, expected_pipe.unit_head_loss_m_per_km,
-            HydraulicQuantity::HeadMetres, comparison("unit_head_loss_m_per_km", expected.time_elapsed_s, "Pipe", id));
+        context.expectNear(actual_pipe->head_loss_gradient_m_per_km, expected_pipe.head_loss_gradient_m_per_km,
+            HydraulicQuantity::HeadMetres, comparison("head_loss_gradient_m_per_km", expected.time_elapsed_s, "Pipe", id));
 
         // EPANET reports an equivalent friction factor reconstructed from head loss / flow^2.
         // Near a stagnant state both quantities are solver residuals, so changing only the
@@ -436,7 +436,7 @@ void comparePumps(const NativeHydraulicResult &expected, const HydraulicSimulati
         context.expectEqual(static_cast<std::int64_t>(actual_pump->state),
             static_cast<std::int64_t>(modelPumpState(expected_pump.state)),
             comparison("state", expected.time_elapsed_s, "Pump", id));
-        context.expectNear(actual_pump->speed, expected_pump.speed,
+        context.expectNear(actual_pump->speed_ratio, expected_pump.speed_ratio,
             HydraulicQuantity::Setting, comparison("speed", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_pump->efficiency_percent, expected_pump.efficiency_percent,
             HydraulicQuantity::Percent, comparison("efficiency_percent", expected.time_elapsed_s, "Pump", id));

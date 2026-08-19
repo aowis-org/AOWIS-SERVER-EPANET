@@ -47,18 +47,17 @@ The adapter initializes every native EPANET project with `EN_CMH` and explicitly
 
 No m³/h-to-L/s conversion is performed by this adapter. `HydraulicSolverOptions` does not expose selectable native flow or pressure units; conversion to presentation or interchange units belongs outside the hydraulic solver.
 
-Pipe roughness is selected according to `headloss_formula`: `roughness_hw` for Hazen-Williams, `roughness_dw_mm` for Darcy-Weisbach, and `roughness_cm` for Chezy-Manning.
+Pipe roughness is selected according to `headloss_formula`: `roughness_hazen_williams` for Hazen-Williams, `roughness_darcy_weisbach_mm` for Darcy-Weisbach, and `roughness_chezy_manning` for Chezy-Manning.
 
-## Known model-boundary issues
+## Model-boundary conventions and remaining issues
 
-The following model fields do not fully satisfy the canonical, self-describing unit contract:
+Leakage uses the EPANET-compatible AOWIS engineering convention `leak_area_mm2_per_100m` for distributed leak area and `leak_area_expansion_per_pressure_head_mm2_per_m` for pressure-head-dependent area expansion. The adapter writes these canonical model values directly to `EN_LEAK_AREA` and `EN_LEAK_EXPAN`.
 
-- `leak_area_mm2_per_100m` uses EPANET's per-100-metre convention rather than the canonical AOWIS `mm2_per_m` representation. The adapter writes this value directly to `EN_LEAK_AREA` and writes `leak_expansion_mm2_per_m_head` to `EN_LEAK_EXPAN`.
-- Generic control `setting` values are context-dependent and do not carry a single unit in their names. They require discriminated quantity-specific representations before complete control support can be unit-safe.
+Generic control `setting` values remain context-dependent and do not carry a single unit in their names. They require discriminated quantity-specific representations before complete control support can be unit-safe.
 
 Pumps and all seven EPANET 2.3 valve types are implemented, including their curves, patterns, energy inputs, geometry, hydraulic results, states, and pump energy summaries. EPANET has no pump-specific numeric constant-efficiency field, so the adapter represents that model option with a private one-point efficiency curve. EPANET also treats a pump-specific energy price of zero as inheritance from the global price; the adapter rejects that unrepresentable override explicitly.
 
-FAVAD leakage and control inputs are implemented in the builder path. Pipe fixed-area and pressure-dependent leakage parameters are validated and written to EPANET; pipe and junction leakage flows, the leakage-loss statistic, and leakage in the run flow balance are exposed in the simulation results. Junction emitters are written directly to EPANET using the canonical m³/h and meter-head backend units. Pipe roughness results are exposed through `roughness_hw`, `roughness_dw_mm`, or `roughness_cm`, according to the selected headloss formula.
+FAVAD leakage and control inputs are implemented in the builder path. Pipe fixed-area and pressure-dependent leakage parameters are validated and written to EPANET; pipe and junction leakage flows, the leakage-loss statistic, and leakage in the run flow balance are exposed in the simulation results. Junction emitters are written directly to EPANET using the canonical m³/h and meter-head backend units. Pipe roughness results are exposed through `roughness_hazen_williams`, `roughness_darcy_weisbach_mm`, or `roughness_chezy_manning`, according to the selected headloss formula.
 
 The bundled EPANET 2.3 headers expose `EN_R_POWER`, but its rule parser rejects pump `POWER` premises and its rule evaluator does not implement them. The adapter therefore rejects structured pump-power premises explicitly instead of forwarding a rule that cannot execute. Other implemented simple and rule-based controls are passed to EPANET normally.
 

@@ -42,12 +42,12 @@ double patternFactor(const NetworkHydraulic &network, const QUuid &pattern_uuid,
 
     for (const HydraulicPatternTime &pattern : network.patterns_time)
     {
-        if (pattern.uuid != pattern_uuid || pattern.factors.isEmpty())
+        if (pattern.uuid != pattern_uuid || pattern.multipliers.isEmpty())
             continue;
 
         const quint64 period = (time_s + network.start_pattern_s) / network.timestep_pattern_s;
-        const int factor_index = static_cast<int>(period % static_cast<quint64>(pattern.factors.size()));
-        return pattern.factors.at(factor_index);
+        const int factor_index = static_cast<int>(period % static_cast<quint64>(pattern.multipliers.size()));
+        return pattern.multipliers.at(factor_index);
     }
 
     return 1.0;

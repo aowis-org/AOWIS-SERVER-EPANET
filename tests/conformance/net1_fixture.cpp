@@ -47,8 +47,8 @@ QUuid appendPipe(NetworkHydraulic &network, const QString &id, const QUuid &node
     pipe.node_uuid_to = node_to;
     pipe.length_calculated_m = feetToMetres(length_ft);
     pipe.diameter_mm = diameter_in * 25.4;
-    pipe.roughness_hw = 100.0;
-    pipe.minor_loss = 0.0;
+    pipe.roughness_hazen_williams = 100.0;
+    pipe.minor_loss_coefficient = 0.0;
     pipe.initial_status = HydraulicLinkPipeInitialStatus::Open;
     network.links_pipes.append(pipe);
     return pipe.uuid;
@@ -99,7 +99,7 @@ Net1Fixture makeNet1Fixture()
     HydraulicPatternTime demand_pattern;
     demand_pattern.id = QStringLiteral("1");
     demand_pattern.uuid = QUuid::createUuid();
-    demand_pattern.factors = {1.0, 1.2, 1.4, 1.6, 1.4, 1.2, 1.0, 0.8, 0.6, 0.4, 0.6, 0.8};
+    demand_pattern.multipliers = {1.0, 1.2, 1.4, 1.6, 1.4, 1.2, 1.0, 0.8, 0.6, 0.4, 0.6, 0.8};
     network.patterns_time.append(demand_pattern);
     network.options_hydraulic.default_demand_pattern_uuid = demand_pattern.uuid;
 
@@ -116,7 +116,7 @@ Net1Fixture makeNet1Fixture()
     HydraulicNodeReservoir reservoir;
     reservoir.id = QStringLiteral("9");
     reservoir.uuid = QUuid::createUuid();
-    reservoir.head_m = feetToMetres(800.0);
+    reservoir.hydraulic_head_m = feetToMetres(800.0);
     network.nodes_reservoirs.append(reservoir);
 
     HydraulicNodeTank tank;
@@ -161,7 +161,7 @@ Net1Fixture makeNet1Fixture()
     pump.node_uuid_to = node_10;
     pump.definition_type = HydraulicLinkPumpDefinitionType::OnePointCurve;
     pump.head_curve_uuid = pump_curve.uuid;
-    pump.initial_speed = 1.0;
+    pump.initial_speed_ratio = 1.0;
     pump.initial_status = HydraulicLinkPumpInitialStatus::On;
     pump.efficiency_input_type = HydraulicLinkPumpEfficiencyInputType::Global;
     pump.energy_price_input_type = HydraulicLinkPumpEnergyPriceInputType::Global;

@@ -74,7 +74,7 @@ HydraulicLinkValve replacePipeWithMetadataValve(NetworkHydraulic &network, const
 
     valve.type = HydraulicLinkValveType::TCV;
     valve.diameter_mm = 200.0;
-    valve.minor_loss = 0.15;
+    valve.minor_loss_coefficient = 0.15;
     valve.setting = 3.0;
     valve.initial_status = HydraulicLinkValveInitialStatus::Open;
     valve.metadata.comment = QStringLiteral("valve export comment");
@@ -398,13 +398,13 @@ void scenarioPatternsCurves(TestContext &context)
     context.expectEqual(objectComment(native.handle(), EN_TIMEPAT, pattern_index), std::string_view("pattern export comment"), comparison("pattern.comment", "Pattern", network.patterns_time.first().id.toStdString()));
     int pattern_length = 0;
     checkEpanet(EN_getpatternlen(native.handle(), pattern_index, &pattern_length), "EN_getpatternlen");
-    context.expectEqual(static_cast<std::int64_t>(pattern_length), static_cast<std::int64_t>(network.patterns_time.first().factors.size()), comparison("pattern.length"));
+    context.expectEqual(static_cast<std::int64_t>(pattern_length), static_cast<std::int64_t>(network.patterns_time.first().multipliers.size()), comparison("pattern.length"));
     for (int index = 0; index < pattern_length; index++)
     {
         double value = 0.0;
         checkEpanet(EN_getpatternvalue(native.handle(), pattern_index, index + 1, &value), "EN_getpatternvalue");
-        context.expectNear(value, network.patterns_time.first().factors.at(index), NumericTolerance{5.0e-5, 0.0}, comparison("pattern.factor"),
-            "EPANET's native INP writer serializes pattern factors with four decimal places");
+        context.expectNear(value, network.patterns_time.first().multipliers.at(index), NumericTolerance{5.0e-5, 0.0}, comparison("pattern.factor"),
+            "EPANET's native INP writer serializes pattern multipliers with four decimal places");
     }
 
     struct CurveExpectation

@@ -51,13 +51,13 @@ bool assignPipeRoughness(HydraulicSimulationResultLinkPipe &result, HydraulicHea
     switch (headloss_formula)
     {
     case HydraulicHeadlossFormula::HazenWilliams:
-        result.roughness_hw = roughness_backend_value;
+        result.roughness_hazen_williams = roughness_backend_value;
         return true;
     case HydraulicHeadlossFormula::DarcyWeisbach:
-        result.roughness_dw_mm = roughness_backend_value;
+        result.roughness_darcy_weisbach_mm = roughness_backend_value;
         return true;
     case HydraulicHeadlossFormula::ChezyManning:
-        result.roughness_cm = roughness_backend_value;
+        result.roughness_chezy_manning = roughness_backend_value;
         return true;
     }
 
@@ -183,7 +183,7 @@ HydraulicSimulationStatus EpanetResultReader::readNodesJunctions(HydraulicSimula
         if (!status.success)
             return status;
 
-        status = readNodeValue(this->project, junction_index, EN_HEAD, HydraulicSimulationStatusStage::ReadJunctionResults, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::Head, QStringLiteral("Failed to get junction head"), junction_result.head_m);
+        status = readNodeValue(this->project, junction_index, EN_HEAD, HydraulicSimulationStatusStage::ReadJunctionResults, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::Head, QStringLiteral("Failed to get junction head"), junction_result.hydraulic_head_m);
         if (!status.success)
             return status;
 
@@ -219,7 +219,7 @@ HydraulicSimulationStatus EpanetResultReader::readNodesReservoirs(HydraulicSimul
         if (!status.success)
             return status;
 
-        status = readNodeValue(this->project, reservoir_index, EN_HEAD, HydraulicSimulationStatusStage::ReadReservoirResults, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, HydraulicSimulationStatusProperty::Head, QStringLiteral("Failed to get reservoir head"), reservoir_result.head_m);
+        status = readNodeValue(this->project, reservoir_index, EN_HEAD, HydraulicSimulationStatusStage::ReadReservoirResults, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, HydraulicSimulationStatusProperty::Head, QStringLiteral("Failed to get reservoir head"), reservoir_result.hydraulic_head_m);
         if (!status.success)
             return status;
 
@@ -255,7 +255,7 @@ HydraulicSimulationStatus EpanetResultReader::readNodesTanks(HydraulicSimulation
         if (!status.success)
             return status;
 
-        status = readNodeValue(this->project, tank_index, EN_HEAD, HydraulicSimulationStatusStage::ReadTankResults, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, HydraulicSimulationStatusProperty::Head, QStringLiteral("Failed to get tank head"), tank_result.head_m);
+        status = readNodeValue(this->project, tank_index, EN_HEAD, HydraulicSimulationStatusStage::ReadTankResults, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, HydraulicSimulationStatusProperty::Head, QStringLiteral("Failed to get tank head"), tank_result.hydraulic_head_m);
         if (!status.success)
             return status;
 
@@ -317,7 +317,7 @@ HydraulicSimulationStatus EpanetResultReader::readLinksPipes(HydraulicSimulation
 
         const double length_m = pipe.length_measured_m.value_or(pipe.length_calculated_m);
         if (length_m > 0.0)
-            pipe_result.unit_head_loss_m_per_km = pipe_result.head_loss_m / length_m * 1000.0;
+            pipe_result.head_loss_gradient_m_per_km = pipe_result.head_loss_m / length_m * 1000.0;
 
         constexpr double meters_per_foot = 0.3048;
         constexpr double cubic_meters_per_hour_per_cubic_foot_per_second = 101.94;
@@ -395,7 +395,7 @@ HydraulicSimulationStatus EpanetResultReader::readLinksPumps(HydraulicSimulation
         if (!resolvePumpState(backend_state, pump_result.state))
             return makeEpanetStatus(HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusOperation::ReadLinkResult, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("EPANET returned an unknown pump operating state"));
 
-        status = readLinkValue(this->project, pump_index, EN_SETTING, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Setting, QStringLiteral("Failed to get pump speed"), pump_result.speed);
+        status = readLinkValue(this->project, pump_index, EN_SETTING, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Setting, QStringLiteral("Failed to get pump speed"), pump_result.speed_ratio);
         if (!status.success)
             return status;
         status = readLinkValue(this->project, pump_index, EN_PUMP_EFFIC, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Efficiency, QStringLiteral("Failed to get pump efficiency"), pump_result.efficiency_percent);

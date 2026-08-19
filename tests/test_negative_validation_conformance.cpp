@@ -218,7 +218,7 @@ void scenarioDisabledEntityPruning(TestContext &context)
     disabled_reservoir.id = QStringLiteral("__DISABLED_RESERVOIR");
     disabled_reservoir.uuid = QUuid::createUuid();
     disabled_reservoir.metadata.enabled = false;
-    disabled_reservoir.head_m = std::numeric_limits<double>::quiet_NaN();
+    disabled_reservoir.hydraulic_head_m = std::numeric_limits<double>::quiet_NaN();
     network.nodes_reservoirs.append(disabled_reservoir);
 
     HydraulicNodeTank disabled_tank;
@@ -243,7 +243,7 @@ void scenarioDisabledEntityPruning(TestContext &context)
     disabled_pump.metadata.enabled = false;
     disabled_pump.node_uuid_from = QUuid::createUuid();
     disabled_pump.node_uuid_to = QUuid::createUuid();
-    disabled_pump.initial_speed = std::numeric_limits<double>::quiet_NaN();
+    disabled_pump.initial_speed_ratio = std::numeric_limits<double>::quiet_NaN();
     network.links_pumps.append(disabled_pump);
 
     HydraulicLinkValve disabled_valve;
@@ -378,7 +378,7 @@ void scenarioMissingValveCurve(TestContext &context)
     valve.node_uuid_to = pipe->node_uuid_to;
     valve.type = HydraulicLinkValveType::GPV;
     valve.diameter_mm = 200.0;
-    valve.minor_loss = 0.0;
+    valve.minor_loss_coefficient = 0.0;
     valve.initial_status = HydraulicLinkValveInitialStatus::Open;
     valve.setting_curve_uuid = QUuid::createUuid();
 
@@ -402,7 +402,7 @@ void scenarioInvalidPatternNumeric(TestContext &context)
     HydraulicPatternTime pattern;
     pattern.id = QStringLiteral("BAD_PATTERN");
     pattern.uuid = QUuid::createUuid();
-    pattern.factors.append(std::numeric_limits<double>::quiet_NaN());
+    pattern.multipliers.append(std::numeric_limits<double>::quiet_NaN());
     network.patterns_time.append(pattern);
 
     expectRejected(context, network, HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("invalid numeric"));
@@ -456,7 +456,7 @@ void scenarioInvalidPumpNumeric(TestContext &context)
     if (pump == nullptr)
         return;
 
-    pump->initial_speed = std::numeric_limits<double>::infinity();
+    pump->initial_speed_ratio = std::numeric_limits<double>::infinity();
     expectRejected(context, network, HydraulicSimulationStatusEntityType::Pump, pump->id, pump->uuid, QStringLiteral("invalid numeric"));
 }
 
@@ -579,7 +579,7 @@ void scenarioMultipleValidationDiagnostics(TestContext &context)
     reservoir.id = junction.id;
     pipe.node_uuid_from = QUuid::createUuid();
     junction.coordinate_wgs84.longitude_deg = std::numeric_limits<double>::quiet_NaN();
-    pump.initial_speed = std::numeric_limits<double>::quiet_NaN();
+    pump.initial_speed_ratio = std::numeric_limits<double>::quiet_NaN();
 
     const EpanetResultRun run = EpanetRunner().run(network);
 
@@ -684,7 +684,7 @@ void registerNegativeValidationScenarios(ScenarioRegistry &registry)
         &scenarioMissingValveCurve});
     registry.add(ScenarioDefinition{
         "conformance-negative-invalid-pattern-numeric",
-        "Reject non-finite time-pattern factors before calling EPANET.",
+        "Reject non-finite time-pattern multipliers before calling EPANET.",
         {"conformance", "hydraulic", "negative"},
         &scenarioInvalidPatternNumeric});
     registry.add(ScenarioDefinition{

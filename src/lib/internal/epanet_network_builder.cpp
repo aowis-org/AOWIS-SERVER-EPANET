@@ -66,7 +66,7 @@ HydraulicSimulationStatus validateSupportedFeatures(const NetworkHydraulic &requ
     {
         if (!std::isfinite(pipe.leak_area_mm2_per_100m) || pipe.leak_area_mm2_per_100m < 0.0)
             details.append(QStringLiteral("Pipe %1 has an invalid fixed leakage area").arg(pipe.id));
-        if (!std::isfinite(pipe.leak_expansion_mm2_per_m_head) || pipe.leak_expansion_mm2_per_m_head < 0.0)
+        if (!std::isfinite(pipe.leak_area_expansion_per_pressure_head_mm2_per_m) || pipe.leak_area_expansion_per_pressure_head_mm2_per_m < 0.0)
             details.append(QStringLiteral("Pipe %1 has an invalid leakage expansion coefficient").arg(pipe.id));
     }
 
@@ -252,13 +252,13 @@ bool resolvePipeRoughness(const HydraulicLinkPipe &pipe, HydraulicHeadlossFormul
     switch (headloss_formula)
     {
     case HydraulicHeadlossFormula::HazenWilliams:
-        roughness = pipe.roughness_hw;
+        roughness = pipe.roughness_hazen_williams;
         return true;
     case HydraulicHeadlossFormula::DarcyWeisbach:
-        roughness = pipe.roughness_dw_mm;
+        roughness = pipe.roughness_darcy_weisbach_mm;
         return true;
     case HydraulicHeadlossFormula::ChezyManning:
-        roughness = pipe.roughness_cm;
+        roughness = pipe.roughness_chezy_manning;
         return true;
     }
 
@@ -762,7 +762,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addPatternTime(const HydraulicPa
     if (pattern.id.isEmpty())
         return makeEpanetStatus(HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::None, HydraulicSimulationStatusEntityType::Pattern, QString(), pattern.uuid, QStringLiteral("Time pattern has no ID"));
 
-    if (pattern.factors.isEmpty())
+    if (pattern.multipliers.isEmpty())
         return makeEpanetStatus(HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::None, HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Time pattern requires at least one factor"));
 
     const QByteArray pattern_id = pattern.id.toUtf8();
@@ -783,11 +783,11 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addPatternTime(const HydraulicPa
             return epanet_status;
     }
 
-    QList<double> factors = pattern.factors;
-    error = EN_setpattern(this->project.handle(), pattern_index, factors.data(), factors.length());
+    QList<double> multipliers = pattern.multipliers;
+    error = EN_setpattern(this->project.handle(), pattern_index, multipliers.data(), multipliers.length());
     if (error != 0)
     {
-        HydraulicSimulationStatus status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::AddPattern, QStringLiteral("EN_setpattern"), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Failed to set time pattern factors"));
+        HydraulicSimulationStatus status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPattern, HydraulicSimulationStatusOperation::AddPattern, QStringLiteral("EN_setpattern"), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("Failed to set time pattern multipliers"));
         if (!status.success)
         {
             status.entity.index = pattern_index;
@@ -1121,9 +1121,9 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeReservoir(const Hydraulic
             return epanet_status;
     }
 
-    double reservoir_head_m = reservoir.head_m;
+    double reservoir_head_m = reservoir.hydraulic_head_m;
     if (reservoir.head_input_type == HydraulicNodeElevationInputType::TerrainElevationAndOffset)
-        reservoir_head_m = reservoir.terrain_elevation_m + reservoir.head_offset_m;
+        reservoir_head_m = reservoir.terrain_elevation_m + reservoir.hydraulic_head_offset_m;
 
     error = EN_setnodevalue(this->project.handle(), reservoir_index, EN_ELEVATION, reservoir_head_m);
     if (error != 0)
@@ -1356,7 +1356,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPipe(const HydraulicLinkP
     if (!resolvePipeRoughness(pipe, headloss_formula, roughness_for_selected_formula))
         return makeEpanetStatus(HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::AddLink, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Unsupported hydraulic headloss formula"));
 
-    error = EN_setpipedata(this->project.handle(), pipe_index, length_m, pipe.diameter_mm, roughness_for_selected_formula, pipe.minor_loss);
+    error = EN_setpipedata(this->project.handle(), pipe_index, length_m, pipe.diameter_mm, roughness_for_selected_formula, pipe.minor_loss_coefficient);
     if (error != 0)
     {
         const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::AddLink, QStringLiteral("EN_setpipedata"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to set pipe data"));
@@ -1374,9 +1374,9 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPipe(const HydraulicLinkP
             return epanet_status;
     }
 
-    if (!std::isfinite(pipe.leak_expansion_mm2_per_m_head) || pipe.leak_expansion_mm2_per_m_head < 0.0)
+    if (!std::isfinite(pipe.leak_area_expansion_per_pressure_head_mm2_per_m) || pipe.leak_area_expansion_per_pressure_head_mm2_per_m < 0.0)
         return makeEpanetStatus(HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::SetEntityMetadata, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Pipe leakage expansion coefficient must be finite and non-negative"));
-    error = EN_setlinkvalue(this->project.handle(), pipe_index, EN_LEAK_EXPAN, pipe.leak_expansion_mm2_per_m_head);
+    error = EN_setlinkvalue(this->project.handle(), pipe_index, EN_LEAK_EXPAN, pipe.leak_area_expansion_per_pressure_head_mm2_per_m);
     if (error != 0)
     {
         const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_LEAK_EXPAN)"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to set pipe leakage expansion coefficient"));
@@ -1464,9 +1464,9 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkPump(const HydraulicLinkP
         }
     }
 
-    if (pump.initial_speed < 0.0)
+    if (pump.initial_speed_ratio < 0.0)
         return makeEpanetStatus(HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Pump initial speed cannot be negative"));
-    error = EN_setlinkvalue(this->project.handle(), pump_index, EN_INITSETTING, pump.initial_speed);
+    error = EN_setlinkvalue(this->project.handle(), pump_index, EN_INITSETTING, pump.initial_speed_ratio);
     if (error != 0)
     {
         const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddPump, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_INITSETTING)"), HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to set pump initial speed"));
@@ -1600,7 +1600,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkValve(const HydraulicLink
         if (!epanet_status.success)
             return epanet_status;
     }
-    error = EN_setlinkvalue(this->project.handle(), valve_index, EN_MINORLOSS, valve.minor_loss);
+    error = EN_setlinkvalue(this->project.handle(), valve_index, EN_MINORLOSS, valve.minor_loss_coefficient);
     if (error != 0)
     {
         const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_MINORLOSS)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set valve minor-loss coefficient"));

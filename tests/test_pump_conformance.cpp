@@ -248,7 +248,7 @@ void testPumpInitialSpeed(TestContext &context)
     context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
     if (pump == nullptr)
         return;
-    pump->initial_speed = 0.8;
+    pump->initial_speed_ratio = 0.8;
 
     const NativeHydraulicTimeline native_timeline = runNative(fixture, NativeReferenceVariant::PumpInitialSpeed, context);
     if (native_timeline.success && !native_timeline.results.isEmpty())
@@ -257,8 +257,8 @@ void testPumpInitialSpeed(TestContext &context)
         context.expect(native_pump != nullptr, "initial-speed native result must contain pump 9");
         if (native_pump != nullptr)
         {
-            context.expectNear(native_pump->speed, 0.8, NumericTolerance{1.0e-12, 0.0},
-                comparison("upstream_golden.speed", 0, "Pump", "9"));
+            context.expectNear(native_pump->speed_ratio, 0.8, NumericTolerance{1.0e-12, 0.0},
+                comparison("upstream_golden.speed_ratio", 0, "Pump", "9"));
         }
     }
     compareWithWrapper(fixture, native_timeline, context);
@@ -274,7 +274,7 @@ void testPumpSpeedPattern(TestContext &context)
     HydraulicPatternTime pattern;
     pattern.id = QStringLiteral("PUMP_SPEED_PATTERN");
     pattern.uuid = QUuid::createUuid();
-    pattern.factors = {0.8, 1.0, 1.15};
+    pattern.multipliers = {0.8, 1.0, 1.15};
     fixture.network.patterns_time.append(pattern);
     HydraulicLinkPump *pump = findModelPump(fixture.network, QStringLiteral("9"));
     context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
@@ -294,7 +294,7 @@ void testPumpSpeedPattern(TestContext &context)
         context.expect(native_pump != nullptr, "speed-pattern result must contain pump 9");
         if (native_pump != nullptr)
         {
-            context.expectNear(native_pump->speed, item.second, NumericTolerance{1.0e-12, 0.0},
+            context.expectNear(native_pump->speed_ratio, item.second, NumericTolerance{1.0e-12, 0.0},
                 comparison("upstream_golden.pattern_speed", item.first, "Pump", "9"));
         }
     }
@@ -406,7 +406,7 @@ void testPumpGlobalEnergy(TestContext &context)
     HydraulicPatternTime pattern;
     pattern.id = QStringLiteral("GLOBAL_ENERGY_PRICE_PATTERN");
     pattern.uuid = QUuid::createUuid();
-    pattern.factors = {1.0, 2.0};
+    pattern.multipliers = {1.0, 2.0};
     fixture.network.patterns_time.append(pattern);
     fixture.network.options_energy.global_energy_price_pattern_uuid = pattern.uuid;
 
@@ -437,14 +437,14 @@ void testPumpEnergyPattern(TestContext &context)
     HydraulicPatternTime global_pattern;
     global_pattern.id = QStringLiteral("UNUSED_GLOBAL_PRICE_PATTERN");
     global_pattern.uuid = QUuid::createUuid();
-    global_pattern.factors = {4.0, 4.0};
+    global_pattern.multipliers = {4.0, 4.0};
     fixture.network.patterns_time.append(global_pattern);
     fixture.network.options_energy.global_energy_price_pattern_uuid = global_pattern.uuid;
 
     HydraulicPatternTime pump_pattern;
     pump_pattern.id = QStringLiteral("PUMP_ENERGY_PRICE_PATTERN");
     pump_pattern.uuid = QUuid::createUuid();
-    pump_pattern.factors = {1.0, 0.5};
+    pump_pattern.multipliers = {1.0, 0.5};
     fixture.network.patterns_time.append(pump_pattern);
 
     HydraulicLinkPump *pump = findModelPump(fixture.network, QStringLiteral("9"));

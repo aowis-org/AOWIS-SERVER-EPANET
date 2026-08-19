@@ -690,9 +690,9 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
 
     for (const HydraulicPatternTime &pattern : network.patterns_time)
     {
-        for (int index = 0; index < pattern.factors.size(); index++)
+        for (int index = 0; index < pattern.multipliers.size(); index++)
         {
-            status = validateFinite(pattern.factors.at(index), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("factors[%1]").arg(index));
+            status = validateFinite(pattern.multipliers.at(index), HydraulicSimulationStatusEntityType::Pattern, pattern.id, pattern.uuid, QStringLiteral("multipliers[%1]").arg(index));
             appendValidationFailure(failures, status);
         }
     }
@@ -801,12 +801,12 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         {
             status = validateFinite(reservoir.terrain_elevation_m, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("terrain_elevation_m"));
             appendValidationFailure(failures, status);
-            status = validateFinite(reservoir.head_offset_m, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("head_offset_m"));
+            status = validateFinite(reservoir.hydraulic_head_offset_m, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("hydraulic_head_offset_m"));
             appendValidationFailure(failures, status);
         }
         else
         {
-            status = validateFinite(reservoir.head_m, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("head_m"));
+            status = validateFinite(reservoir.hydraulic_head_m, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("hydraulic_head_m"));
             appendValidationFailure(failures, status);
         }
         status = validateFinite(reservoir.coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("coordinate_wgs84.longitude_deg"));
@@ -868,19 +868,19 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         status = validateFinitePositive(pipe.diameter_mm, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("diameter_mm"));
         appendValidationFailure(failures, status);
         if (network.options_hydraulic.headloss_formula == HydraulicHeadlossFormula::HazenWilliams)
-            status = validateFinite(pipe.roughness_hw, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("roughness_hw"));
+            status = validateFinite(pipe.roughness_hazen_williams, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("roughness_hazen_williams"));
         else if (network.options_hydraulic.headloss_formula == HydraulicHeadlossFormula::DarcyWeisbach)
-            status = validateFinite(pipe.roughness_dw_mm, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("roughness_dw_mm"));
+            status = validateFinite(pipe.roughness_darcy_weisbach_mm, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("roughness_darcy_weisbach_mm"));
         else if (network.options_hydraulic.headloss_formula == HydraulicHeadlossFormula::ChezyManning)
-            status = validateFinite(pipe.roughness_cm, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("roughness_cm"));
+            status = validateFinite(pipe.roughness_chezy_manning, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("roughness_chezy_manning"));
         else
             status = makeEpanetSuccess();
         appendValidationFailure(failures, status);
-        status = validateFiniteNonNegative(pipe.minor_loss, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("minor_loss"));
+        status = validateFiniteNonNegative(pipe.minor_loss_coefficient, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("minor_loss_coefficient"));
         appendValidationFailure(failures, status);
         status = validateFiniteNonNegative(pipe.leak_area_mm2_per_100m, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("leak_area_mm2_per_100m"));
         appendValidationFailure(failures, status);
-        status = validateFiniteNonNegative(pipe.leak_expansion_mm2_per_m_head, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("leak_expansion_mm2_per_m_head"));
+        status = validateFiniteNonNegative(pipe.leak_area_expansion_per_pressure_head_mm2_per_m, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("leak_area_expansion_per_pressure_head_mm2_per_m"));
         appendValidationFailure(failures, status);
         for (int index = 0; index < pipe.vertices.size(); index++)
         {
@@ -900,7 +900,7 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
             status = validateFinitePositive(pump.constant_power_kw, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("constant_power_kw"));
             appendValidationFailure(failures, status);
         }
-        status = validateFiniteNonNegative(pump.initial_speed, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("initial_speed"));
+        status = validateFiniteNonNegative(pump.initial_speed_ratio, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("initial_speed_ratio"));
         appendValidationFailure(failures, status);
         if (pump.efficiency_input_type == HydraulicLinkPumpEfficiencyInputType::Constant)
         {
@@ -927,7 +927,7 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
             continue;
         status = validateFinitePositive(valve.diameter_mm, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("diameter_mm"));
         appendValidationFailure(failures, status);
-        status = validateFiniteNonNegative(valve.minor_loss, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("minor_loss"));
+        status = validateFiniteNonNegative(valve.minor_loss_coefficient, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("minor_loss_coefficient"));
         appendValidationFailure(failures, status);
         if (valve.type != HydraulicLinkValveType::GPV)
         {

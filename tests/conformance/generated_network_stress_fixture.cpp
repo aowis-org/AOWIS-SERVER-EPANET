@@ -18,7 +18,7 @@ struct StressPattern
 {
     QString id;
     QUuid uuid;
-    std::vector<double> factors;
+    std::vector<double> multipliers;
 };
 
 struct StressJunction
@@ -34,7 +34,7 @@ struct StressReservoir
 {
     QString id;
     QUuid uuid;
-    double head_m = 0.0;
+    double hydraulic_head_m = 0.0;
     int pattern_index = -1;
 };
 
@@ -49,7 +49,7 @@ struct StressPipe
     double length_m = 0.0;
     double diameter_mm = 0.0;
     double roughness = 0.0;
-    double minor_loss = 0.0;
+    double minor_loss_coefficient = 0.0;
 };
 
 struct StressSpecification
@@ -115,12 +115,12 @@ double generatedRoughness(HydraulicHeadlossFormula formula, std::mt19937_64 &gen
     throw std::runtime_error("Unsupported generated-stress roughness formula");
 }
 
-void addPattern(StressSpecification &specification, std::uint64_t seed, int pattern_index, std::vector<double> factors)
+void addPattern(StressSpecification &specification, std::uint64_t seed, int pattern_index, std::vector<double> multipliers)
 {
     StressPattern pattern;
     pattern.id = QStringLiteral("PAT%1").arg(pattern_index + 1);
     pattern.uuid = deterministicUuid(seed, 1U, static_cast<std::uint32_t>(pattern_index + 1));
-    pattern.factors = std::move(factors);
+    pattern.multipliers = std::move(multipliers);
     specification.patterns.push_back(std::move(pattern));
 }
 
@@ -139,12 +139,12 @@ void addJunctions(StressSpecification &specification, const GeneratedStressCase 
     }
 }
 
-void addReservoir(StressSpecification &specification, const GeneratedStressCase &definition, int reservoir_index, double head_m, int pattern_index = -1)
+void addReservoir(StressSpecification &specification, const GeneratedStressCase &definition, int reservoir_index, double hydraulic_head_m, int pattern_index = -1)
 {
     StressReservoir reservoir;
     reservoir.id = QStringLiteral("R%1").arg(reservoir_index + 1);
     reservoir.uuid = deterministicUuid(definition.seed, 3U, static_cast<std::uint32_t>(reservoir_index + 1));
-    reservoir.head_m = head_m;
+    reservoir.hydraulic_head_m = hydraulic_head_m;
     reservoir.pattern_index = pattern_index;
     specification.reservoirs.push_back(std::move(reservoir));
 }
@@ -170,7 +170,7 @@ void addPipe(StressSpecification &specification,
     pipe.length_m = randomReal(generator, 180.0, 920.0) * length_scale;
     pipe.diameter_mm = randomReal(generator, 240.0, 430.0) * diameter_scale;
     pipe.roughness = generatedRoughness(definition.headloss_formula, generator);
-    pipe.minor_loss = randomReal(generator, 0.0, 0.75);
+    pipe.minor_loss_coefficient = randomReal(generator, 0.0, 0.75);
     specification.pipes.push_back(std::move(pipe));
 }
 
@@ -317,8 +317,8 @@ NetworkHydraulic buildModel(const StressSpecification &specification, const Gene
         HydraulicPatternTime pattern;
         pattern.id = source.id;
         pattern.uuid = source.uuid;
-        for (double factor : source.factors)
-            pattern.factors.append(factor);
+        for (double factor : source.multipliers)
+            pattern.multipliers.append(factor);
         network.patterns_time.append(pattern);
     }
 
@@ -343,7 +343,7 @@ NetworkHydraulic buildModel(const StressSpecification &specification, const Gene
         HydraulicNodeReservoir reservoir;
         reservoir.id = source.id;
         reservoir.uuid = source.uuid;
-        reservoir.head_m = source.head_m;
+        reservoir.hydraulic_head_m = source.hydraulic_head_m;
         if (source.pattern_index >= 0)
         {
             reservoir.head_pattern_mode = HydraulicTimePatternMode::TimePattern;
@@ -366,12 +366,12 @@ NetworkHydraulic buildModel(const StressSpecification &specification, const Gene
         pipe.length_calculated_m = source.length_m;
         pipe.diameter_mm = source.diameter_mm;
         if (specification.headloss_formula == HydraulicHeadlossFormula::HazenWilliams)
-            pipe.roughness_hw = source.roughness;
+            pipe.roughness_hazen_williams = source.roughness;
         else if (specification.headloss_formula == HydraulicHeadlossFormula::DarcyWeisbach)
-            pipe.roughness_dw_mm = source.roughness;
+            pipe.roughness_darcy_weisbach_mm = source.roughness;
         else
-            pipe.roughness_cm = source.roughness;
-        pipe.minor_loss = source.minor_loss;
+            pipe.roughness_chezy_manning = source.roughness;
+        pipe.minor_loss_coefficient = source.minor_loss_coefficient;
         pipe.initial_status = HydraulicLinkPipeInitialStatus::Open;
         network.links_pipes.append(pipe);
     }
@@ -396,7 +396,7 @@ QString buildNativeInp(const StressSpecification &specification)
     text += QStringLiteral("\n[RESERVOIRS]\n;ID Head Pattern\n");
     for (const StressReservoir &reservoir : specification.reservoirs)
     {
-        text += reservoir.id + QLatin1Char(' ') + number(reservoir.head_m);
+        text += reservoir.id + QLatin1Char(' ') + number(reservoir.hydraulic_head_m);
         if (reservoir.pattern_index >= 0)
             text += QLatin1Char(' ') + specification.patterns.at(static_cast<std::size_t>(reservoir.pattern_index)).id;
         text += QLatin1Char('\n');
@@ -407,13 +407,13 @@ QString buildNativeInp(const StressSpecification &specification)
     {
         text += pipe.id + QLatin1Char(' ') + pipe.from_id + QLatin1Char(' ') + pipe.to_id + QLatin1Char(' ')
             + number(pipe.length_m) + QLatin1Char(' ') + number(pipe.diameter_mm) + QLatin1Char(' ')
-            + number(pipe.roughness) + QLatin1Char(' ') + number(pipe.minor_loss) + QStringLiteral(" OPEN\n");
+            + number(pipe.roughness) + QLatin1Char(' ') + number(pipe.minor_loss_coefficient) + QStringLiteral(" OPEN\n");
     }
 
     text += QStringLiteral("\n[PATTERNS]\n");
     for (const StressPattern &pattern : specification.patterns)
     {
-        for (double factor : pattern.factors)
+        for (double factor : pattern.multipliers)
             text += pattern.id + QLatin1Char(' ') + number(factor) + QLatin1Char('\n');
     }
 

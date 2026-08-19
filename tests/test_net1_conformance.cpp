@@ -104,8 +104,8 @@ void verifyUpstreamNet1GoldenValues(const NativeHydraulicTimeline &timeline, Tes
         context.expectNear(junction->total_demand_m3_per_h,
             gallonsPerMinuteToCubicMetresPerHour(179.999), flow_tolerance,
             comparison("upstream_golden.total_demand_m3_per_h", 10800, "Junction", "11"));
-        context.expectNear(junction->head_m, 991.574 * kMetresPerFoot, head_tolerance,
-            comparison("upstream_golden.head_m", 10800, "Junction", "11"));
+        context.expectNear(junction->hydraulic_head_m, 991.574 * kMetresPerFoot, head_tolerance,
+            comparison("upstream_golden.hydraulic_head_m", 10800, "Junction", "11"));
         context.expectNear(junction->pressure_head_m, psiToMetresOfHead(122.006), pressure_tolerance,
             comparison("upstream_golden.pressure_head_m", 10800, "Junction", "11"));
     }
@@ -115,8 +115,8 @@ void verifyUpstreamNet1GoldenValues(const NativeHydraulicTimeline &timeline, Tes
         context.expectNear(tank->net_demand_m3_per_h,
             gallonsPerMinuteToCubicMetresPerHour(505.383), flow_tolerance,
             comparison("upstream_golden.net_demand_m3_per_h", 10800, "Tank", "2"));
-        context.expectNear(tank->head_m, 978.138 * kMetresPerFoot, head_tolerance,
-            comparison("upstream_golden.head_m", 10800, "Tank", "2"));
+        context.expectNear(tank->hydraulic_head_m, 978.138 * kMetresPerFoot, head_tolerance,
+            comparison("upstream_golden.hydraulic_head_m", 10800, "Tank", "2"));
         context.expectNear(tank->pressure_head_m, psiToMetresOfHead(55.522), pressure_tolerance,
             comparison("upstream_golden.pressure_head_m", 10800, "Tank", "2"));
     }

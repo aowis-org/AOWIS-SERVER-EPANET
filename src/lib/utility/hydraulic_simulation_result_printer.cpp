@@ -36,16 +36,16 @@ QString HydraulicSimulationResultPrinter::toString(const HydraulicSimulationResu
     stream << "Time: " << result.time_elapsed_s << " s\n";
     stream << "Junctions:\n";
     for (const HydraulicSimulationResultNodeJunction &junction : result.nodes_junctions)
-        stream << "  " << junction.id << ": requested=" << junction.demand_requested_m3_per_h << " m3/h, delivered=" << junction.demand_delivered_m3_per_h << " m3/h, deficit=" << junction.demand_deficit_m3_per_h << " m3/h, total=" << junction.total_demand_m3_per_h << " m3/h, emitter=" << junction.emitter_flow_m3_per_h << " m3/h, leakage=" << junction.leakage_flow_m3_per_h << " m3/h, head=" << junction.head_m << " m, pressure=" << junction.pressure_head_m << " m\n";
+        stream << "  " << junction.id << ": requested=" << junction.demand_requested_m3_per_h << " m3/h, delivered=" << junction.demand_delivered_m3_per_h << " m3/h, deficit=" << junction.demand_deficit_m3_per_h << " m3/h, total=" << junction.total_demand_m3_per_h << " m3/h, emitter=" << junction.emitter_flow_m3_per_h << " m3/h, leakage=" << junction.leakage_flow_m3_per_h << " m3/h, head=" << junction.hydraulic_head_m << " m, pressure=" << junction.pressure_head_m << " m\n";
     stream << "Reservoirs:\n";
     for (const HydraulicSimulationResultNodeReservoir &reservoir : result.nodes_reservoirs)
-        stream << "  " << reservoir.id << ": head=" << reservoir.head_m << " m, pressure=" << reservoir.pressure_head_m << " m\n";
+        stream << "  " << reservoir.id << ": head=" << reservoir.hydraulic_head_m << " m, pressure=" << reservoir.pressure_head_m << " m\n";
     stream << "Tanks:\n";
     for (const HydraulicSimulationResultNodeTank &tank : result.nodes_tanks)
-        stream << "  " << tank.id << ": head=" << tank.head_m << " m, level=" << tank.water_level_m << " m, volume=" << tank.volume_m3 << " m3\n";
+        stream << "  " << tank.id << ": head=" << tank.hydraulic_head_m << " m, level=" << tank.water_level_m << " m, volume=" << tank.volume_m3 << " m3\n";
     stream << "Pipes:\n";
     for (const HydraulicSimulationResultLinkPipe &pipe : result.links_pipes)
-        stream << "  " << pipe.id << ": flow=" << pipe.flow_m3_per_h << " m3/h, leakage=" << pipe.leakage_flow_m3_per_h << " m3/h, velocity=" << pipe.velocity_m_per_s << " m/s, head_loss=" << pipe.head_loss_m << " m, unit_head_loss=" << pipe.unit_head_loss_m_per_km << " m/km, friction_factor=" << pipe.friction_factor << '\n';
+        stream << "  " << pipe.id << ": flow=" << pipe.flow_m3_per_h << " m3/h, leakage=" << pipe.leakage_flow_m3_per_h << " m3/h, velocity=" << pipe.velocity_m_per_s << " m/s, head_loss=" << pipe.head_loss_m << " m, unit_head_loss=" << pipe.head_loss_gradient_m_per_km << " m/km, friction_factor=" << pipe.friction_factor << '\n';
     stream << "Pumps:\n";
     for (const HydraulicSimulationResultLinkPump &pump : result.links_pumps)
         stream << "  " << pump.id << ": flow=" << pump.flow_m3_per_h << " m3/h, head_gain=" << pump.head_gain_m << " m, power=" << pump.power_kw << " kW, efficiency=" << pump.efficiency_percent << "%\n";

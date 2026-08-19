@@ -187,13 +187,13 @@ void testJunctionReservoirInputs(TestContext &context)
     HydraulicPatternTime reservoir_pattern;
     reservoir_pattern.id = QStringLiteral("RESERVOIR_HEAD_PATTERN");
     reservoir_pattern.uuid = QUuid::createUuid();
-    reservoir_pattern.factors = {1.0, 1.05};
+    reservoir_pattern.multipliers = {1.0, 1.05};
     fixture.network.patterns_time.append(reservoir_pattern);
 
     reservoir->head_input_type = HydraulicNodeElevationInputType::TerrainElevationAndOffset;
     reservoir->terrain_elevation_m = 240.0;
-    reservoir->head_offset_m = 10.0;
-    reservoir->head_m = 0.0;
+    reservoir->hydraulic_head_offset_m = 10.0;
+    reservoir->hydraulic_head_m = 0.0;
     reservoir->head_pattern_mode = HydraulicTimePatternMode::TimePattern;
     reservoir->head_pattern_uuid = reservoir_pattern.uuid;
 
@@ -213,8 +213,8 @@ void testJunctionReservoirInputs(TestContext &context)
         context.expect(native_junction != nullptr, "native result must contain junction 11");
         if (native_reservoir != nullptr)
         {
-            context.expectNear(native_reservoir->head_m, 250.0, NumericTolerance{1.0e-9, 0.0},
-                comparison("upstream_golden.head_m", 0, "Reservoir", "9"));
+            context.expectNear(native_reservoir->hydraulic_head_m, 250.0, NumericTolerance{1.0e-9, 0.0},
+                comparison("upstream_golden.hydraulic_head_m", 0, "Reservoir", "9"));
         }
         if (native_junction != nullptr)
         {
@@ -228,7 +228,7 @@ void testJunctionReservoirInputs(TestContext &context)
         context.expect(native_reservoir != nullptr, "native result at 7200 s must contain reservoir 9");
         if (native_reservoir != nullptr)
         {
-            context.expectNear(native_reservoir->head_m, 262.5, NumericTolerance{1.0e-9, 0.0},
+            context.expectNear(native_reservoir->hydraulic_head_m, 262.5, NumericTolerance{1.0e-9, 0.0},
                 comparison("upstream_golden.patterned_head_m", 7200, "Reservoir", "9"));
         }
     }
@@ -244,13 +244,13 @@ void testDemandCategories(TestContext &context)
     HydraulicPatternTime primary_pattern;
     primary_pattern.id = QStringLiteral("PRIMARY_DEMAND");
     primary_pattern.uuid = QUuid::createUuid();
-    primary_pattern.factors = {1.0, 2.0};
+    primary_pattern.multipliers = {1.0, 2.0};
     fixture.network.patterns_time.append(primary_pattern);
 
     HydraulicPatternTime secondary_pattern;
     secondary_pattern.id = QStringLiteral("SECONDARY_DEMAND_PATTERN");
     secondary_pattern.uuid = QUuid::createUuid();
-    secondary_pattern.factors = {0.5, 1.5};
+    secondary_pattern.multipliers = {0.5, 1.5};
     fixture.network.patterns_time.append(secondary_pattern);
 
     HydraulicNodeJunction *junction = findModelJunction(fixture.network, QStringLiteral("12"));
@@ -340,7 +340,7 @@ void assertTankGolden(const NativeHydraulicTimeline &native_timeline, double exp
     context.expect(tank != nullptr, "native tank input-mapping result must contain tank 2");
     if (tank == nullptr)
         return;
-    context.expectNear(tank->head_m, 295.0, NumericTolerance{1.0e-9, 0.0},
+    context.expectNear(tank->hydraulic_head_m, 295.0, NumericTolerance{1.0e-9, 0.0},
         comparison("upstream_golden.initial_head_m", native_timeline.results.first().time_elapsed_s, "Tank", "2"));
     context.expectNear(tank->volume_m3, expected_volume_m3, NumericTolerance{1.0e-6, 0.0},
         comparison("upstream_golden.initial_volume_m3", native_timeline.results.first().time_elapsed_s, "Tank", "2"));
@@ -419,8 +419,8 @@ void testPipeInputs(TestContext &context)
 
     pipe_111->length_measured_m = 1234.0;
     pipe_111->diameter_mm = 275.0;
-    pipe_111->roughness_hw = 127.0;
-    pipe_111->minor_loss = 0.65;
+    pipe_111->roughness_hazen_williams = 127.0;
+    pipe_111->minor_loss_coefficient = 0.65;
 
     const QUuid original_from = pipe_113->node_uuid_from;
     pipe_113->node_uuid_from = pipe_113->node_uuid_to;
@@ -442,7 +442,7 @@ void testPipeInputs(TestContext &context)
         if (native_pipe_111 != nullptr)
         {
             context.expectNear(native_pipe_111->roughness, 127.0, NumericTolerance{1.0e-9, 0.0},
-                comparison("upstream_golden.roughness_hw", result.time_elapsed_s, "Pipe", "111"));
+                comparison("upstream_golden.roughness_hazen_williams", result.time_elapsed_s, "Pipe", "111"));
         }
         if (native_pipe_113 != nullptr)
         {
@@ -468,9 +468,9 @@ void configureFormulaFixture(Net1Fixture &fixture, HydraulicHeadlossFormula form
     for (HydraulicLinkPipe &pipe : fixture.network.links_pipes)
     {
         if (formula == HydraulicHeadlossFormula::DarcyWeisbach)
-            pipe.roughness_dw_mm = pipe.id == QStringLiteral("10") ? pipe_10_roughness : default_roughness;
+            pipe.roughness_darcy_weisbach_mm = pipe.id == QStringLiteral("10") ? pipe_10_roughness : default_roughness;
         else if (formula == HydraulicHeadlossFormula::ChezyManning)
-            pipe.roughness_cm = pipe.id == QStringLiteral("10") ? pipe_10_roughness : default_roughness;
+            pipe.roughness_chezy_manning = pipe.id == QStringLiteral("10") ? pipe_10_roughness : default_roughness;
     }
 }
 

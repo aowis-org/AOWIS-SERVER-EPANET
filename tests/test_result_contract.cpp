@@ -36,7 +36,7 @@ NetworkHydraulic makeJunctionNetwork()
     HydraulicNodeReservoir reservoir;
     reservoir.id = QStringLiteral("R1");
     reservoir.uuid = QUuid::createUuid();
-    reservoir.head_m = 40.0;
+    reservoir.hydraulic_head_m = 40.0;
 
     HydraulicNodeJunction junction;
     junction.id = QStringLiteral("J1");
@@ -53,9 +53,9 @@ NetworkHydraulic makeJunctionNetwork()
     pipe.node_uuid_to = junction.uuid;
     pipe.length_calculated_m = 250.0;
     pipe.diameter_mm = 150.0;
-    pipe.roughness_hw = 130.0;
+    pipe.roughness_hazen_williams = 130.0;
     pipe.leak_area_mm2_per_100m = 5.0;
-    pipe.leak_expansion_mm2_per_m_head = 0.05;
+    pipe.leak_area_expansion_per_pressure_head_mm2_per_m = 0.05;
 
     HydraulicControlSimple level_control;
     level_control.id = QStringLiteral("LEVEL_CONTROL");
@@ -87,12 +87,12 @@ NetworkHydraulic makeReservoirPipeNetwork()
     HydraulicNodeReservoir source;
     source.id = QStringLiteral("R_SOURCE");
     source.uuid = QUuid::createUuid();
-    source.head_m = 50.0;
+    source.hydraulic_head_m = 50.0;
 
     HydraulicNodeReservoir sink;
     sink.id = QStringLiteral("R_SINK");
     sink.uuid = QUuid::createUuid();
-    sink.head_m = 20.0;
+    sink.hydraulic_head_m = 20.0;
 
     HydraulicLinkPipe pipe;
     pipe.id = QStringLiteral("P_RULE");
@@ -101,7 +101,7 @@ NetworkHydraulic makeReservoirPipeNetwork()
     pipe.node_uuid_to = sink.uuid;
     pipe.length_calculated_m = 500.0;
     pipe.diameter_mm = 200.0;
-    pipe.roughness_hw = 130.0;
+    pipe.roughness_hazen_williams = 130.0;
 
     HydraulicControlRule rule;
     rule.id = QStringLiteral("RULE_CLOSE");
@@ -141,12 +141,12 @@ NetworkHydraulic makePumpNetwork(bool with_timer_control, quint64 duration_s)
     HydraulicNodeReservoir source;
     source.id = QStringLiteral("R_LOW");
     source.uuid = QUuid::createUuid();
-    source.head_m = 0.0;
+    source.hydraulic_head_m = 0.0;
 
     HydraulicNodeReservoir sink;
     sink.id = QStringLiteral("R_HIGH");
     sink.uuid = QUuid::createUuid();
-    sink.head_m = 10.0;
+    sink.hydraulic_head_m = 10.0;
 
     HydraulicCurvePumpHead curve;
     curve.id = QStringLiteral("C_PUMP");
@@ -172,7 +172,7 @@ NetworkHydraulic makePumpNetwork(bool with_timer_control, quint64 duration_s)
     pump.definition_type = HydraulicLinkPumpDefinitionType::ThreePointCurve;
     pump.head_curve_uuid = curve.uuid;
     pump.initial_status = HydraulicLinkPumpInitialStatus::On;
-    pump.initial_speed = 1.0;
+    pump.initial_speed_ratio = 1.0;
     pump.control_type = with_timer_control
         ? HydraulicLinkPumpControlType::TimeBased
         : HydraulicLinkPumpControlType::None;
@@ -222,9 +222,9 @@ void testPhysicalResultContractAndLeakage(TestContext &context)
     context.expect(pipe.leakage_flow_m3_per_h > 0.0, "native EPANET pipe leakage should be positive");
     context.expect(junction.leakage_flow_m3_per_h > 0.0, "pipe leakage should be assigned to the junction");
     context.expect(junction.appears_in_control && pipe.appears_in_control, "disabled level control should still be represented in control membership");
-    context.expectNear(pipe.unit_head_loss_m_per_km, pipe.head_loss_m / 250.0 * 1000.0,
+    context.expectNear(pipe.head_loss_gradient_m_per_km, pipe.head_loss_m / 250.0 * 1000.0,
         HydraulicQuantity::HeadMetres,
-        comparison("unit_head_loss_m_per_km", first.time_elapsed_s, "Pipe", pipe.id.toStdString()),
+        comparison("head_loss_gradient_m_per_km", first.time_elapsed_s, "Pipe", pipe.id.toStdString()),
         "pipe unit head loss should match total head loss and length");
     context.expect(pipe.friction_factor > 0.0, "flowing pipe should return a friction factor");
 

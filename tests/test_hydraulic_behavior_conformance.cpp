@@ -217,7 +217,7 @@ void testLeakage(TestContext &context)
         if (pipe.id != QStringLiteral("21"))
             continue;
         pipe.leak_area_mm2_per_100m = 1.0 / kMetresPerFoot;
-        pipe.leak_expansion_mm2_per_m_head = 0.1 / kMetresPerFoot;
+        pipe.leak_area_expansion_per_pressure_head_mm2_per_m = 0.1 / kMetresPerFoot;
         break;
     }
 
@@ -398,7 +398,7 @@ Net1Fixture pcvFixture()
     valve.node_uuid_to = node_to;
     valve.type = HydraulicLinkValveType::PCV;
     valve.diameter_mm = 12.0 * 25.4;
-    valve.minor_loss = 0.19;
+    valve.minor_loss_coefficient = 0.19;
     valve.setting = 35.0;
     valve.setting_curve_uuid = curve.uuid;
     valve.initial_status = HydraulicLinkValveInitialStatus::Active;
@@ -436,9 +436,9 @@ void testPcv(TestContext &context)
             NumericTolerance{1.0e-9, 1.0e-12},
             comparison("upstream_golden.diameter_mm", result.time_elapsed_s, "Valve", "22"),
             "upstream PCV must retain its configured 12-inch diameter");
-        context.expectNear(valve->minor_loss, 0.19,
+        context.expectNear(valve->minor_loss_coefficient, 0.19,
             NumericTolerance{1.0e-12, 1.0e-12},
-            comparison("upstream_golden.minor_loss", result.time_elapsed_s, "Valve", "22"),
+            comparison("upstream_golden.minor_loss_coefficient", result.time_elapsed_s, "Valve", "22"),
             "upstream PCV must retain its configured minor-loss coefficient");
         context.expectNear(valve->setting, 35.0, NumericTolerance{1.0e-7, 1.0e-6},
             comparison("upstream_golden.returned_setting", result.time_elapsed_s, "Valve", "22"),
@@ -463,7 +463,7 @@ Net1Fixture demandPatternFixture()
     HydraulicPatternTime pattern;
     pattern.id = QStringLiteral("DEMAND_PATTERN");
     pattern.uuid = QUuid::createUuid();
-    pattern.factors = {3.1, 3.2, 3.3, 3.4};
+    pattern.multipliers = {3.1, 3.2, 3.3, 3.4};
     fixture.network.patterns_time.append(pattern);
 
     for (HydraulicNodeJunction &junction : fixture.network.nodes_junctions)
@@ -551,7 +551,7 @@ void testSimpleControl(TestContext &context)
         context.expect(replacement_tank != nullptr, "replacement simple-control run must contain tank 2");
         if (baseline_tank != nullptr && replacement_tank != nullptr)
         {
-            context.expectNear(replacement_tank->head_m, baseline_tank->head_m,
+            context.expectNear(replacement_tank->hydraulic_head_m, baseline_tank->hydraulic_head_m,
                 NumericTolerance{feetToMetres(1.0e-5), 0.0},
                 comparison("upstream_invariant.final_tank_head_m", native_timeline.results.last().time_elapsed_s, "Tank", "2"),
                 "upstream replacement controls must preserve final tank head");
@@ -619,7 +619,7 @@ void registerHydraulicBehaviorScenarios(ScenarioRegistry &registry)
         &testPcv});
     registry.add(ScenarioDefinition{
         "conformance-upstream-demand-pattern",
-        "Ports upstream demand-pattern assignment and factors and compares every hydraulic event and result field.",
+        "Ports upstream demand-pattern assignment and multipliers and compares every hydraulic event and result field.",
         {"conformance", "hydraulic", "upstream", "pattern"},
         &testDemandPattern});
     registry.add(ScenarioDefinition{

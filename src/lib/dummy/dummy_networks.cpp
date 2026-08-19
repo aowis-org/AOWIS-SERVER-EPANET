@@ -8,7 +8,7 @@ NetworkHydraulic DummyNetworks::networkSimple()
     HydraulicNodeReservoir reservoir;
     reservoir.uuid = QUuid::createUuid();
     reservoir.id = "R1";
-    reservoir.head_m = 30.0;
+    reservoir.hydraulic_head_m = 30.0;
     
     HydraulicNodeJunction junction;
     junction.uuid = QUuid::createUuid();
@@ -25,8 +25,8 @@ NetworkHydraulic DummyNetworks::networkSimple()
     pipe.node_uuid_to = junction.uuid;
     pipe.length_calculated_m = 100.0;
     pipe.diameter_mm = 150.0;
-    pipe.roughness_hw = 130.0;
-    pipe.minor_loss = 0.0;
+    pipe.roughness_hazen_williams = 130.0;
+    pipe.minor_loss_coefficient = 0.0;
     pipe.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     NetworkHydraulic network;
@@ -79,8 +79,8 @@ NetworkHydraulic DummyNetworks::networkOnMap()
     
     pipe_1.length_calculated_m = 250.0;
     pipe_1.diameter_mm = 300.0;
-    pipe_1.roughness_hw = 130.0;
-    pipe_1.minor_loss = 0.0;
+    pipe_1.roughness_hazen_williams = 130.0;
+    pipe_1.minor_loss_coefficient = 0.0;
     pipe_1.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     NetworkHydraulic network;
@@ -104,7 +104,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     reservoir.id = "R1";
     reservoir.coordinate_wgs84.latitude_deg = 11.98119;
     reservoir.coordinate_wgs84.longitude_deg = 18.19080;
-    reservoir.head_m = 75.0;
+    reservoir.hydraulic_head_m = 75.0;
     
     
     // ------------------------------------------------------------
@@ -336,8 +336,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_1.node_uuid_to = junction_1.uuid;
     pipe_1.length_calculated_m = 250.0;
     pipe_1.diameter_mm = 300.0;
-    pipe_1.roughness_hw = 130.0;
-    pipe_1.minor_loss = 0.0;
+    pipe_1.roughness_hazen_williams = 130.0;
+    pipe_1.minor_loss_coefficient = 0.0;
     pipe_1.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     // Upper-left distribution branch.
@@ -348,8 +348,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_2.node_uuid_to = junction_2.uuid;
     pipe_2.length_calculated_m = 300.0;
     pipe_2.diameter_mm = 250.0;
-    pipe_2.roughness_hw = 130.0;
-    pipe_2.minor_loss = 0.0;
+    pipe_2.roughness_hazen_williams = 130.0;
+    pipe_2.minor_loss_coefficient = 0.0;
     pipe_2.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     // Upper-right distribution branch.
@@ -360,8 +360,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_3.node_uuid_to = junction_3.uuid;
     pipe_3.length_calculated_m = 350.0;
     pipe_3.diameter_mm = 250.0;
-    pipe_3.roughness_hw = 130.0;
-    pipe_3.minor_loss = 0.0;
+    pipe_3.roughness_hazen_williams = 130.0;
+    pipe_3.minor_loss_coefficient = 0.0;
     pipe_3.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     // Left-side branch.
@@ -372,8 +372,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_4.node_uuid_to = junction_4.uuid;
     pipe_4.length_calculated_m = 400.0;
     pipe_4.diameter_mm = 200.0;
-    pipe_4.roughness_hw = 130.0;
-    pipe_4.minor_loss = 0.0;
+    pipe_4.roughness_hazen_williams = 130.0;
+    pipe_4.minor_loss_coefficient = 0.0;
     pipe_4.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     // Right-side branch.
@@ -384,8 +384,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_5.node_uuid_to = junction_5.uuid;
     pipe_5.length_calculated_m = 375.0;
     pipe_5.diameter_mm = 200.0;
-    pipe_5.roughness_hw = 130.0;
-    pipe_5.minor_loss = 0.0;
+    pipe_5.roughness_hazen_williams = 130.0;
+    pipe_5.minor_loss_coefficient = 0.0;
     pipe_5.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     // Lower cross-connection creates a loop.
@@ -396,8 +396,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_6.node_uuid_to = junction_5.uuid;
     pipe_6.length_calculated_m = 500.0;
     pipe_6.diameter_mm = 180.0;
-    pipe_6.roughness_hw = 130.0;
-    pipe_6.minor_loss = 0.0;
+    pipe_6.roughness_hazen_williams = 130.0;
+    pipe_6.minor_loss_coefficient = 0.0;
     pipe_6.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     // Upper cross-connection creates another loop.
@@ -408,8 +408,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     pipe_7.node_uuid_to = junction_3.uuid;
     pipe_7.length_calculated_m = 450.0;
     pipe_7.diameter_mm = 180.0;
-    pipe_7.roughness_hw = 130.0;
-    pipe_7.minor_loss = 0.0;
+    pipe_7.roughness_hazen_williams = 130.0;
+    pipe_7.minor_loss_coefficient = 0.0;
     pipe_7.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     
@@ -424,8 +424,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     tank_pipe_1.node_uuid_to = junction_2.uuid;
     tank_pipe_1.length_calculated_m = 80.0;
     tank_pipe_1.diameter_mm = 200.0;
-    tank_pipe_1.roughness_hw = 130.0;
-    tank_pipe_1.minor_loss = 0.0;
+    tank_pipe_1.roughness_hazen_williams = 130.0;
+    tank_pipe_1.minor_loss_coefficient = 0.0;
     tank_pipe_1.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     HydraulicLinkPipe tank_pipe_2;
@@ -435,8 +435,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     tank_pipe_2.node_uuid_to = junction_3.uuid;
     tank_pipe_2.length_calculated_m = 100.0;
     tank_pipe_2.diameter_mm = 200.0;
-    tank_pipe_2.roughness_hw = 130.0;
-    tank_pipe_2.minor_loss = 0.0;
+    tank_pipe_2.roughness_hazen_williams = 130.0;
+    tank_pipe_2.minor_loss_coefficient = 0.0;
     tank_pipe_2.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     HydraulicLinkPipe tank_pipe_3;
@@ -446,8 +446,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     tank_pipe_3.node_uuid_to = junction_4.uuid;
     tank_pipe_3.length_calculated_m = 120.0;
     tank_pipe_3.diameter_mm = 180.0;
-    tank_pipe_3.roughness_hw = 130.0;
-    tank_pipe_3.minor_loss = 0.0;
+    tank_pipe_3.roughness_hazen_williams = 130.0;
+    tank_pipe_3.minor_loss_coefficient = 0.0;
     tank_pipe_3.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     HydraulicLinkPipe tank_pipe_4;
@@ -457,8 +457,8 @@ NetworkHydraulic DummyNetworks::networkTanks()
     tank_pipe_4.node_uuid_to = junction_5.uuid;
     tank_pipe_4.length_calculated_m = 90.0;
     tank_pipe_4.diameter_mm = 180.0;
-    tank_pipe_4.roughness_hw = 130.0;
-    tank_pipe_4.minor_loss = 0.0;
+    tank_pipe_4.roughness_hazen_williams = 130.0;
+    tank_pipe_4.minor_loss_coefficient = 0.0;
     tank_pipe_4.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
     
@@ -579,8 +579,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     reservoir.coordinate_wgs84.longitude_deg = 18.1980;
     reservoir.head_input_type = HydraulicNodeElevationInputType::TerrainElevationAndOffset;
     reservoir.terrain_elevation_m = 82.0;
-    reservoir.head_offset_m = 18.0;
-    reservoir.head_m = 100.0;
+    reservoir.hydraulic_head_offset_m = 18.0;
+    reservoir.hydraulic_head_m = 100.0;
     network.nodes_reservoirs.append(reservoir);
     
     // Junctions
@@ -711,7 +711,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     curve_pump.node_uuid_to = junction_pump_out.uuid;
     curve_pump.definition_type = HydraulicLinkPumpDefinitionType::ThreePointCurve;
     curve_pump.head_curve_uuid = pump_head_curve.uuid;
-    curve_pump.initial_speed = 1.0;
+    curve_pump.initial_speed_ratio = 1.0;
     curve_pump.initial_status = HydraulicLinkPumpInitialStatus::On;
     curve_pump.control_type = HydraulicLinkPumpControlType::LevelBased;
     curve_pump.constant_efficiency_percent = 78.0;
@@ -725,7 +725,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     power_pump.node_uuid_to = tank.uuid;
     power_pump.definition_type = HydraulicLinkPumpDefinitionType::ConstantPower;
     power_pump.constant_power_kw = 11.0;
-    power_pump.initial_speed = 0.85;
+    power_pump.initial_speed_ratio = 0.85;
     power_pump.initial_status = HydraulicLinkPumpInitialStatus::Off;
     power_pump.control_type = HydraulicLinkPumpControlType::TimeBased;
     power_pump.constant_efficiency_percent = 72.0;
@@ -742,7 +742,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     prv.setting = 38.0;
     prv.initial_status = HydraulicLinkValveInitialStatus::Active;
     prv.diameter_mm = 200.0;
-    prv.minor_loss = 0.2;
+    prv.minor_loss_coefficient = 0.2;
     
     HydraulicLinkValve psv;
     psv.uuid = QUuid::createUuid();
@@ -753,7 +753,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     psv.setting = 42.0;
     psv.initial_status = HydraulicLinkValveInitialStatus::Active;
     psv.diameter_mm = 200.0;
-    psv.minor_loss = 0.2;
+    psv.minor_loss_coefficient = 0.2;
     
     HydraulicLinkValve fcv;
     fcv.uuid = QUuid::createUuid();
@@ -764,7 +764,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     fcv.setting = 30.0;
     fcv.initial_status = HydraulicLinkValveInitialStatus::Active;
     fcv.diameter_mm = 180.0;
-    fcv.minor_loss = 0.1;
+    fcv.minor_loss_coefficient = 0.1;
     
     HydraulicLinkValve pbv;
     pbv.uuid = QUuid::createUuid();
@@ -775,7 +775,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     pbv.setting = 5.0;
     pbv.initial_status = HydraulicLinkValveInitialStatus::Active;
     pbv.diameter_mm = 180.0;
-    pbv.minor_loss = 0.1;
+    pbv.minor_loss_coefficient = 0.1;
     
     HydraulicLinkValve tcv;
     tcv.uuid = QUuid::createUuid();
@@ -786,7 +786,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     tcv.setting = 2.5;
     tcv.initial_status = HydraulicLinkValveInitialStatus::Open;
     tcv.diameter_mm = 160.0;
-    tcv.minor_loss = 0.0;
+    tcv.minor_loss_coefficient = 0.0;
     
     HydraulicLinkValve gpv;
     gpv.uuid = QUuid::createUuid();
@@ -797,7 +797,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     gpv.setting_curve_uuid = gpv_headloss_curve.uuid;
     gpv.initial_status = HydraulicLinkValveInitialStatus::Active;
     gpv.diameter_mm = 160.0;
-    gpv.minor_loss = 0.0;
+    gpv.minor_loss_coefficient = 0.0;
     
     HydraulicLinkValve pcv;
     pcv.uuid = QUuid::createUuid();
@@ -808,7 +808,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     pcv.setting = 65.0;
     pcv.initial_status = HydraulicLinkValveInitialStatus::Closed;
     pcv.diameter_mm = 150.0;
-    pcv.minor_loss = 0.0;
+    pcv.minor_loss_coefficient = 0.0;
     
     network.links_valves.append(prv);
     network.links_valves.append(psv);
@@ -829,10 +829,10 @@ NetworkHydraulic DummyNetworks::networkFull()
     loop_pipe_1.initial_status = HydraulicLinkPipeInitialStatus::Open;
     loop_pipe_1.diameter_mm = 200.0;
     loop_pipe_1.material_id = "DI";
-    loop_pipe_1.roughness_hw = 125.0;
-    loop_pipe_1.roughness_dw_mm = 0.26;
-    loop_pipe_1.roughness_cm = 0.014;
-    loop_pipe_1.minor_loss = 0.4;
+    loop_pipe_1.roughness_hazen_williams = 125.0;
+    loop_pipe_1.roughness_darcy_weisbach_mm = 0.26;
+    loop_pipe_1.roughness_chezy_manning = 0.014;
+    loop_pipe_1.minor_loss_coefficient = 0.4;
     loop_pipe_1.override_reaction_coefficients = true;
     loop_pipe_1.bulk_reaction_coefficient_per_day = -0.15;
     loop_pipe_1.wall_reaction_coefficient_m_per_day = -0.05;
@@ -846,9 +846,9 @@ NetworkHydraulic DummyNetworks::networkFull()
     loop_pipe_2.initial_status = HydraulicLinkPipeInitialStatus::Open;
     loop_pipe_2.diameter_mm = 250.0;
     loop_pipe_2.material_id = "PVC";
-    loop_pipe_2.roughness_hw = 145.0;
-    loop_pipe_2.roughness_dw_mm = 0.0015;
-    loop_pipe_2.roughness_cm = 0.010;
+    loop_pipe_2.roughness_hazen_williams = 145.0;
+    loop_pipe_2.roughness_darcy_weisbach_mm = 0.0015;
+    loop_pipe_2.roughness_chezy_manning = 0.010;
     
     HydraulicLinkPipe check_pipe;
     check_pipe.uuid = QUuid::createUuid();
@@ -858,10 +858,10 @@ NetworkHydraulic DummyNetworks::networkFull()
     check_pipe.length_calculated_m = 280.0;
     check_pipe.initial_status = HydraulicLinkPipeInitialStatus::CheckValve;
     check_pipe.diameter_mm = 150.0;
-    check_pipe.roughness_hw = 130.0;
-    check_pipe.roughness_dw_mm = 0.1;
-    check_pipe.roughness_cm = 0.013;
-    check_pipe.minor_loss = 0.3;
+    check_pipe.roughness_hazen_williams = 130.0;
+    check_pipe.roughness_darcy_weisbach_mm = 0.1;
+    check_pipe.roughness_chezy_manning = 0.013;
+    check_pipe.minor_loss_coefficient = 0.3;
     
     HydraulicLinkPipe closed_pipe;
     closed_pipe.uuid = QUuid::createUuid();
@@ -871,9 +871,9 @@ NetworkHydraulic DummyNetworks::networkFull()
     closed_pipe.length_calculated_m = 210.0;
     closed_pipe.initial_status = HydraulicLinkPipeInitialStatus::Closed;
     closed_pipe.diameter_mm = 125.0;
-    closed_pipe.roughness_hw = 130.0;
-    closed_pipe.roughness_dw_mm = 0.1;
-    closed_pipe.roughness_cm = 0.013;
+    closed_pipe.roughness_hazen_williams = 130.0;
+    closed_pipe.roughness_darcy_weisbach_mm = 0.1;
+    closed_pipe.roughness_chezy_manning = 0.013;
     
     HydraulicLinkPipe tank_pipe;
     tank_pipe.uuid = QUuid::createUuid();
@@ -883,9 +883,9 @@ NetworkHydraulic DummyNetworks::networkFull()
     tank_pipe.length_calculated_m = 360.0;
     tank_pipe.initial_status = HydraulicLinkPipeInitialStatus::Open;
     tank_pipe.diameter_mm = 200.0;
-    tank_pipe.roughness_hw = 130.0;
-    tank_pipe.roughness_dw_mm = 0.1;
-    tank_pipe.roughness_cm = 0.013;
+    tank_pipe.roughness_hazen_williams = 130.0;
+    tank_pipe.roughness_darcy_weisbach_mm = 0.1;
+    tank_pipe.roughness_chezy_manning = 0.013;
     
     network.links_pipes.append(loop_pipe_1);
     network.links_pipes.append(loop_pipe_2);

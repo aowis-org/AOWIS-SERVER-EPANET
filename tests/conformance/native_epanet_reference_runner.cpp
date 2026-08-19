@@ -71,12 +71,12 @@ void configureCanonicalMetricUnits(EN_Project project)
     checkEpanet(EN_setoption(project, EN_PRESS_UNITS, EN_METERS), "EN_setoption(EN_PRESS_UNITS)");
 }
 
-int addPattern(EN_Project project, const char *id, double *factors, int factor_count)
+int addPattern(EN_Project project, const char *id, double *multipliers, int factor_count)
 {
     checkEpanet(EN_addpattern(project, id), "EN_addpattern");
     int pattern_index = 0;
     checkEpanet(EN_getpatternindex(project, id, &pattern_index), "EN_getpatternindex");
-    checkEpanet(EN_setpattern(project, pattern_index, factors, factor_count), "EN_setpattern");
+    checkEpanet(EN_setpattern(project, pattern_index, multipliers, factor_count), "EN_setpattern");
     return pattern_index;
 }
 
@@ -295,8 +295,8 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         checkEpanet(EN_addpattern(project, "DEMAND_PATTERN"), "EN_addpattern");
         int pattern_index = 0;
         checkEpanet(EN_getpatternindex(project, "DEMAND_PATTERN", &pattern_index), "EN_getpatternindex");
-        double factors[] = {3.1, 3.2, 3.3, 3.4};
-        checkEpanet(EN_setpattern(project, pattern_index, factors, 4), "EN_setpattern");
+        double multipliers[] = {3.1, 3.2, 3.3, 3.4};
+        checkEpanet(EN_setpattern(project, pattern_index, multipliers, 4), "EN_setpattern");
         const int junction_index = nodeIndex(project, "12");
         checkEpanet(EN_setdemandpattern(project, junction_index, 1, pattern_index), "EN_setdemandpattern");
         return;
@@ -329,8 +329,8 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         checkEpanet(EN_setjuncdata(project, junction_index, 215.0, 34.0, "1"), "EN_setjuncdata(input-mapping junction)");
         checkEpanet(EN_setnodevalue(project, junction_index, EN_EMITTER, 1.75), "EN_setnodevalue(EN_EMITTER)");
 
-        double factors[] = {1.0, 1.05};
-        const int pattern_index = addPattern(project, "RESERVOIR_HEAD_PATTERN", factors, 2);
+        double multipliers[] = {1.0, 1.05};
+        const int pattern_index = addPattern(project, "RESERVOIR_HEAD_PATTERN", multipliers, 2);
         const int reservoir_index = nodeIndex(project, "9");
         checkEpanet(EN_setnodevalue(project, reservoir_index, EN_ELEVATION, 250.0), "EN_setnodevalue(reservoir head)");
         checkEpanet(EN_setnodevalue(project, reservoir_index, EN_PATTERN, static_cast<double>(pattern_index)), "EN_setnodevalue(reservoir pattern)");
@@ -453,8 +453,8 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         disableNet1PumpControls(project);
         checkEpanet(EN_settimeparam(project, EN_DURATION, 7200), "EN_settimeparam(EN_DURATION)");
         checkEpanet(EN_settimeparam(project, EN_PATTERNSTEP, 3600), "EN_settimeparam(EN_PATTERNSTEP)");
-        double factors[] = {0.8, 1.0, 1.15};
-        const int pattern_index = addPattern(project, "PUMP_SPEED_PATTERN", factors, 3);
+        double multipliers[] = {0.8, 1.0, 1.15};
+        const int pattern_index = addPattern(project, "PUMP_SPEED_PATTERN", multipliers, 3);
         checkEpanet(EN_setlinkvalue(project, linkIndex(project, "9"), EN_LINKPATTERN, static_cast<double>(pattern_index)), "EN_setlinkvalue(EN_LINKPATTERN)");
         return;
     }
@@ -500,8 +500,8 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         checkEpanet(EN_setoption(project, EN_GLOBALEFFIC, 82.0), "EN_setoption(EN_GLOBALEFFIC)");
         checkEpanet(EN_setoption(project, EN_GLOBALPRICE, 0.2), "EN_setoption(EN_GLOBALPRICE)");
         checkEpanet(EN_setoption(project, EN_DEMANDCHARGE, 1.5), "EN_setoption(EN_DEMANDCHARGE)");
-        double factors[] = {1.0, 2.0};
-        const int pattern_index = addPattern(project, "GLOBAL_ENERGY_PRICE_PATTERN", factors, 2);
+        double multipliers[] = {1.0, 2.0};
+        const int pattern_index = addPattern(project, "GLOBAL_ENERGY_PRICE_PATTERN", multipliers, 2);
         checkEpanet(EN_setoption(project, EN_GLOBALPATTERN, static_cast<double>(pattern_index)), "EN_setoption(EN_GLOBALPATTERN)");
         return;
     }
@@ -868,7 +868,7 @@ void appendNodeResult(EN_Project project, int node_index, const NativeUnitSystem
         junction.total_demand_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_DEMAND), units.flow_units);
         junction.emitter_flow_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_EMITTERFLOW), units.flow_units);
         junction.leakage_flow_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_LEAKAGEFLOW), units.flow_units);
-        junction.head_m = headToMetres(nodeValue(project, node_index, EN_HEAD), units.flow_units);
+        junction.hydraulic_head_m = headToMetres(nodeValue(project, node_index, EN_HEAD), units.flow_units);
         junction.pressure_head_m = pressureToHeadMetres(nodeValue(project, node_index, EN_PRESSURE), units);
         junction.appears_in_control = nodeValue(project, node_index, EN_NODE_INCONTROL) != 0.0;
         result.nodes_junctions.append(junction);
@@ -880,7 +880,7 @@ void appendNodeResult(EN_Project project, int node_index, const NativeUnitSystem
         NativeReservoirResult reservoir;
         reservoir.id = id;
         reservoir.net_demand_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_DEMAND), units.flow_units);
-        reservoir.head_m = headToMetres(nodeValue(project, node_index, EN_HEAD), units.flow_units);
+        reservoir.hydraulic_head_m = headToMetres(nodeValue(project, node_index, EN_HEAD), units.flow_units);
         reservoir.pressure_head_m = pressureToHeadMetres(nodeValue(project, node_index, EN_PRESSURE), units);
         reservoir.appears_in_control = nodeValue(project, node_index, EN_NODE_INCONTROL) != 0.0;
         result.nodes_reservoirs.append(reservoir);
@@ -892,7 +892,7 @@ void appendNodeResult(EN_Project project, int node_index, const NativeUnitSystem
         NativeTankResult tank;
         tank.id = id;
         tank.net_demand_m3_per_h = flowToCubicMetresPerHour(nodeValue(project, node_index, EN_DEMAND), units.flow_units);
-        tank.head_m = headToMetres(nodeValue(project, node_index, EN_HEAD), units.flow_units);
+        tank.hydraulic_head_m = headToMetres(nodeValue(project, node_index, EN_HEAD), units.flow_units);
         tank.pressure_head_m = pressureToHeadMetres(nodeValue(project, node_index, EN_PRESSURE), units);
         tank.water_level_m = headToMetres(nodeValue(project, node_index, EN_TANKLEVEL), units.flow_units);
         tank.volume_m3 = volumeToCubicMetres(nodeValue(project, node_index, EN_TANKVOLUME), units.flow_units);
@@ -956,7 +956,7 @@ void appendLinkResult(EN_Project project, int link_index, const NativeUnitSystem
 
         const double length_m = headToMetres(linkValue(project, link_index, EN_LENGTH), units.flow_units);
         if (length_m > 0.0)
-            pipe.unit_head_loss_m_per_km = pipe.head_loss_m / length_m * 1000.0;
+            pipe.head_loss_gradient_m_per_km = pipe.head_loss_m / length_m * 1000.0;
 
         const double diameter_m = diameterToMetres(linkValue(project, link_index, EN_DIAMETER), units.flow_units);
         const double flow_cubic_feet_per_second = std::abs(pipe.flow_m3_per_h)
@@ -984,7 +984,7 @@ void appendLinkResult(EN_Project project, int link_index, const NativeUnitSystem
         pump.head_gain_m = -headToMetres(linkValue(project, link_index, EN_HEADLOSS), units.flow_units);
         pump.open = static_cast<int>(linkValue(project, link_index, EN_STATUS)) != EN_CLOSED;
         pump.state = pumpState(linkValue(project, link_index, EN_PUMP_STATE));
-        pump.speed = linkValue(project, link_index, EN_SETTING);
+        pump.speed_ratio = linkValue(project, link_index, EN_SETTING);
         pump.efficiency_percent = linkValue(project, link_index, EN_PUMP_EFFIC) * 100.0;
         pump.power_kw = linkValue(project, link_index, EN_ENERGY);
         pump.appears_in_control = linkValue(project, link_index, EN_LINK_INCONTROL) != 0.0;
@@ -997,7 +997,7 @@ void appendLinkResult(EN_Project project, int link_index, const NativeUnitSystem
         NativeValveResult valve;
         valve.id = id;
         valve.diameter_mm = diameterToMetres(linkValue(project, link_index, EN_DIAMETER), units.flow_units) * 1000.0;
-        valve.minor_loss = linkValue(project, link_index, EN_MINORLOSS);
+        valve.minor_loss_coefficient = linkValue(project, link_index, EN_MINORLOSS);
         const int initial_status = static_cast<int>(linkValue(project, link_index, EN_INITSTATUS));
         valve.initially_open = initial_status != EN_CLOSED;
         valve.initially_active = initial_status > EN_OPEN;

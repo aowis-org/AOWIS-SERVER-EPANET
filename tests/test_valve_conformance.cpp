@@ -61,7 +61,7 @@ const NativeValveResult *findValve(const NativeHydraulicResult &result, const QS
 }
 
 Net1Fixture valveFixture(const QString &pipe_id, HydraulicLinkValveType type, double diameter_mm,
-    double minor_loss, double setting, HydraulicLinkValveInitialStatus initial_status)
+    double minor_loss_coefficient, double setting, HydraulicLinkValveInitialStatus initial_status)
 {
     Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     fixture.network.duration_s = 0;
@@ -85,7 +85,7 @@ Net1Fixture valveFixture(const QString &pipe_id, HydraulicLinkValveType type, do
     valve.node_uuid_to = node_to;
     valve.type = type;
     valve.diameter_mm = diameter_mm;
-    valve.minor_loss = minor_loss;
+    valve.minor_loss_coefficient = minor_loss_coefficient;
     valve.setting = setting;
     valve.initial_status = initial_status;
     fixture.network.links_valves.append(valve);
@@ -109,15 +109,15 @@ void compareWithWrapper(const Net1Fixture &fixture, const NativeHydraulicTimelin
     AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, fixture.network, context);
 }
 
-void expectValveInputs(const NativeValveResult &valve, double diameter_mm, double minor_loss, TestContext &context)
+void expectValveInputs(const NativeValveResult &valve, double diameter_mm, double minor_loss_coefficient, TestContext &context)
 {
     context.expectNear(valve.diameter_mm, diameter_mm,
         NumericTolerance{1.0e-9, 1.0e-12},
         comparison("upstream_golden.diameter_mm", 0, "Valve", valve.id.toStdString()),
         "native valve must retain the configured non-default diameter");
-    context.expectNear(valve.minor_loss, minor_loss,
+    context.expectNear(valve.minor_loss_coefficient, minor_loss_coefficient,
         NumericTolerance{1.0e-12, 1.0e-12},
-        comparison("upstream_golden.minor_loss", 0, "Valve", valve.id.toStdString()),
+        comparison("upstream_golden.minor_loss_coefficient", 0, "Valve", valve.id.toStdString()),
         "native valve must retain the configured minor-loss coefficient");
 }
 
