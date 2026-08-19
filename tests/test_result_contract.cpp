@@ -64,7 +64,7 @@ NetworkHydraulic makeJunctionNetwork()
     level_control.link_uuid = pipe.uuid;
     level_control.action = HydraulicControlActionType::Open;
     level_control.trigger_node_uuid = junction.uuid;
-    level_control.trigger_level_or_pressure_head_m = 1.0;
+    level_control.trigger_pressure_head_m = 1.0;
     level_control.enabled = false;
 
     network.nodes_reservoirs.append(reservoir);
@@ -111,7 +111,7 @@ NetworkHydraulic makeReservoirPipeNetwork()
     premise.object = HydraulicControlRuleObject::System;
     premise.variable = HydraulicControlRuleVariable::Time;
     premise.comparison = HydraulicControlRuleOperator::GreaterOrEqual;
-    premise.value = 1800.0;
+    premise.elapsed_time_s = 1800;
     rule.premises.append(premise);
 
     HydraulicControlRuleAction action;
@@ -191,7 +191,7 @@ NetworkHydraulic makePumpNetwork(bool with_timer_control, quint64 duration_s)
         control.type = HydraulicControlSimpleType::Timer;
         control.link_uuid = pump.uuid;
         control.action = HydraulicControlActionType::Close;
-        control.trigger_time_s = 1800;
+        control.trigger_elapsed_time_s = 1800;
         network.controls_simple.append(control);
     }
 
@@ -314,7 +314,7 @@ void testUnsupportedPumpPowerRule(TestContext &context)
     premise.object_uuid = network.links_pumps.first().uuid;
     premise.variable = HydraulicControlRuleVariable::Power;
     premise.comparison = HydraulicControlRuleOperator::Greater;
-    premise.value = 0.1;
+    premise.power_kw = 0.1;
     rule.premises.append(premise);
 
     HydraulicControlRuleAction action;

@@ -146,8 +146,12 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-negative-missing-valve-curve
     conformance-negative-invalid-pattern-numeric
     conformance-negative-invalid-curve-numeric
+    conformance-negative-invalid-curve-shape
+    conformance-negative-missing-typed-curve-references
     conformance-negative-invalid-pipe-numeric
     conformance-negative-invalid-node-numeric
+    conformance-negative-invalid-map-numeric
+    conformance-negative-missing-map-label-anchor
     conformance-negative-invalid-pump-numeric
     conformance-negative-invalid-valve-numeric
     conformance-negative-invalid-control-numeric
@@ -244,6 +248,10 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "export")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-stress-")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "stress")
+    endif()
+
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "coordinates-vertices|map-label")
+        list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "coordinate")
     endif()
 
     set_tests_properties(

@@ -514,6 +514,32 @@ void scenarioCoordinatesVertices(TestContext &context)
     valve_vertex_2.coordinate_wgs84.latitude_deg = 50.690006;
     network.links_valves.last().vertices = {valve_vertex_1, valve_vertex_2};
 
+    HydraulicMapLabel anchored_label;
+    anchored_label.id = QStringLiteral("label-source");
+    anchored_label.uuid = QUuid::createUuid();
+    anchored_label.coordinate_wgs84.longitude_deg = 8.111111;
+    anchored_label.coordinate_wgs84.latitude_deg = 50.611111;
+    anchored_label.text = QStringLiteral("Source label");
+    anchored_label.anchor_node_uuid = network.nodes_reservoirs.first().uuid;
+    network.map_labels.append(anchored_label);
+
+    HydraulicMapLabel free_label;
+    free_label.id = QStringLiteral("label-free");
+    free_label.uuid = QUuid::createUuid();
+    free_label.coordinate_wgs84.longitude_deg = 8.222222;
+    free_label.coordinate_wgs84.latitude_deg = 50.722222;
+    free_label.text = QStringLiteral("Free label");
+    network.map_labels.append(free_label);
+
+    network.map_backdrop.enabled = true;
+    network.map_backdrop.lower_left_wgs84.longitude_deg = 8.0;
+    network.map_backdrop.lower_left_wgs84.latitude_deg = 50.5;
+    network.map_backdrop.upper_right_wgs84.longitude_deg = 8.5;
+    network.map_backdrop.upper_right_wgs84.latitude_deg = 51.0;
+    network.map_backdrop.file = QStringLiteral("network-map.png");
+    network.map_backdrop.offset_longitude_deg = 0.001;
+    network.map_backdrop.offset_latitude_deg = -0.002;
+
     NativeSavedProject native(network);
 
     struct CoordinateExpectation
@@ -539,6 +565,22 @@ void scenarioCoordinatesVertices(TestContext &context)
     expectLinkVertices(native.handle(), network.links_pipes.first().id, network.links_pipes.first().vertices, context);
     expectLinkVertices(native.handle(), network.links_pumps.first().id, network.links_pumps.first().vertices, context);
     expectLinkVertices(native.handle(), valve.id, network.links_valves.last().vertices, context);
+
+    const QString labels = sectionText(native.inpText(), QStringLiteral("LABELS"));
+    context.expect(sectionContainsCommand(labels, QStringLiteral("8.111111 50.611111 \"Source label\" %1").arg(network.nodes_reservoirs.first().id)),
+        "Generated [LABELS] must preserve anchored WGS84 labels");
+    context.expect(sectionContainsCommand(labels, QStringLiteral("8.222222 50.722222 \"Free label\"")),
+        "Generated [LABELS] must preserve unanchored WGS84 labels");
+
+    const QString backdrop = sectionText(native.inpText(), QStringLiteral("BACKDROP"));
+    context.expect(sectionContainsCommand(backdrop, QStringLiteral("DIMENSIONS 8 50.5 8.5 51")),
+        "Generated [BACKDROP] must preserve WGS84 bounds");
+    context.expect(sectionContainsCommand(backdrop, QStringLiteral("UNITS DEGREES")),
+        "Generated [BACKDROP] must declare canonical WGS84 degree units");
+    context.expect(sectionContainsCommand(backdrop, QStringLiteral("FILE network-map.png")),
+        "Generated [BACKDROP] must preserve the image file name");
+    context.expect(sectionContainsCommand(backdrop, QStringLiteral("OFFSET 0.001 -0.002")),
+        "Generated [BACKDROP] must preserve WGS84 degree offsets");
 }
 
 void scenarioReportOptions(TestContext &context)
@@ -558,24 +600,24 @@ void scenarioReportOptions(TestContext &context)
 
     options.fields_node.elevation.enabled = false;
     options.fields_node.demand.precision = 4;
-    options.fields_node.demand.below = 1.25;
-    options.fields_node.demand.above = 99.75;
+    options.fields_node.demand.below_m3_per_h = 1.25;
+    options.fields_node.demand.above_m3_per_h = 99.75;
     options.fields_node.head.precision = 5;
     options.fields_node.pressure.enabled = false;
     options.fields_node.quality.enabled = false;
 
     options.fields_link.length.enabled = false;
     options.fields_link.diameter.precision = 3;
-    options.fields_link.flow.below = 2.5;
-    options.fields_link.velocity.above = 0.75;
+    options.fields_link.flow.below_m3_per_h = 2.5;
+    options.fields_link.velocity.above_m_per_s = 0.75;
     options.fields_link.headloss.precision = 6;
     options.fields_link.position.enabled = false;
     options.fields_link.setting.precision = 4;
     options.fields_link.reaction.enabled = false;
     options.fields_link.friction.enabled = true;
     options.fields_link.friction.precision = 7;
-    options.fields_link.friction.below = 0.01;
-    options.fields_link.friction.above = 0.1;
+    options.fields_link.friction.below_friction_factor = 0.01;
+    options.fields_link.friction.above_friction_factor = 0.1;
     options.backend_commands.append(QStringLiteral("FLOW PRECISION 9"));
     options.backend_commands.append(QStringLiteral("F-FACTOR PRECISION 8"));
 
@@ -647,12 +689,12 @@ void registerExportFidelityScenarios(ScenarioRegistry &registry)
     registry.add(ScenarioDefinition{
         "conformance-export-patterns-curves",
         "Persist pattern data/comments and every AOWIS curve family, including generic curves, through native reopen.",
-        {"conformance", "hydraulic", "upstream", "export"},
+        {"conformance", "hydraulic", "upstream", "export", "curve"},
         &scenarioPatternsCurves});
     registry.add(ScenarioDefinition{
         "conformance-export-coordinates-vertices",
-        "Persist node coordinates and link vertices through generated INP/native EPANET reopen.",
-        {"conformance", "hydraulic", "upstream", "export"},
+        "Persist WGS84 node coordinates, link vertices, labels, and backdrop metadata through generated INP/native EPANET reopen.",
+        {"conformance", "hydraulic", "upstream", "export", "coordinate"},
         &scenarioCoordinatesVertices});
     registry.add(ScenarioDefinition{
         "conformance-export-report-options",

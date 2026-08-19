@@ -9,6 +9,8 @@
 
 #include <array>
 #include <cmath>
+#include <functional>
+#include <optional>
 
 namespace
 {
@@ -191,6 +193,30 @@ HydraulicSimulationStatus validateFinite(
     if (std::isfinite(value))
         return makeEpanetSuccess();
     return invalidNumeric(entity_type, entity_id, entity_uuid, field_name, QStringLiteral("must be finite"));
+}
+
+HydraulicSimulationStatus validateLongitudeDeg(
+    double value,
+    HydraulicSimulationStatusEntityType entity_type,
+    const QString &entity_id,
+    const QUuid &entity_uuid,
+    const QString &field_name)
+{
+    if (std::isfinite(value) && value >= -180.0 && value <= 180.0)
+        return makeEpanetSuccess();
+    return invalidNumeric(entity_type, entity_id, entity_uuid, field_name, QStringLiteral("must be finite and between -180 and 180 degrees"));
+}
+
+HydraulicSimulationStatus validateLatitudeDeg(
+    double value,
+    HydraulicSimulationStatusEntityType entity_type,
+    const QString &entity_id,
+    const QUuid &entity_uuid,
+    const QString &field_name)
+{
+    if (std::isfinite(value) && value >= -90.0 && value <= 90.0)
+        return makeEpanetSuccess();
+    return invalidNumeric(entity_type, entity_id, entity_uuid, field_name, QStringLiteral("must be finite and between -90 and 90 degrees"));
 }
 
 HydraulicSimulationStatus validateFiniteNonNegative(
@@ -552,6 +578,14 @@ QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulic &netw
         appendValidationFailure(failures, status);
     }
 
+    for (const HydraulicMapLabel &label : network.map_labels)
+    {
+        if (label.anchor_node_uuid.isNull())
+            continue;
+        status = validateReference(all_nodes, enabled_nodes, label.anchor_node_uuid, HydraulicSimulationStatusEntityType::Network, label.id, label.uuid, QStringLiteral("map-label anchor node"));
+        appendValidationFailure(failures, status);
+    }
+
     for (const HydraulicControlSimple &control : network.controls_simple)
     {
         status = validateReference(all_links, enabled_links, control.link_uuid, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("controlled link"));
@@ -598,31 +632,21 @@ QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulic &netw
     return failures;
 }
 
-void collectReportFieldFailures(
+void collectReportThresholdFailures(
     QList<HydraulicSimulationStatus> &failures,
-    const HydraulicSimulationReportField &field,
+    const std::optional<double> &threshold,
     const QString &field_name,
     const NetworkHydraulic &network)
 {
-    if (field.below.has_value() && !std::isfinite(field.below.value()))
-    {
-        failures.append(invalidNumeric(
-            HydraulicSimulationStatusEntityType::Report,
-            network.id,
-            network.uuid,
-            field_name + QStringLiteral(".below"),
-            QStringLiteral("must be finite when configured")));
-    }
+    if (!threshold.has_value() || std::isfinite(threshold.value()))
+        return;
 
-    if (field.above.has_value() && !std::isfinite(field.above.value()))
-    {
-        failures.append(invalidNumeric(
-            HydraulicSimulationStatusEntityType::Report,
-            network.id,
-            network.uuid,
-            field_name + QStringLiteral(".above"),
-            QStringLiteral("must be finite when configured")));
-    }
+    failures.append(invalidNumeric(
+        HydraulicSimulationStatusEntityType::Report,
+        network.id,
+        network.uuid,
+        field_name,
+        QStringLiteral("must be finite when configured")));
 }
 
 QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &network)
@@ -662,31 +686,43 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         appendValidationFailure(failures, status);
     }
 
-    struct NamedReportField
+    struct NamedReportThreshold
     {
         const char *name;
-        const HydraulicSimulationReportField *field;
+        const std::optional<double> *threshold;
     };
 
-    const std::array<NamedReportField, 14> report_fields = {{
-        {"fields_node.elevation", &network.options_report.fields_node.elevation},
-        {"fields_node.demand", &network.options_report.fields_node.demand},
-        {"fields_node.head", &network.options_report.fields_node.head},
-        {"fields_node.pressure", &network.options_report.fields_node.pressure},
-        {"fields_node.quality", &network.options_report.fields_node.quality},
-        {"fields_link.length", &network.options_report.fields_link.length},
-        {"fields_link.diameter", &network.options_report.fields_link.diameter},
-        {"fields_link.flow", &network.options_report.fields_link.flow},
-        {"fields_link.velocity", &network.options_report.fields_link.velocity},
-        {"fields_link.headloss", &network.options_report.fields_link.headloss},
-        {"fields_link.position", &network.options_report.fields_link.position},
-        {"fields_link.setting", &network.options_report.fields_link.setting},
-        {"fields_link.reaction", &network.options_report.fields_link.reaction},
-        {"fields_link.friction", &network.options_report.fields_link.friction}
+    const std::array<NamedReportThreshold, 20> report_thresholds = {{
+        {"fields_node.elevation.below_m", &network.options_report.fields_node.elevation.below_m},
+        {"fields_node.elevation.above_m", &network.options_report.fields_node.elevation.above_m},
+        {"fields_node.demand.below_m3_per_h", &network.options_report.fields_node.demand.below_m3_per_h},
+        {"fields_node.demand.above_m3_per_h", &network.options_report.fields_node.demand.above_m3_per_h},
+        {"fields_node.head.below_m", &network.options_report.fields_node.head.below_m},
+        {"fields_node.head.above_m", &network.options_report.fields_node.head.above_m},
+        {"fields_node.pressure.below_m", &network.options_report.fields_node.pressure.below_m},
+        {"fields_node.pressure.above_m", &network.options_report.fields_node.pressure.above_m},
+        {"fields_link.length.below_m", &network.options_report.fields_link.length.below_m},
+        {"fields_link.length.above_m", &network.options_report.fields_link.length.above_m},
+        {"fields_link.diameter.below_mm", &network.options_report.fields_link.diameter.below_mm},
+        {"fields_link.diameter.above_mm", &network.options_report.fields_link.diameter.above_mm},
+        {"fields_link.flow.below_m3_per_h", &network.options_report.fields_link.flow.below_m3_per_h},
+        {"fields_link.flow.above_m3_per_h", &network.options_report.fields_link.flow.above_m3_per_h},
+        {"fields_link.velocity.below_m_per_s", &network.options_report.fields_link.velocity.below_m_per_s},
+        {"fields_link.velocity.above_m_per_s", &network.options_report.fields_link.velocity.above_m_per_s},
+        {"fields_link.headloss.below_m_per_km", &network.options_report.fields_link.headloss.below_m_per_km},
+        {"fields_link.headloss.above_m_per_km", &network.options_report.fields_link.headloss.above_m_per_km},
+        {"fields_link.friction.below_friction_factor", &network.options_report.fields_link.friction.below_friction_factor},
+        {"fields_link.friction.above_friction_factor", &network.options_report.fields_link.friction.above_friction_factor}
     }};
 
-    for (const NamedReportField &report_field : report_fields)
-        collectReportFieldFailures(failures, *report_field.field, QString::fromLatin1(report_field.name), network);
+    for (const NamedReportThreshold &report_threshold : report_thresholds)
+    {
+        collectReportThresholdFailures(
+            failures,
+            *report_threshold.threshold,
+            QString::fromLatin1(report_threshold.name),
+            network);
+    }
 
     for (const HydraulicPatternTime &pattern : network.patterns_time)
     {
@@ -763,6 +799,30 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         }
     }
 
+    for (const HydraulicMapLabel &label : network.map_labels)
+    {
+        status = validateLongitudeDeg(label.coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Network, label.id, label.uuid, QStringLiteral("map_labels.coordinate_wgs84.longitude_deg"));
+        appendValidationFailure(failures, status);
+        status = validateLatitudeDeg(label.coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Network, label.id, label.uuid, QStringLiteral("map_labels.coordinate_wgs84.latitude_deg"));
+        appendValidationFailure(failures, status);
+    }
+
+    if (network.map_backdrop.enabled)
+    {
+        status = validateLongitudeDeg(network.map_backdrop.lower_left_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Network, network.id, network.uuid, QStringLiteral("map_backdrop.lower_left_wgs84.longitude_deg"));
+        appendValidationFailure(failures, status);
+        status = validateLatitudeDeg(network.map_backdrop.lower_left_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Network, network.id, network.uuid, QStringLiteral("map_backdrop.lower_left_wgs84.latitude_deg"));
+        appendValidationFailure(failures, status);
+        status = validateLongitudeDeg(network.map_backdrop.upper_right_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Network, network.id, network.uuid, QStringLiteral("map_backdrop.upper_right_wgs84.longitude_deg"));
+        appendValidationFailure(failures, status);
+        status = validateLatitudeDeg(network.map_backdrop.upper_right_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Network, network.id, network.uuid, QStringLiteral("map_backdrop.upper_right_wgs84.latitude_deg"));
+        appendValidationFailure(failures, status);
+        status = validateFinite(network.map_backdrop.offset_longitude_deg, HydraulicSimulationStatusEntityType::Network, network.id, network.uuid, QStringLiteral("map_backdrop.offset_longitude_deg"));
+        appendValidationFailure(failures, status);
+        status = validateFinite(network.map_backdrop.offset_latitude_deg, HydraulicSimulationStatusEntityType::Network, network.id, network.uuid, QStringLiteral("map_backdrop.offset_latitude_deg"));
+        appendValidationFailure(failures, status);
+    }
+
     for (const HydraulicNodeJunction &junction : network.nodes_junctions)
     {
         if (!junction.metadata.enabled)
@@ -781,9 +841,9 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         }
         status = validateFiniteNonNegative(junction.emitter_coefficient_m3_per_h_per_m_exponent, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("emitter_coefficient_m3_per_h_per_m_exponent"));
         appendValidationFailure(failures, status);
-        status = validateFinite(junction.coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("coordinate_wgs84.longitude_deg"));
+        status = validateLongitudeDeg(junction.coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("coordinate_wgs84.longitude_deg"));
         appendValidationFailure(failures, status);
-        status = validateFinite(junction.coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("coordinate_wgs84.latitude_deg"));
+        status = validateLatitudeDeg(junction.coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("coordinate_wgs84.latitude_deg"));
         appendValidationFailure(failures, status);
 
         for (int index = 0; index < junction.demands.size(); index++)
@@ -809,9 +869,9 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
             status = validateFinite(reservoir.hydraulic_head_m, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("hydraulic_head_m"));
             appendValidationFailure(failures, status);
         }
-        status = validateFinite(reservoir.coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("coordinate_wgs84.longitude_deg"));
+        status = validateLongitudeDeg(reservoir.coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("coordinate_wgs84.longitude_deg"));
         appendValidationFailure(failures, status);
-        status = validateFinite(reservoir.coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("coordinate_wgs84.latitude_deg"));
+        status = validateLatitudeDeg(reservoir.coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("coordinate_wgs84.latitude_deg"));
         appendValidationFailure(failures, status);
     }
 
@@ -852,9 +912,9 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
             status = makeEpanetSuccess();
         appendValidationFailure(failures, status);
 
-        status = validateFinite(tank.coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("coordinate_wgs84.longitude_deg"));
+        status = validateLongitudeDeg(tank.coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("coordinate_wgs84.longitude_deg"));
         appendValidationFailure(failures, status);
-        status = validateFinite(tank.coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("coordinate_wgs84.latitude_deg"));
+        status = validateLatitudeDeg(tank.coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("coordinate_wgs84.latitude_deg"));
         appendValidationFailure(failures, status);
     }
 
@@ -884,9 +944,9 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         appendValidationFailure(failures, status);
         for (int index = 0; index < pipe.vertices.size(); index++)
         {
-            status = validateFinite(pipe.vertices.at(index).coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("vertices[%1].longitude_deg").arg(index));
+            status = validateLongitudeDeg(pipe.vertices.at(index).coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("vertices[%1].longitude_deg").arg(index));
             appendValidationFailure(failures, status);
-            status = validateFinite(pipe.vertices.at(index).coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("vertices[%1].latitude_deg").arg(index));
+            status = validateLatitudeDeg(pipe.vertices.at(index).coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("vertices[%1].latitude_deg").arg(index));
             appendValidationFailure(failures, status);
         }
     }
@@ -914,9 +974,9 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         }
         for (int index = 0; index < pump.vertices.size(); index++)
         {
-            status = validateFinite(pump.vertices.at(index).coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("vertices[%1].longitude_deg").arg(index));
+            status = validateLongitudeDeg(pump.vertices.at(index).coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("vertices[%1].longitude_deg").arg(index));
             appendValidationFailure(failures, status);
-            status = validateFinite(pump.vertices.at(index).coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("vertices[%1].latitude_deg").arg(index));
+            status = validateLatitudeDeg(pump.vertices.at(index).coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("vertices[%1].latitude_deg").arg(index));
             appendValidationFailure(failures, status);
         }
     }
@@ -954,23 +1014,40 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         }
         for (int index = 0; index < valve.vertices.size(); index++)
         {
-            status = validateFinite(valve.vertices.at(index).coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("vertices[%1].longitude_deg").arg(index));
+            status = validateLongitudeDeg(valve.vertices.at(index).coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("vertices[%1].longitude_deg").arg(index));
             appendValidationFailure(failures, status);
-            status = validateFinite(valve.vertices.at(index).coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("vertices[%1].latitude_deg").arg(index));
+            status = validateLatitudeDeg(valve.vertices.at(index).coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("vertices[%1].latitude_deg").arg(index));
             appendValidationFailure(failures, status);
         }
     }
 
+    const std::function<void(const HydraulicControlLinkSetting &, HydraulicSimulationStatusEntityType, const QString &, const QUuid &, const QString &)> validate_control_setting = [&failures](const HydraulicControlLinkSetting &setting, HydraulicSimulationStatusEntityType entity_type, const QString &id, const QUuid &uuid, const QString &prefix)
+    {
+        const QList<QPair<QString, std::optional<double>>> values = {
+            {QStringLiteral("pump_speed_ratio"), setting.pump_speed_ratio},
+            {QStringLiteral("valve_pressure_head_m"), setting.valve_pressure_head_m},
+            {QStringLiteral("valve_flow_m3_per_h"), setting.valve_flow_m3_per_h},
+            {QStringLiteral("valve_loss_coefficient"), setting.valve_loss_coefficient},
+            {QStringLiteral("valve_position_percent"), setting.valve_position_percent}
+        };
+        for (const QPair<QString, std::optional<double>> &entry : values)
+        {
+            if (!entry.second.has_value())
+                continue;
+            HydraulicSimulationStatus setting_status = validateFinite(entry.second.value(), entity_type, id, uuid, prefix + entry.first);
+            appendValidationFailure(failures, setting_status);
+        }
+    };
+
     for (const HydraulicControlSimple &control : network.controls_simple)
     {
         if (control.action == HydraulicControlActionType::Setting)
-        {
-            status = validateFinite(control.setting, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("setting"));
-            appendValidationFailure(failures, status);
-        }
+            validate_control_setting(control.setting, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("setting."));
         if (control.type == HydraulicControlSimpleType::LowLevel || control.type == HydraulicControlSimpleType::HighLevel)
         {
-            status = validateFinite(control.trigger_level_or_pressure_head_m, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("trigger_level_or_pressure_head_m"));
+            status = validateFinite(control.trigger_water_level_m, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("trigger_water_level_m"));
+            appendValidationFailure(failures, status);
+            status = validateFinite(control.trigger_pressure_head_m, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("trigger_pressure_head_m"));
             appendValidationFailure(failures, status);
         }
     }
@@ -986,24 +1063,29 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         for (int index = 0; index < rule.premises.size(); index++)
         {
             const HydraulicControlRulePremise &premise = rule.premises.at(index);
-            if (premise.value.has_value())
+            const QList<QPair<QString, std::optional<double>>> values = {
+                {QStringLiteral("demand_m3_per_h"), premise.demand_m3_per_h},
+                {QStringLiteral("hydraulic_head_m"), premise.hydraulic_head_m},
+                {QStringLiteral("water_level_m"), premise.water_level_m},
+                {QStringLiteral("pressure_head_m"), premise.pressure_head_m},
+                {QStringLiteral("flow_m3_per_h"), premise.flow_m3_per_h},
+                {QStringLiteral("power_kw"), premise.power_kw}
+            };
+            for (const QPair<QString, std::optional<double>> &entry : values)
             {
-                status = validateFinite(premise.value.value(), HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("premises[%1].value").arg(index));
+                if (!entry.second.has_value())
+                    continue;
+                status = validateFinite(entry.second.value(), HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("premises[%1].").arg(index) + entry.first);
                 appendValidationFailure(failures, status);
             }
+            validate_control_setting(premise.link_setting, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("premises[%1].link_setting.").arg(index));
         }
 
         const QList<QList<HydraulicControlRuleAction>> action_groups = {rule.actions_then, rule.actions_else};
         for (const QList<HydraulicControlRuleAction> &actions : action_groups)
         {
             for (const HydraulicControlRuleAction &action : actions)
-            {
-                if (action.setting.has_value())
-                {
-                    status = validateFinite(action.setting.value(), HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("action.setting"));
-                    appendValidationFailure(failures, status);
-                }
-            }
+                validate_control_setting(action.setting, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("action.setting."));
         }
     }
 

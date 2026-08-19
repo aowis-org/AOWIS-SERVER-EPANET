@@ -292,7 +292,7 @@ void scenarioDisabledControlLinkReference(TestContext &context)
     control.type = HydraulicControlSimpleType::Timer;
     control.link_uuid = pipe->uuid;
     control.action = HydraulicControlActionType::Close;
-    control.trigger_time_s = 3600;
+    control.trigger_elapsed_time_s = 3600;
     network.controls_simple.append(control);
 
     expectRejected(context, network, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("disabled controlled link"));
@@ -317,7 +317,7 @@ void scenarioDisabledRuleLinkReference(TestContext &context)
     premise.object = HydraulicControlRuleObject::System;
     premise.variable = HydraulicControlRuleVariable::Time;
     premise.comparison = HydraulicControlRuleOperator::GreaterOrEqual;
-    premise.value = 1800.0;
+    premise.elapsed_time_s = 1800;
     rule.premises.append(premise);
 
     HydraulicControlRuleAction action;
@@ -424,6 +424,154 @@ void scenarioInvalidCurveNumeric(TestContext &context)
     expectRejected(context, network, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("invalid numeric"));
 }
 
+
+void scenarioInvalidCurveShape(TestContext &context)
+{
+    {
+        NetworkHydraulic network = cleanNet1();
+        HydraulicCurveTankVolume curve;
+        curve.id = QStringLiteral("BAD_TANK_CURVE_SHAPE");
+        curve.uuid = QUuid::createUuid();
+        HydraulicCurveTankVolumePoint point_1;
+        point_1.water_level_m = 0.0;
+        point_1.volume_m3 = 0.0;
+        HydraulicCurveTankVolumePoint point_2;
+        point_2.water_level_m = 0.0;
+        point_2.volume_m3 = 10.0;
+        curve.points = {point_1, point_2};
+        network.curves_tank_volume.append(curve);
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid,
+            QStringLiteral("levels must increase"), HydraulicSimulationStatusStage::AddCurve);
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        HydraulicCurvePumpHead curve;
+        curve.id = QStringLiteral("BAD_PUMP_CURVE_SHAPE");
+        curve.uuid = QUuid::createUuid();
+        HydraulicCurvePumpHeadPoint point_1;
+        point_1.flow_m3_per_h = 0.0;
+        point_1.head_gain_m = 30.0;
+        HydraulicCurvePumpHeadPoint point_2;
+        point_2.flow_m3_per_h = 100.0;
+        point_2.head_gain_m = 35.0;
+        curve.points = {point_1, point_2};
+        network.curves_pump_head.append(curve);
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid,
+            QStringLiteral("heads must decrease"), HydraulicSimulationStatusStage::AddCurve);
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        HydraulicCurvePumpEfficiency curve;
+        curve.id = QStringLiteral("BAD_EFFICIENCY_CURVE_SHAPE");
+        curve.uuid = QUuid::createUuid();
+        HydraulicCurvePumpEfficiencyPoint point;
+        point.flow_m3_per_h = 100.0;
+        point.efficiency_percent = 101.0;
+        curve.points.append(point);
+        network.curves_pump_efficiency.append(curve);
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid,
+            QStringLiteral("efficiencies in (0, 100]"), HydraulicSimulationStatusStage::AddCurve);
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        HydraulicCurveValveHeadloss curve;
+        curve.id = QStringLiteral("BAD_HEADLOSS_CURVE_SHAPE");
+        curve.uuid = QUuid::createUuid();
+        HydraulicCurveValveHeadlossPoint point;
+        point.flow_m3_per_h = 100.0;
+        point.head_loss_m = -1.0;
+        curve.points.append(point);
+        network.curves_valve_headloss.append(curve);
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid,
+            QStringLiteral("cannot be negative"), HydraulicSimulationStatusStage::AddCurve);
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        HydraulicCurveValveCharacteristic curve;
+        curve.id = QStringLiteral("BAD_CHARACTERISTIC_CURVE_SHAPE");
+        curve.uuid = QUuid::createUuid();
+        HydraulicCurveValveCharacteristicPoint point;
+        point.position_percent = 101.0;
+        point.relative_flow_percent = 50.0;
+        curve.points.append(point);
+        network.curves_valve_characteristic.append(curve);
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid,
+            QStringLiteral("must be in [0, 100] percent"), HydraulicSimulationStatusStage::AddCurve);
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        HydraulicCurveGeneric curve;
+        curve.id = QStringLiteral("BAD_GENERIC_CURVE_SHAPE");
+        curve.uuid = QUuid::createUuid();
+        HydraulicCurveGenericPoint point_1;
+        point_1.x = 2.0;
+        point_1.y = 10.0;
+        HydraulicCurveGenericPoint point_2;
+        point_2.x = 1.0;
+        point_2.y = 20.0;
+        curve.points = {point_1, point_2};
+        network.curves_generic.append(curve);
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid,
+            QStringLiteral("x values must increase"), HydraulicSimulationStatusStage::AddCurve);
+    }
+}
+
+void scenarioMissingTypedCurveReferences(TestContext &context)
+{
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.nodes_tanks.isEmpty(), "missing-typed-curve fixture requires a tank");
+        if (!network.nodes_tanks.isEmpty())
+        {
+            HydraulicNodeTank &tank = network.nodes_tanks.first();
+            tank.geometry_input_type = HydraulicNodeTankGeometryInputType::VolumeCurve;
+            tank.volume_curve_uuid = QUuid::createUuid();
+            expectRejected(context, network, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid,
+                QStringLiteral("missing tank volume curve"));
+        }
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        HydraulicLinkPump *pump = firstPump(network);
+        context.expect(pump != nullptr, "missing-typed-curve fixture requires a pump");
+        if (pump != nullptr)
+        {
+            pump->efficiency_input_type = HydraulicLinkPumpEfficiencyInputType::Curve;
+            pump->efficiency_curve_uuid = QUuid::createUuid();
+            expectRejected(context, network, HydraulicSimulationStatusEntityType::Pump, pump->id, pump->uuid,
+                QStringLiteral("missing efficiency curve"));
+        }
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.links_pipes.isEmpty(), "missing-typed-curve fixture requires a pipe");
+        if (!network.links_pipes.isEmpty())
+        {
+            const HydraulicLinkPipe &pipe = network.links_pipes.first();
+            HydraulicLinkValve valve;
+            valve.id = QStringLiteral("MISSING_PCV_CURVE");
+            valve.uuid = QUuid::createUuid();
+            valve.node_uuid_from = pipe.node_uuid_from;
+            valve.node_uuid_to = pipe.node_uuid_to;
+            valve.type = HydraulicLinkValveType::PCV;
+            valve.diameter_mm = 300.0;
+            valve.setting_position_percent = 50.0;
+            valve.characteristic_curve_uuid = QUuid::createUuid();
+            valve.initial_status = HydraulicLinkValveInitialStatus::Active;
+            network.links_valves.append(valve);
+            expectRejected(context, network, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid,
+                QStringLiteral("missing PCV characteristic curve"));
+        }
+    }
+}
+
 void scenarioInvalidPipeNumeric(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
@@ -446,6 +594,37 @@ void scenarioInvalidNodeNumeric(TestContext &context)
     HydraulicNodeJunction &junction = network.nodes_junctions.first();
     junction.elevation_m = std::numeric_limits<double>::quiet_NaN();
     expectRejected(context, network, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("invalid numeric"));
+}
+
+void scenarioInvalidMapNumeric(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+
+    HydraulicMapLabel label;
+    label.id = QStringLiteral("BAD_MAP_LABEL");
+    label.uuid = QUuid::createUuid();
+    label.coordinate_wgs84.longitude_deg = 181.0;
+    label.coordinate_wgs84.latitude_deg = 50.0;
+    label.text = QStringLiteral("Invalid map label");
+    network.map_labels.append(label);
+
+    expectRejected(context, network, HydraulicSimulationStatusEntityType::Network, label.id, label.uuid, QStringLiteral("invalid numeric"));
+}
+
+void scenarioMissingMapLabelAnchor(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+
+    HydraulicMapLabel label;
+    label.id = QStringLiteral("BAD_MAP_ANCHOR");
+    label.uuid = QUuid::createUuid();
+    label.coordinate_wgs84.longitude_deg = 8.0;
+    label.coordinate_wgs84.latitude_deg = 50.0;
+    label.text = QStringLiteral("Missing anchor");
+    label.anchor_node_uuid = QUuid::createUuid();
+    network.map_labels.append(label);
+
+    expectRejected(context, network, HydraulicSimulationStatusEntityType::Network, label.id, label.uuid, QStringLiteral("missing map-label anchor node"));
 }
 
 void scenarioInvalidPumpNumeric(TestContext &context)
@@ -495,8 +674,8 @@ void scenarioInvalidControlNumeric(TestContext &context)
     control.type = HydraulicControlSimpleType::Timer;
     control.link_uuid = pump->uuid;
     control.action = HydraulicControlActionType::Setting;
-    control.setting = std::numeric_limits<double>::quiet_NaN();
-    control.trigger_time_s = 1800;
+    control.setting.pump_speed_ratio = std::numeric_limits<double>::quiet_NaN();
+    control.trigger_elapsed_time_s = 1800;
     network.controls_simple.append(control);
 
     expectRejected(context, network, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("invalid numeric"));
@@ -519,7 +698,7 @@ void scenarioInvalidSolverNumeric(TestContext &context)
 void scenarioInvalidReportNumeric(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
-    network.options_report.fields_link.flow.below = std::numeric_limits<double>::quiet_NaN();
+    network.options_report.fields_link.flow.below_m3_per_h = std::numeric_limits<double>::quiet_NaN();
 
     expectRejected(
         context,
@@ -640,7 +819,7 @@ void registerNegativeValidationScenarios(ScenarioRegistry &registry)
     registry.add(ScenarioDefinition{
         "conformance-negative-duplicate-curve-id",
         "Reject duplicate IDs across EPANET curve families before backend construction.",
-        {"conformance", "hydraulic", "negative"},
+        {"conformance", "hydraulic", "negative", "curve"},
         &scenarioDuplicateCurveId});
     registry.add(ScenarioDefinition{
         "conformance-negative-broken-node-reference",
@@ -675,12 +854,12 @@ void registerNegativeValidationScenarios(ScenarioRegistry &registry)
     registry.add(ScenarioDefinition{
         "conformance-negative-missing-curve",
         "Reject a curve-based pump whose head-curve UUID does not resolve.",
-        {"conformance", "hydraulic", "negative"},
+        {"conformance", "hydraulic", "negative", "curve"},
         &scenarioMissingPumpCurve});
     registry.add(ScenarioDefinition{
         "conformance-negative-missing-valve-curve",
         "Reject a GPV whose head-loss curve UUID does not resolve.",
-        {"conformance", "hydraulic", "negative"},
+        {"conformance", "hydraulic", "negative", "curve"},
         &scenarioMissingValveCurve});
     registry.add(ScenarioDefinition{
         "conformance-negative-invalid-pattern-numeric",
@@ -690,8 +869,18 @@ void registerNegativeValidationScenarios(ScenarioRegistry &registry)
     registry.add(ScenarioDefinition{
         "conformance-negative-invalid-curve-numeric",
         "Reject non-finite curve point values before calling EPANET.",
-        {"conformance", "hydraulic", "negative"},
+        {"conformance", "hydraulic", "negative", "curve"},
         &scenarioInvalidCurveNumeric});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-invalid-curve-shape",
+        "Reject invalid ordering, range, and monotonicity across all AOWIS curve families.",
+        {"conformance", "hydraulic", "negative", "curve"},
+        &scenarioInvalidCurveShape});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-missing-typed-curve-references",
+        "Reject unresolved tank-volume, pump-efficiency, and PCV characteristic-curve references.",
+        {"conformance", "hydraulic", "negative", "curve"},
+        &scenarioMissingTypedCurveReferences});
     registry.add(ScenarioDefinition{
         "conformance-negative-invalid-pipe-numeric",
         "Reject a non-finite pipe hydraulic input before calling EPANET.",
@@ -702,6 +891,16 @@ void registerNegativeValidationScenarios(ScenarioRegistry &registry)
         "Reject a non-finite node hydraulic input before calling EPANET.",
         {"conformance", "hydraulic", "negative"},
         &scenarioInvalidNodeNumeric});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-invalid-map-numeric",
+        "Reject out-of-range canonical WGS84 map-label coordinates before EPANET export.",
+        {"conformance", "hydraulic", "negative", "coordinate"},
+        &scenarioInvalidMapNumeric});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-missing-map-label-anchor",
+        "Reject a map label whose anchor UUID does not resolve to an enabled node.",
+        {"conformance", "hydraulic", "negative", "coordinate"},
+        &scenarioMissingMapLabelAnchor});
     registry.add(ScenarioDefinition{
         "conformance-negative-invalid-pump-numeric",
         "Reject a non-finite pump hydraulic input before calling EPANET.",

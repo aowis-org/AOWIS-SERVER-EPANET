@@ -40,7 +40,10 @@ The adapter initializes every native EPANET project with `EN_CMH` and explicitly
 - Pump energy intensity: AOWIS stores `kW.h/m3`; the wrapper computes it from canonical `kW` and `m3/h` values.
 - Energy prices and costs use the single `PumpEnergyOptions::currency_iso4217` billing currency. EPANET receives only the numeric price/charge values and performs no currency conversion; exchange-rate handling belongs to the AOWIS controller.
 - Pump efficiency: `percent`.
-- Pump and valve curves use the canonical units encoded by their point fields.
+- Typed tank, pump, and valve curves use the canonical units encoded by their point fields.
+- Hydraulic node coordinates and link vertices are exported as canonical WGS84 longitude/latitude in degrees. EPANET permits geographic coordinates, so generated `[COORDINATES]` and `[VERTICES]` use this WGS84 map space directly.
+- Map labels use the same WGS84 coordinate representation as nodes and vertices. Enabled backdrop metadata stores WGS84 lower-left/upper-right bounds and longitude/latitude offsets in degrees; generated `[BACKDROP]` therefore declares `UNITS DEGREES`. The former ambiguous GUI/map-space `x`/`y` position fields are not part of the hydraulic model.
+- `HydraulicCurveGeneric` is an opaque EPANET-compatible preservation type. Its `x` and `y` coordinates are backend-defined numeric data, not AOWIS measurement quantities, and therefore do not carry canonical UCUM units. AOWIS hydraulic entities reference typed curves instead; generic curves are retained for complete backend data/export fidelity.
 - PRV, PSV, and PBV settings: pressure head in `m`.
 - FCV settings: `m3_per_h`.
 - TCV settings: dimensionless loss coefficient.
@@ -54,11 +57,13 @@ Pipe roughness is selected according to `headloss_formula`: `roughness_hazen_wil
 
 The Toolkit `EN_HEADLOSS` link result is the total hydraulic-head difference across the link in the configured head unit. For pipes, AOWIS stores this directly as `head_loss_m` and derives `head_loss_gradient_m_per_km` from the pipe length. This is distinct from EPANET's formatted pipe report, which presents pipe head loss as a per-length gradient.
 
+Typed report thresholds use AOWIS canonical units in the Model (`m`, `m3_per_h`, `mm`, `m_per_s`, `m_per_km`, or the dimensionless friction factor). Report fields whose numeric meaning depends on quality mode or link type do not expose typed `BELOW`/`ABOVE` thresholds; backend-specific report commands remain available through `backend_commands` when such EPANET-native configuration is required.
+
 ## Model-boundary conventions and remaining issues
 
 Leakage uses the EPANET-compatible AOWIS engineering convention `leak_area_mm2_per_100m` for distributed leak area and `leak_area_expansion_per_pressure_head_mm2_per_m` for pressure-head-dependent area expansion. The adapter writes these canonical model values directly to `EN_LEAK_AREA` and `EN_LEAK_EXPAN`.
 
-Generic control `setting` values remain context-dependent and do not carry a single unit in their names. They require discriminated quantity-specific representations before complete control support can be unit-safe.
+Simple-control and rule values use quantity-specific Model fields. Pump settings are speed ratios; valve settings use the same pressure-head, flow, loss-coefficient, or position quantities as the target valve type. Level controls distinguish tank water level from junction pressure head, and rule premises distinguish demand, head, level, pressure, flow, power, and time quantities explicitly. GPV curve selection is not represented as a numeric control setting.
 
 Pumps and all seven EPANET 2.3 valve types are implemented, including their curves, patterns, energy inputs, geometry, hydraulic results, states, and pump energy summaries. EPANET has no pump-specific numeric constant-efficiency field, so the adapter represents that model option with a private one-point efficiency curve. EPANET also treats a pump-specific energy price of zero as inheritance from the global price; the adapter rejects that unrepresentable override explicitly.
 

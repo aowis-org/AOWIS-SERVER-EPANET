@@ -43,6 +43,8 @@ private:
 
     bool resolveLinkId(const QUuid &uuid, QString &id) const;
     bool resolveLinkIndex(const QUuid &uuid, int &index) const;
+    bool resolveControlLinkSetting(const QUuid &link_uuid, const HydraulicControlLinkSetting &setting, double &backend_setting) const;
+    bool resolveRulePremiseValue(const HydraulicControlRulePremise &premise, double &value) const;
 
     EpanetProject &project;
     EpanetIndexRegistry &indices;
@@ -58,6 +60,7 @@ private:
     QHash<QUuid, QString> pipe_ids_by_uuid;
     QHash<QUuid, QString> pump_ids_by_uuid;
     QHash<QUuid, QString> valve_ids_by_uuid;
+    QHash<QUuid, HydraulicLinkValveType> valve_types_by_uuid;
     QHash<QUuid, QString> control_simple_ids_by_uuid;
     QHash<QUuid, QString> control_rule_ids_by_uuid;
     QString constant_demand_pattern_id;

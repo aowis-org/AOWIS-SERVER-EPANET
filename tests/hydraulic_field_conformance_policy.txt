@@ -5,29 +5,24 @@
 hydraulic_types.h|HydraulicEntityMetadata|enabled|complete|conformance-negative-disabled-entity-pruning|
 hydraulic_types.h|HydraulicEntityMetadata|model_role,date_added,date_installed|excluded-non-epanet||AOWIS lifecycle/presentation metadata is not an EPANET hydraulic input.
 hydraulic_types.h|HydraulicEntityMetadata|comment,tag|complete|conformance-export-titles-comments-tags|
-hydraulic_types.h|HydraulicMapPosition|x,y|excluded-non-epanet||GUI/map-space position is not substituted for EPANET hydraulic coordinates.
 hydraulic_types.h|HydraulicLinkVertex|coordinate_wgs84|complete|conformance-export-coordinates-vertices|
-hydraulic_types.h|HydraulicLinkVertex|map_position|excluded-non-epanet||Optional GUI/map-space vertex position is outside EPANET hydraulic semantics.
 hydraulic_types.h|HydraulicNodeQualitySource|type,strength,pattern_uuid|excluded-quality||Water-quality source configuration is outside the current hydraulic denominator.
 hydraulic_nodes.h|HydraulicNodeJunctionDemand|category_name,base_demand_m3_per_h,pattern_mode,pattern_uuid|complete|conformance-upstream-demand-categories,conformance-upstream-demand-pattern|
 hydraulic_nodes.h|HydraulicNodeJunctionDemand|source_method,note|excluded-non-epanet||Demand provenance/note metadata is not an EPANET hydraulic input.
 hydraulic_nodes.h|HydraulicNodeJunction|id,uuid|complete|conformance-net1,conformance-negative-duplicate-node-id,conformance-negative-duplicate-uuid|
 hydraulic_nodes.h|HydraulicNodeJunction|coordinate_wgs84|complete|conformance-export-coordinates-vertices|
-hydraulic_nodes.h|HydraulicNodeJunction|map_position|excluded-non-epanet||GUI/map-space position is outside EPANET hydraulic semantics.
 hydraulic_nodes.h|HydraulicNodeJunction|elevation_input_type,elevation_m,terrain_elevation_m,elevation_offset_m,emitter_coefficient_m3_per_h_per_m_exponent|complete|conformance-upstream-junction-reservoir-inputs,conformance-upstream-dda-pda|
 hydraulic_nodes.h|HydraulicNodeJunction|demands|complete|conformance-upstream-demand-categories|
 hydraulic_nodes.h|HydraulicNodeJunction|initial_quality,quality_source|excluded-quality||Water-quality node configuration is outside the current hydraulic denominator.
 hydraulic_nodes.h|HydraulicNodeJunction|metadata|complete|conformance-export-titles-comments-tags,conformance-negative-disabled-entity-pruning|
 hydraulic_nodes.h|HydraulicNodeReservoir|id,uuid|complete|conformance-net1,conformance-negative-duplicate-node-id,conformance-negative-duplicate-uuid|
 hydraulic_nodes.h|HydraulicNodeReservoir|coordinate_wgs84|complete|conformance-export-coordinates-vertices|
-hydraulic_nodes.h|HydraulicNodeReservoir|map_position|excluded-non-epanet||GUI/map-space position is outside EPANET hydraulic semantics.
 hydraulic_nodes.h|HydraulicNodeReservoir|head_input_type,hydraulic_head_m,terrain_elevation_m,hydraulic_head_offset_m,head_pattern_mode,head_pattern_uuid|complete|conformance-upstream-junction-reservoir-inputs,conformance-upstream-demand-pattern|
 hydraulic_nodes.h|HydraulicNodeReservoir|initial_quality,quality_source|excluded-quality||Water-quality node configuration is outside the current hydraulic denominator.
 hydraulic_nodes.h|HydraulicNodeReservoir|metadata|complete|conformance-export-titles-comments-tags,conformance-negative-disabled-entity-pruning|
 hydraulic_nodes.h|HydraulicNodeTank|id,uuid|complete|conformance-upstream-tank-uniform-area,conformance-negative-duplicate-node-id,conformance-negative-duplicate-uuid|
 hydraulic_nodes.h|HydraulicNodeTank|coordinate_wgs84|complete|conformance-export-coordinates-vertices|
-hydraulic_nodes.h|HydraulicNodeTank|map_position|excluded-non-epanet||GUI/map-space position is outside EPANET hydraulic semantics.
-hydraulic_nodes.h|HydraulicNodeTank|elevation_input_type,bottom_elevation_m,terrain_elevation_m,bottom_offset_m,water_level_initial_m,water_level_minimum_m,water_level_maximum_m,geometry_input_type,diameter_m,cross_section_area_m2,volume_at_maximum_level_m3,minimum_volume_m3,volume_curve_uuid,can_overflow|complete|conformance-upstream-tank-uniform-area,conformance-upstream-tank-volume-at-max,conformance-upstream-tank-volume-curve,conformance-upstream-tank-overflow|
+hydraulic_nodes.h|HydraulicNodeTank|elevation_input_type,bottom_elevation_m,terrain_elevation_m,bottom_offset_m,water_level_initial_m,water_level_minimum_m,water_level_maximum_m,geometry_input_type,diameter_m,cross_section_area_m2,volume_at_maximum_level_m3,minimum_volume_m3,volume_curve_uuid,can_overflow|complete|conformance-upstream-tank-uniform-area,conformance-upstream-tank-volume-at-max,conformance-upstream-tank-volume-curve,conformance-upstream-tank-overflow,conformance-negative-missing-typed-curve-references|
 hydraulic_nodes.h|HydraulicNodeTank|initial_quality,quality_source,mixing_model,mixing_fraction,override_bulk_reaction_coefficient,bulk_reaction_coefficient_per_day|excluded-quality||Water-quality/tank-mixing configuration is outside the current hydraulic denominator.
 hydraulic_nodes.h|HydraulicNodeTank|metadata|complete|conformance-export-titles-comments-tags,conformance-negative-disabled-entity-pruning|
 hydraulic_links.h|HydraulicLinkPipe|id,uuid|complete|conformance-upstream-pipe-inputs,conformance-negative-duplicate-link-id,conformance-negative-duplicate-uuid|
@@ -38,7 +33,7 @@ hydraulic_links.h|HydraulicLinkPipe|override_reaction_coefficients,bulk_reaction
 hydraulic_links.h|HydraulicLinkPipe|leak_area_mm2_per_100m,leak_area_expansion_per_pressure_head_mm2_per_m|complete|conformance-upstream-leakage|
 hydraulic_links.h|HydraulicLinkPipe|metadata|complete|conformance-export-titles-comments-tags,conformance-negative-disabled-entity-pruning|
 hydraulic_links.h|HydraulicLinkPump|id,uuid|complete|conformance-upstream-pump-three-point,conformance-negative-duplicate-link-id,conformance-negative-duplicate-uuid|
-hydraulic_links.h|HydraulicLinkPump|node_uuid_from,node_uuid_to,definition_type,constant_power_kw,head_curve_uuid,initial_speed_ratio,initial_status,speed_pattern_uuid,efficiency_input_type,constant_efficiency_percent,efficiency_curve_uuid,energy_price_input_type,energy_price_per_kw_h,price_pattern_uuid|complete|conformance-upstream-pump-three-point,conformance-upstream-pump-multipoint,conformance-upstream-pump-constant-power,conformance-upstream-pump-initial-speed,conformance-upstream-pump-speed-pattern,conformance-upstream-pump-initial-off,conformance-upstream-pump-constant-efficiency,conformance-upstream-pump-efficiency-curve,conformance-upstream-pump-energy-pattern|
+hydraulic_links.h|HydraulicLinkPump|node_uuid_from,node_uuid_to,definition_type,constant_power_kw,head_curve_uuid,initial_speed_ratio,initial_status,speed_pattern_uuid,efficiency_input_type,constant_efficiency_percent,efficiency_curve_uuid,energy_price_input_type,energy_price_per_kw_h,price_pattern_uuid|complete|conformance-upstream-pump-three-point,conformance-upstream-pump-multipoint,conformance-upstream-pump-constant-power,conformance-upstream-pump-initial-speed,conformance-upstream-pump-speed-pattern,conformance-upstream-pump-initial-off,conformance-upstream-pump-constant-efficiency,conformance-upstream-pump-efficiency-curve,conformance-upstream-pump-energy-pattern,conformance-negative-missing-typed-curve-references|
 hydraulic_links.h|HydraulicLinkPump|vertices|complete|conformance-export-coordinates-vertices|
 hydraulic_links.h|HydraulicLinkPump|control_type|excluded-non-epanet||Presentation/control-family metadata, executable controls are stored separately.
 hydraulic_links.h|HydraulicLinkPump|metadata|complete|conformance-export-titles-comments-tags,conformance-negative-disabled-entity-pruning|
@@ -47,25 +42,26 @@ hydraulic_links.h|HydraulicLinkValve|node_uuid_from,node_uuid_to,type,initial_st
 hydraulic_links.h|HydraulicLinkValve|setting_pressure_head_m|complete|conformance-upstream-valve-prv,conformance-upstream-valve-psv,conformance-upstream-valve-pbv|
 hydraulic_links.h|HydraulicLinkValve|setting_flow_m3_per_h|complete|conformance-upstream-valve-fcv|
 hydraulic_links.h|HydraulicLinkValve|setting_loss_coefficient|complete|conformance-upstream-valve-tcv|
-hydraulic_links.h|HydraulicLinkValve|setting_position_percent,characteristic_curve_uuid|complete|conformance-upstream-pcv|
+hydraulic_links.h|HydraulicLinkValve|setting_position_percent,characteristic_curve_uuid|complete|conformance-upstream-pcv,conformance-negative-missing-typed-curve-references|
 hydraulic_links.h|HydraulicLinkValve|head_loss_curve_uuid|complete|conformance-upstream-valve-gpv|
 hydraulic_links.h|HydraulicLinkValve|vertices|complete|conformance-export-coordinates-vertices|
 hydraulic_links.h|HydraulicLinkValve|metadata|complete|conformance-export-titles-comments-tags,conformance-negative-disabled-entity-pruning|
 hydraulic_curves.h|HydraulicPatternTime|id,uuid,multipliers,comment|complete|conformance-export-patterns-curves,conformance-upstream-demand-pattern|
-hydraulic_curves.h|HydraulicCurveTankVolumePoint|water_level_m,volume_m3|complete|conformance-upstream-tank-volume-curve,conformance-export-patterns-curves|
-hydraulic_curves.h|HydraulicCurveTankVolume|id,uuid,points,comment|complete|conformance-upstream-tank-volume-curve,conformance-export-patterns-curves|
-hydraulic_curves.h|HydraulicCurvePumpHeadPoint|flow_m3_per_h,head_gain_m|complete|conformance-upstream-pump-multipoint,conformance-export-patterns-curves|
-hydraulic_curves.h|HydraulicCurvePumpHead|id,uuid,points,comment|complete|conformance-upstream-pump-multipoint,conformance-export-patterns-curves|
-hydraulic_curves.h|HydraulicCurvePumpEfficiencyPoint|flow_m3_per_h,efficiency_percent|complete|conformance-upstream-pump-efficiency-curve,conformance-export-patterns-curves|
-hydraulic_curves.h|HydraulicCurvePumpEfficiency|id,uuid,points,comment|complete|conformance-upstream-pump-efficiency-curve,conformance-export-patterns-curves|
-hydraulic_curves.h|HydraulicCurveValveHeadlossPoint|flow_m3_per_h,head_loss_m|complete|conformance-upstream-valve-gpv,conformance-export-patterns-curves|
-hydraulic_curves.h|HydraulicCurveValveHeadloss|id,uuid,points,comment|complete|conformance-upstream-valve-gpv,conformance-export-patterns-curves|
-hydraulic_curves.h|HydraulicCurveValveCharacteristicPoint|position_percent,relative_flow_percent|complete|conformance-upstream-pcv,conformance-export-patterns-curves|
-hydraulic_curves.h|HydraulicCurveValveCharacteristic|id,uuid,points,comment|complete|conformance-upstream-pcv,conformance-export-patterns-curves|
-hydraulic_curves.h|HydraulicCurveGenericPoint|x,y|complete|conformance-export-patterns-curves|
-hydraulic_curves.h|HydraulicCurveGeneric|id,uuid,points,comment|complete|conformance-export-patterns-curves|
-hydraulic_controls.h|HydraulicControlSimple|id,uuid,type,link_uuid,action,setting,trigger_node_uuid,trigger_level_or_pressure_head_m,trigger_time_s,enabled|complete|conformance-controls-simple-low-level,conformance-controls-simple-high-level,conformance-controls-simple-timer,conformance-controls-simple-time-of-day,conformance-controls-action-open,conformance-controls-action-close,conformance-controls-action-setting,conformance-controls-simple-disabled|
-hydraulic_controls.h|HydraulicControlRulePremise|logical_operator,object,object_uuid,variable,comparison,status,value|complete|conformance-controls-rule-logical-if,conformance-controls-rule-logical-and,conformance-controls-rule-logical-or,conformance-controls-premise-node-pressure,conformance-controls-premise-link-flow,conformance-controls-premise-system-time,conformance-controls-operator-greater,conformance-controls-operator-is|
+hydraulic_curves.h|HydraulicCurveTankVolumePoint|water_level_m,volume_m3|complete|conformance-upstream-tank-volume-curve,conformance-export-patterns-curves,conformance-negative-invalid-curve-shape|
+hydraulic_curves.h|HydraulicCurveTankVolume|id,uuid,points,comment|complete|conformance-upstream-tank-volume-curve,conformance-export-patterns-curves,conformance-negative-invalid-curve-shape|
+hydraulic_curves.h|HydraulicCurvePumpHeadPoint|flow_m3_per_h,head_gain_m|complete|conformance-upstream-pump-multipoint,conformance-export-patterns-curves,conformance-negative-invalid-curve-shape|
+hydraulic_curves.h|HydraulicCurvePumpHead|id,uuid,points,comment|complete|conformance-upstream-pump-multipoint,conformance-export-patterns-curves,conformance-negative-invalid-curve-shape|
+hydraulic_curves.h|HydraulicCurvePumpEfficiencyPoint|flow_m3_per_h,efficiency_percent|complete|conformance-upstream-pump-efficiency-curve,conformance-export-patterns-curves,conformance-negative-invalid-curve-shape|
+hydraulic_curves.h|HydraulicCurvePumpEfficiency|id,uuid,points,comment|complete|conformance-upstream-pump-efficiency-curve,conformance-export-patterns-curves,conformance-negative-invalid-curve-shape|
+hydraulic_curves.h|HydraulicCurveValveHeadlossPoint|flow_m3_per_h,head_loss_m|complete|conformance-upstream-valve-gpv,conformance-export-patterns-curves,conformance-negative-invalid-curve-shape|
+hydraulic_curves.h|HydraulicCurveValveHeadloss|id,uuid,points,comment|complete|conformance-upstream-valve-gpv,conformance-export-patterns-curves,conformance-negative-invalid-curve-shape|
+hydraulic_curves.h|HydraulicCurveValveCharacteristicPoint|position_percent,relative_flow_percent|complete|conformance-upstream-pcv,conformance-export-patterns-curves,conformance-negative-invalid-curve-shape|
+hydraulic_curves.h|HydraulicCurveValveCharacteristic|id,uuid,points,comment|complete|conformance-upstream-pcv,conformance-export-patterns-curves,conformance-negative-invalid-curve-shape|
+hydraulic_curves.h|HydraulicCurveGenericPoint|x,y|complete|conformance-export-patterns-curves,conformance-negative-invalid-curve-shape|
+hydraulic_curves.h|HydraulicCurveGeneric|id,uuid,points,comment|complete|conformance-export-patterns-curves,conformance-negative-invalid-curve-shape|
+hydraulic_controls.h|HydraulicControlLinkSetting|pump_speed_ratio,valve_pressure_head_m,valve_flow_m3_per_h,valve_loss_coefficient,valve_position_percent|complete|conformance-controls-action-setting,conformance-controls-rule-setting-action,conformance-controls-premise-link-setting|
+hydraulic_controls.h|HydraulicControlSimple|id,uuid,type,link_uuid,action,setting,trigger_node_uuid,trigger_water_level_m,trigger_pressure_head_m,trigger_elapsed_time_s,trigger_time_of_day_s,enabled|complete|conformance-controls-simple-low-level,conformance-controls-simple-high-level,conformance-controls-simple-timer,conformance-controls-simple-time-of-day,conformance-controls-action-open,conformance-controls-action-close,conformance-controls-action-setting,conformance-controls-simple-disabled|
+hydraulic_controls.h|HydraulicControlRulePremise|logical_operator,object,object_uuid,variable,comparison,status,demand_m3_per_h,hydraulic_head_m,water_level_m,pressure_head_m,flow_m3_per_h,link_setting,power_kw,elapsed_time_s,time_of_day_s,fill_time_s,drain_time_s|complete|conformance-controls-rule-logical-if,conformance-controls-rule-logical-and,conformance-controls-rule-logical-or,conformance-controls-premise-node-demand,conformance-controls-premise-node-head,conformance-controls-premise-node-grade,conformance-controls-premise-node-level,conformance-controls-premise-node-pressure,conformance-controls-premise-node-fill-time,conformance-controls-premise-node-drain-time,conformance-controls-premise-link-flow,conformance-controls-premise-link-setting,conformance-controls-premise-system-demand,conformance-controls-premise-system-time,conformance-controls-premise-system-clock-time,conformance-controls-operator-greater,conformance-controls-operator-is|
 hydraulic_controls.h|HydraulicControlRuleAction|link_uuid,status,setting|complete|conformance-controls-rule-then,conformance-controls-rule-else,conformance-controls-rule-setting-action,conformance-controls-rule-active-action|
 hydraulic_controls.h|HydraulicControlRule|id,uuid,premises,actions_then,actions_else,priority,enabled,source_text|complete|conformance-controls-rule-priority,conformance-controls-rule-disabled,conformance-controls-rule-source-text|
 hydraulic_simulation_options.h|HydraulicSolverOptions|headloss_formula|complete|conformance-options-hydraulic-headloss-hazen-williams,conformance-upstream-pipe-darcy-weisbach,conformance-upstream-pipe-chezy-manning|
@@ -91,7 +87,13 @@ hydraulic_simulation_options.h|HydraulicSolverOptions|relative_viscosity|complet
 hydraulic_simulation_options.h|WaterQualitySolverOptions|analysis,chemical_name,chemical_units,trace_node_uuid,tolerance,relative_diffusivity|excluded-quality||Water-quality solver/reaction configuration is outside the current hydraulic denominator.
 hydraulic_simulation_options.h|WaterQualityReactionOptions|pipe_bulk_order,pipe_wall_order,tank_bulk_order,global_pipe_bulk_coefficient_per_day,global_pipe_wall_coefficient_m_per_day,global_tank_bulk_coefficient_per_day,limiting_concentration,roughness_correlation|excluded-quality||Water-quality solver/reaction configuration is outside the current hydraulic denominator.
 hydraulic_simulation_options.h|PumpEnergyOptions|currency_iso4217,global_pump_efficiency_percent,global_energy_price_per_kw_h,global_energy_price_pattern_uuid,demand_charge_per_kw|complete|conformance-upstream-pump-global-energy,conformance-upstream-pump-energy-pattern|
-hydraulic_simulation_options.h|HydraulicSimulationReportField|enabled,precision,below,above|complete|conformance-export-report-options|
+hydraulic_simulation_options.h|HydraulicSimulationReportField|enabled,precision|complete|conformance-export-report-options|
+hydraulic_simulation_options.h|HydraulicSimulationReportFieldM|enabled,precision,below_m,above_m|complete|conformance-export-report-options|
+hydraulic_simulation_options.h|HydraulicSimulationReportFieldM3PerH|enabled,precision,below_m3_per_h,above_m3_per_h|complete|conformance-export-report-options|
+hydraulic_simulation_options.h|HydraulicSimulationReportFieldMm|enabled,precision,below_mm,above_mm|complete|conformance-export-report-options|
+hydraulic_simulation_options.h|HydraulicSimulationReportFieldMPerS|enabled,precision,below_m_per_s,above_m_per_s|complete|conformance-export-report-options|
+hydraulic_simulation_options.h|HydraulicSimulationReportFieldMPerKm|enabled,precision,below_m_per_km,above_m_per_km|complete|conformance-export-report-options|
+hydraulic_simulation_options.h|HydraulicSimulationReportFieldFrictionFactor|enabled,precision,below_friction_factor,above_friction_factor|complete|conformance-export-report-options|
 hydraulic_simulation_options.h|HydraulicSimulationReportNodeFields|elevation,demand,head,pressure,quality|complete|conformance-export-report-options|
 hydraulic_simulation_options.h|HydraulicSimulationReportLinkFields|length,diameter,flow,velocity,headloss,position,setting,reaction,friction|complete|conformance-export-report-options|
 hydraulic_simulation_options.h|HydraulicSimulationReportSelection|mode,uuids|complete|conformance-export-report-options|
@@ -125,8 +127,9 @@ hydraulic_simulation_status.h|HydraulicSimulationStatusEntity|type,id,uuid|compl
 hydraulic_simulation_status.h|HydraulicSimulationStatusEntity|index|excluded-runtime-metadata||Backend-local numeric entity indices are diagnostic implementation metadata, not stable high-level hydraulic contract fields.
 hydraulic_simulation_status.h|HydraulicSimulationStatus|success,stage,operation,property,entity,message,details,backend_name,backend_error_code,backend_operation,message_backend|complete|conformance-operational-warning-diagnostics,conformance-operational-error-diagnostics,conformance-negative-structured-diagnostics|
 hydraulic_simulation_diagnostics.h|HydraulicSimulationDiagnostic|severity,stage,operation,property,entity,message,details,backend_name,backend_error_code,backend_operation,message_backend|complete|conformance-operational-warning-diagnostics,conformance-operational-error-diagnostics,conformance-negative-structured-diagnostics|
-hydraulic_map.h|HydraulicMapLabel|id,uuid,x,y,text,anchor_node_uuid|excluded-non-epanet||Map labels are GUI/cartographic data, not EPANET hydraulic input.
-hydraulic_map.h|HydraulicMapBackdrop|lower_left_x,lower_left_y,upper_right_x,upper_right_y,unit,file,offset_x,offset_y|excluded-non-epanet||Map backdrop configuration is GUI/cartographic data, not EPANET hydraulic input.
+hydraulic_map.h|HydraulicMapLabel|id,uuid|excluded-non-epanet||AOWIS map-label identity is not serialized by EPANET.
+hydraulic_map.h|HydraulicMapLabel|coordinate_wgs84,text,anchor_node_uuid|complete|conformance-export-coordinates-vertices,conformance-negative-invalid-map-numeric,conformance-negative-missing-map-label-anchor|
+hydraulic_map.h|HydraulicMapBackdrop|enabled,lower_left_wgs84,upper_right_wgs84,file,offset_longitude_deg,offset_latitude_deg|complete|conformance-export-coordinates-vertices|
 network_hydraulic.h|NetworkHydraulicCustomerPoint|id,uuid|excluded-non-epanet||Customer-point identity is application metadata, hydraulic demands are represented on junctions.
 network_hydraulic.h|NetworkHydraulic|id,uuid|excluded-non-epanet||Network application identity is not an EPANET hydraulic field.
 network_hydraulic.h|NetworkHydraulic|title_line_1,title_line_2,title_line_3|complete|conformance-export-titles-comments-tags|
@@ -149,4 +152,5 @@ network_hydraulic.h|NetworkHydraulic|curves_tank_volume,curves_pump_head,curves_
 network_hydraulic.h|NetworkHydraulic|nodes_reservoirs,nodes_junctions,nodes_tanks,links_pipes,links_pumps,links_valves|complete|conformance-net1,conformance-negative-disabled-entity-pruning|
 network_hydraulic.h|NetworkHydraulic|controls_simple|complete|conformance-controls-simple-low-level,conformance-controls-simple-disabled|
 network_hydraulic.h|NetworkHydraulic|controls_rules|complete|conformance-controls-rule-logical-if,conformance-controls-rule-disabled|
-network_hydraulic.h|NetworkHydraulic|map_labels,map_backdrop,customer_points|excluded-non-epanet||Application/cartographic data is outside EPANET hydraulic semantics.
+network_hydraulic.h|NetworkHydraulic|map_labels,map_backdrop|complete|conformance-export-coordinates-vertices|
+network_hydraulic.h|NetworkHydraulic|customer_points|excluded-non-epanet||Application/customer-point data is outside EPANET hydraulic semantics.

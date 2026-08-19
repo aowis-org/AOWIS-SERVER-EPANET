@@ -78,6 +78,34 @@ HydraulicSimulationStatus validateSupportedFeatures(const NetworkHydraulic &requ
     return status;
 }
 
+int controlLinkSettingValueCount(const HydraulicControlLinkSetting &setting)
+{
+    int count = 0;
+    count += setting.pump_speed_ratio.has_value() ? 1 : 0;
+    count += setting.valve_pressure_head_m.has_value() ? 1 : 0;
+    count += setting.valve_flow_m3_per_h.has_value() ? 1 : 0;
+    count += setting.valve_loss_coefficient.has_value() ? 1 : 0;
+    count += setting.valve_position_percent.has_value() ? 1 : 0;
+    return count;
+}
+
+int rulePremiseNumericValueCount(const HydraulicControlRulePremise &premise)
+{
+    int count = 0;
+    count += premise.demand_m3_per_h.has_value() ? 1 : 0;
+    count += premise.hydraulic_head_m.has_value() ? 1 : 0;
+    count += premise.water_level_m.has_value() ? 1 : 0;
+    count += premise.pressure_head_m.has_value() ? 1 : 0;
+    count += premise.flow_m3_per_h.has_value() ? 1 : 0;
+    count += controlLinkSettingValueCount(premise.link_setting);
+    count += premise.power_kw.has_value() ? 1 : 0;
+    count += premise.elapsed_time_s.has_value() ? 1 : 0;
+    count += premise.time_of_day_s.has_value() ? 1 : 0;
+    count += premise.fill_time_s.has_value() ? 1 : 0;
+    count += premise.drain_time_s.has_value() ? 1 : 0;
+    return count;
+}
+
 bool resolveSimpleControlType(HydraulicControlSimpleType type, int &backend_type)
 {
     switch (type)
@@ -94,24 +122,6 @@ bool resolveSimpleControlType(HydraulicControlSimpleType type, int &backend_type
     case HydraulicControlSimpleType::TimeOfDay:
         backend_type = EN_TIMEOFDAY;
         return true;
-    }
-
-    return false;
-}
-
-bool resolveSimpleControlSetting(const HydraulicControlSimple &control, double &setting)
-{
-    switch (control.action)
-    {
-    case HydraulicControlActionType::Open:
-        setting = EN_SET_OPEN;
-        return true;
-    case HydraulicControlActionType::Close:
-        setting = EN_SET_CLOSED;
-        return true;
-    case HydraulicControlActionType::Setting:
-        setting = control.setting;
-        return std::isfinite(setting);
     }
 
     return false;
@@ -490,6 +500,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulic &re
     this->pipe_ids_by_uuid.clear();
     this->pump_ids_by_uuid.clear();
     this->valve_ids_by_uuid.clear();
+    this->valve_types_by_uuid.clear();
     this->control_simple_ids_by_uuid.clear();
     this->control_rule_ids_by_uuid.clear();
     this->constant_demand_pattern_id.clear();
@@ -588,6 +599,8 @@ HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulic &re
     {
         status = registerBackendId(this->valve_ids_by_uuid, valve.uuid, valve.id, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusEntityType::Valve, QStringLiteral("Valve"));
         collectBuildFailure(this->project, status, first_failure);
+        if (status.success)
+            this->valve_types_by_uuid.insert(valve.uuid, valve.type);
     }
 
     for (const HydraulicControlSimple &control : request.controls_simple)
@@ -1696,31 +1709,55 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addControlSimple(const Hydraulic
         return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("Could not resolve the link controlled by the simple control"));
 
     double setting = 0.0;
-    if (!resolveSimpleControlSetting(control, setting))
-        return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::AddControl, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("Simple control setting must be finite"));
+    switch (control.action)
+    {
+    case HydraulicControlActionType::Open:
+        if (controlLinkSettingValueCount(control.setting) != 0)
+            return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::AddControl, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("OPEN simple control action must not define a numeric setting"));
+        setting = EN_SET_OPEN;
+        break;
+    case HydraulicControlActionType::Close:
+        if (controlLinkSettingValueCount(control.setting) != 0)
+            return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::AddControl, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("CLOSE simple control action must not define a numeric setting"));
+        setting = EN_SET_CLOSED;
+        break;
+    case HydraulicControlActionType::Setting:
+        if (!resolveControlLinkSetting(control.link_uuid, control.setting, setting) || setting < 0.0)
+            return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::AddControl, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("Simple control setting does not match the controlled pump or valve"));
+        break;
+    }
 
     int trigger_node_index = 0;
     double trigger_value = 0.0;
     if (control.type == HydraulicControlSimpleType::LowLevel || control.type == HydraulicControlSimpleType::HighLevel)
     {
         trigger_node_index = this->indices.nodes_junctions.value(control.trigger_node_uuid, 0);
-        if (trigger_node_index == 0)
-            trigger_node_index = this->indices.nodes_reservoirs.value(control.trigger_node_uuid, 0);
-        if (trigger_node_index == 0)
+        if (trigger_node_index != 0)
+        {
+            if (!std::isfinite(control.trigger_pressure_head_m))
+                return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::AddControl, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("Simple control trigger pressure head must be finite"));
+            trigger_value = control.trigger_pressure_head_m;
+        }
+        else
+        {
             trigger_node_index = this->indices.nodes_tanks.value(control.trigger_node_uuid, 0);
-        if (trigger_node_index == 0)
-            return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("Could not resolve the trigger node for the level control"));
-        if (!std::isfinite(control.trigger_level_or_pressure_head_m))
-            return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::AddControl, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("Simple control trigger level must be finite"));
-        trigger_value = control.trigger_level_or_pressure_head_m;
+            if (trigger_node_index == 0)
+                return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("A level control trigger must reference a junction or tank"));
+            if (!std::isfinite(control.trigger_water_level_m))
+                return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::AddControl, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("Simple control trigger water level must be finite"));
+            trigger_value = control.trigger_water_level_m;
+        }
     }
     else
     {
-        if (control.trigger_time_s > static_cast<quint64>(std::numeric_limits<long>::max()))
+        const quint64 trigger_time_s = control.type == HydraulicControlSimpleType::Timer
+            ? control.trigger_elapsed_time_s
+            : control.trigger_time_of_day_s;
+        if (trigger_time_s > static_cast<quint64>(std::numeric_limits<long>::max()))
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::AddControl, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("Simple control trigger time exceeds the EPANET time range"));
-        if (control.type == HydraulicControlSimpleType::TimeOfDay && control.trigger_time_s >= 24 * 60 * 60)
+        if (control.type == HydraulicControlSimpleType::TimeOfDay && trigger_time_s >= 24 * 60 * 60)
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::AddControl, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("Time-of-day control trigger must be within one day"));
-        trigger_value = static_cast<double>(control.trigger_time_s);
+        trigger_value = static_cast<double>(trigger_time_s);
     }
 
     int control_index = 0;
@@ -1834,7 +1871,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::buildControlRuleText(const Hydra
         QString value_text;
         if (premise.variable == HydraulicControlRuleVariable::Status)
         {
-            if (!premise.status.has_value() || premise.value.has_value())
+            if (!premise.status.has_value() || rulePremiseNumericValueCount(premise) != 0)
                 return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::AddRule, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("A STATUS premise requires one status value and no numeric value"));
             if (premise.comparison != HydraulicControlRuleOperator::Equal
                 && premise.comparison != HydraulicControlRuleOperator::NotEqual
@@ -1847,24 +1884,23 @@ HydraulicSimulationStatus EpanetNetworkBuilder::buildControlRuleText(const Hydra
         }
         else
         {
-            if (premise.status.has_value() || !premise.value.has_value() || !std::isfinite(premise.value.value()))
-                return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::AddRule, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("A numeric control-rule premise requires one finite numeric value and no status value"));
+            double premise_value = 0.0;
+            if (premise.status.has_value() || !resolveRulePremiseValue(premise, premise_value) || !std::isfinite(premise_value))
+                return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::AddRule, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("A numeric control-rule premise requires the quantity-specific value for its selected variable"));
             if (isTimeRuleVariable(premise.variable))
             {
-                if (premise.value.value() < 0.0)
-                    return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::AddRule, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("Control-rule time values cannot be negative"));
                 if ((premise.variable == HydraulicControlRuleVariable::Time || premise.variable == HydraulicControlRuleVariable::ClockTime)
-                    && premise.value.value() > static_cast<double>(std::numeric_limits<long>::max()))
+                    && premise_value > static_cast<double>(std::numeric_limits<long>::max()))
                 {
                     return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::AddRule, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("Control-rule time value exceeds the EPANET time range"));
                 }
-                if (premise.variable == HydraulicControlRuleVariable::ClockTime && premise.value.value() >= 24.0 * 60.0 * 60.0)
+                if (premise.variable == HydraulicControlRuleVariable::ClockTime && premise_value >= 24.0 * 60.0 * 60.0)
                     return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::AddRule, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("CLOCKTIME premise value must be within one day"));
-                value_text = QString::number(premise.value.value() / 3600.0, 'g', 17);
+                value_text = QString::number(premise_value / 3600.0, 'g', 17);
             }
             else
             {
-                value_text = QString::number(premise.value.value(), 'g', 17);
+                value_text = QString::number(premise_value, 'g', 17);
             }
         }
 
@@ -1879,8 +1915,14 @@ HydraulicSimulationStatus EpanetNetworkBuilder::buildControlRuleText(const Hydra
             QString link_id;
             if (!resolveLinkId(action.link_uuid, link_id))
                 return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("Could not resolve a link referenced by a control-rule action"));
-            if (action.status.has_value() == action.setting.has_value())
-                return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::AddRule, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("A control-rule action must define exactly one status or setting"));
+            double action_setting = 0.0;
+            const int setting_value_count = controlLinkSettingValueCount(action.setting);
+            const bool has_setting = resolveControlLinkSetting(action.link_uuid, action.setting, action_setting);
+            if ((action.status.has_value() && setting_value_count != 0)
+                || (!action.status.has_value() && (!has_setting || setting_value_count != 1)))
+            {
+                return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::AddRule, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("A control-rule action must define exactly one status or quantity-specific setting"));
+            }
 
             QString variable;
             QString value;
@@ -1896,10 +1938,10 @@ HydraulicSimulationStatus EpanetNetworkBuilder::buildControlRuleText(const Hydra
             }
             else
             {
-                if (!std::isfinite(action.setting.value()) || action.setting.value() < 0.0)
+                if (!std::isfinite(action_setting) || action_setting < 0.0)
                     return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::AddRule, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("A control-rule action setting must be finite and non-negative"));
                 variable = QStringLiteral("SETTING");
-                value = QString::number(action.setting.value(), 'g', 17);
+                value = QString::number(action_setting, 'g', 17);
             }
 
             const QString keyword = action_index == 0 ? first_keyword : QStringLiteral("AND");
@@ -2015,6 +2057,120 @@ bool EpanetNetworkBuilder::resolveLinkIndex(const QUuid &uuid, int &index) const
     if (index == 0)
         index = this->indices.links_valves.value(uuid, 0);
     return index > 0;
+}
+
+bool EpanetNetworkBuilder::resolveControlLinkSetting(const QUuid &link_uuid, const HydraulicControlLinkSetting &setting, double &backend_setting) const
+{
+    if (controlLinkSettingValueCount(setting) != 1)
+        return false;
+
+    if (this->pump_ids_by_uuid.contains(link_uuid))
+    {
+        if (!setting.pump_speed_ratio.has_value())
+            return false;
+        backend_setting = setting.pump_speed_ratio.value();
+        return std::isfinite(backend_setting);
+    }
+
+    if (!this->valve_types_by_uuid.contains(link_uuid))
+        return false;
+
+    switch (this->valve_types_by_uuid.value(link_uuid))
+    {
+    case HydraulicLinkValveType::PRV:
+    case HydraulicLinkValveType::PSV:
+    case HydraulicLinkValveType::PBV:
+        if (!setting.valve_pressure_head_m.has_value())
+            return false;
+        backend_setting = setting.valve_pressure_head_m.value();
+        return std::isfinite(backend_setting);
+    case HydraulicLinkValveType::FCV:
+        if (!setting.valve_flow_m3_per_h.has_value())
+            return false;
+        backend_setting = setting.valve_flow_m3_per_h.value();
+        return std::isfinite(backend_setting);
+    case HydraulicLinkValveType::TCV:
+        if (!setting.valve_loss_coefficient.has_value())
+            return false;
+        backend_setting = setting.valve_loss_coefficient.value();
+        return std::isfinite(backend_setting);
+    case HydraulicLinkValveType::PCV:
+        if (!setting.valve_position_percent.has_value())
+            return false;
+        backend_setting = setting.valve_position_percent.value();
+        return std::isfinite(backend_setting);
+    case HydraulicLinkValveType::GPV:
+        return false;
+    }
+
+    return false;
+}
+
+bool EpanetNetworkBuilder::resolveRulePremiseValue(const HydraulicControlRulePremise &premise, double &value) const
+{
+    if (rulePremiseNumericValueCount(premise) != 1)
+        return false;
+
+    switch (premise.variable)
+    {
+    case HydraulicControlRuleVariable::Demand:
+        if (!premise.demand_m3_per_h.has_value())
+            return false;
+        value = premise.demand_m3_per_h.value();
+        return true;
+    case HydraulicControlRuleVariable::Head:
+    case HydraulicControlRuleVariable::Grade:
+        if (!premise.hydraulic_head_m.has_value())
+            return false;
+        value = premise.hydraulic_head_m.value();
+        return true;
+    case HydraulicControlRuleVariable::Level:
+        if (!premise.water_level_m.has_value())
+            return false;
+        value = premise.water_level_m.value();
+        return true;
+    case HydraulicControlRuleVariable::Pressure:
+        if (!premise.pressure_head_m.has_value())
+            return false;
+        value = premise.pressure_head_m.value();
+        return true;
+    case HydraulicControlRuleVariable::Flow:
+        if (!premise.flow_m3_per_h.has_value())
+            return false;
+        value = premise.flow_m3_per_h.value();
+        return true;
+    case HydraulicControlRuleVariable::Status:
+        return false;
+    case HydraulicControlRuleVariable::Setting:
+        return resolveControlLinkSetting(premise.object_uuid, premise.link_setting, value);
+    case HydraulicControlRuleVariable::Power:
+        if (!premise.power_kw.has_value())
+            return false;
+        value = premise.power_kw.value();
+        return true;
+    case HydraulicControlRuleVariable::Time:
+        if (!premise.elapsed_time_s.has_value())
+            return false;
+        value = static_cast<double>(premise.elapsed_time_s.value());
+        return true;
+    case HydraulicControlRuleVariable::ClockTime:
+        if (!premise.time_of_day_s.has_value())
+            return false;
+        value = static_cast<double>(premise.time_of_day_s.value());
+        return true;
+    case HydraulicControlRuleVariable::FillTime:
+        if (!premise.fill_time_s.has_value())
+            return false;
+        value = static_cast<double>(premise.fill_time_s.value());
+        return true;
+    case HydraulicControlRuleVariable::DrainTime:
+        if (!premise.drain_time_s.has_value())
+            return false;
+        value = static_cast<double>(premise.drain_time_s.value());
+        return true;
+    }
+
+    return false;
 }
 
 HydraulicSimulationStatus EpanetNetworkBuilder::refreshNodeIndices(const NetworkHydraulic &request)

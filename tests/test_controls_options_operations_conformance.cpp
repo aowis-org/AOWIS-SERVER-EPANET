@@ -210,21 +210,22 @@ HydraulicControlSimple makeSimpleControl(
     control.type = type;
     control.link_uuid = linkUuid(network, QStringLiteral("9"));
     control.action = action;
-    control.setting = 0.83;
+    if (action == HydraulicControlActionType::Setting)
+        control.setting.pump_speed_ratio = 0.83;
     control.enabled = enabled;
 
     if (type == HydraulicControlSimpleType::LowLevel || type == HydraulicControlSimpleType::HighLevel)
     {
         control.trigger_node_uuid = nodeUuid(network, QStringLiteral("2"));
-        control.trigger_level_or_pressure_head_m = type == HydraulicControlSimpleType::LowLevel ? 34.0 : 40.0;
+        control.trigger_water_level_m = type == HydraulicControlSimpleType::LowLevel ? 34.0 : 40.0;
     }
     else if (type == HydraulicControlSimpleType::Timer)
     {
-        control.trigger_time_s = 1800;
+        control.trigger_elapsed_time_s = 1800;
     }
     else
     {
-        control.trigger_time_s = 7 * 3600;
+        control.trigger_time_of_day_s = 7 * 3600;
     }
 
     return control;
@@ -279,7 +280,47 @@ HydraulicControlRulePremise numericPremise(
     premise.object_uuid = object_uuid;
     premise.variable = variable;
     premise.comparison = comparison_operator;
-    premise.value = value;
+
+    switch (variable)
+    {
+    case HydraulicControlRuleVariable::Demand:
+        premise.demand_m3_per_h = value;
+        break;
+    case HydraulicControlRuleVariable::Head:
+    case HydraulicControlRuleVariable::Grade:
+        premise.hydraulic_head_m = value;
+        break;
+    case HydraulicControlRuleVariable::Level:
+        premise.water_level_m = value;
+        break;
+    case HydraulicControlRuleVariable::Pressure:
+        premise.pressure_head_m = value;
+        break;
+    case HydraulicControlRuleVariable::Flow:
+        premise.flow_m3_per_h = value;
+        break;
+    case HydraulicControlRuleVariable::Setting:
+        premise.link_setting.pump_speed_ratio = value;
+        break;
+    case HydraulicControlRuleVariable::Power:
+        premise.power_kw = value;
+        break;
+    case HydraulicControlRuleVariable::Time:
+        premise.elapsed_time_s = static_cast<quint64>(value);
+        break;
+    case HydraulicControlRuleVariable::ClockTime:
+        premise.time_of_day_s = static_cast<quint64>(value);
+        break;
+    case HydraulicControlRuleVariable::FillTime:
+        premise.fill_time_s = static_cast<quint64>(value);
+        break;
+    case HydraulicControlRuleVariable::DrainTime:
+        premise.drain_time_s = static_cast<quint64>(value);
+        break;
+    case HydraulicControlRuleVariable::Status:
+        break;
+    }
+
     return premise;
 }
 
@@ -404,7 +445,7 @@ void testSimpleAction(TestContext &context, HydraulicControlActionType action, d
         network.links_pumps.first().initial_status = HydraulicLinkPumpInitialStatus::Off;
 
     HydraulicControlSimple control = makeSimpleControl(network, HydraulicControlSimpleType::Timer, action);
-    control.trigger_time_s = 0;
+    control.trigger_elapsed_time_s = 0;
     network.controls_simple.append(control);
 
     const NativeSavedProject native_project(network);
@@ -447,7 +488,7 @@ void testDisabledSimpleControl(TestContext &context)
     enabled_network.duration_s = 0;
     HydraulicControlSimple enabled_control = makeSimpleControl(
         enabled_network, HydraulicControlSimpleType::Timer, HydraulicControlActionType::Close, true);
-    enabled_control.trigger_time_s = 0;
+    enabled_control.trigger_elapsed_time_s = 0;
     enabled_network.controls_simple.append(enabled_control);
 
     NetworkHydraulic disabled_network = enabled_network;
@@ -731,7 +772,7 @@ void testRuleSettingAction(TestContext &context)
     rule.premises = premises;
     HydraulicControlRuleAction action;
     action.link_uuid = linkUuid(network, QStringLiteral("9"));
-    action.setting = 0.77;
+    action.setting.pump_speed_ratio = 0.77;
     rule.actions_then.append(action);
     network.controls_rules.append(rule);
 
@@ -1424,7 +1465,7 @@ void testErrorDiagnostics(TestContext &context)
     premise.object_uuid = QUuid::createUuid();
     premise.variable = HydraulicControlRuleVariable::Pressure;
     premise.comparison = HydraulicControlRuleOperator::Greater;
-    premise.value = 1.0;
+    premise.pressure_head_m = 1.0;
     rule.premises.append(premise);
     rule.actions_then.append(closePumpAction(network));
     network.controls_rules.append(rule);

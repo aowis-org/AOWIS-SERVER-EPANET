@@ -615,7 +615,7 @@ void registerHydraulicBehaviorScenarios(ScenarioRegistry &registry)
     registry.add(ScenarioDefinition{
         "conformance-upstream-pcv",
         "Ports the upstream 35-percent-open PCV characteristic-curve case and golden head-loss assertion with full differential comparison.",
-        {"conformance", "hydraulic", "upstream", "valve"},
+        {"conformance", "hydraulic", "upstream", "valve", "curve"},
         &testPcv});
     registry.add(ScenarioDefinition{
         "conformance-upstream-demand-pattern",

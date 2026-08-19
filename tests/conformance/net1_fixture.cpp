@@ -174,7 +174,7 @@ Net1Fixture makeNet1Fixture()
     open_pump.link_uuid = pump.uuid;
     open_pump.action = HydraulicControlActionType::Open;
     open_pump.trigger_node_uuid = tank.uuid;
-    open_pump.trigger_level_or_pressure_head_m = feetToMetres(110.0);
+    open_pump.trigger_water_level_m = feetToMetres(110.0);
     network.controls_simple.append(open_pump);
     fixture.native_control_ids_by_index.insert(1, open_pump.id);
 
@@ -185,7 +185,7 @@ Net1Fixture makeNet1Fixture()
     close_pump.link_uuid = pump.uuid;
     close_pump.action = HydraulicControlActionType::Close;
     close_pump.trigger_node_uuid = tank.uuid;
-    close_pump.trigger_level_or_pressure_head_m = feetToMetres(140.0);
+    close_pump.trigger_water_level_m = feetToMetres(140.0);
     network.controls_simple.append(close_pump);
     fixture.native_control_ids_by_index.insert(2, close_pump.id);
 

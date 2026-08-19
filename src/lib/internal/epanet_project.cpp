@@ -4,6 +4,7 @@
 
 #include <array>
 #include <limits>
+#include <optional>
 
 #include <QByteArray>
 #include <QFile>
@@ -113,18 +114,59 @@ QHash<QUuid, QString> reportLinkIdsByUuid(const NetworkHydraulic &network)
     return ids_by_uuid;
 }
 
-void appendReportFieldCommands(QStringList &commands, const QString &field_name, const HydraulicSimulationReportField &field)
+void appendReportFieldCommands(
+    QStringList &commands,
+    const QString &field_name,
+    bool enabled,
+    const std::optional<int> &precision,
+    const std::optional<double> &below,
+    const std::optional<double> &above)
 {
-    commands.append(field_name + (field.enabled ? QStringLiteral(" YES") : QStringLiteral(" NO")));
-    if (!field.enabled)
+    commands.append(field_name + (enabled ? QStringLiteral(" YES") : QStringLiteral(" NO")));
+    if (!enabled)
         return;
 
-    if (field.precision.has_value())
-        commands.append(field_name + QStringLiteral(" PRECISION %1").arg(field.precision.value()));
-    if (field.below.has_value())
-        commands.append(field_name + QStringLiteral(" BELOW %1").arg(QString::number(field.below.value(), 'g', 17)));
-    if (field.above.has_value())
-        commands.append(field_name + QStringLiteral(" ABOVE %1").arg(QString::number(field.above.value(), 'g', 17)));
+    if (precision.has_value())
+        commands.append(field_name + QStringLiteral(" PRECISION %1").arg(precision.value()));
+    if (below.has_value())
+        commands.append(field_name + QStringLiteral(" BELOW %1").arg(QString::number(below.value(), 'g', 17)));
+    if (above.has_value())
+        commands.append(field_name + QStringLiteral(" ABOVE %1").arg(QString::number(above.value(), 'g', 17)));
+}
+
+void appendReportFieldCommands(QStringList &commands, const QString &field_name, const HydraulicSimulationReportField &field)
+{
+    appendReportFieldCommands(commands, field_name, field.enabled, field.precision, std::nullopt, std::nullopt);
+}
+
+void appendReportFieldCommands(QStringList &commands, const QString &field_name, const HydraulicSimulationReportFieldM &field)
+{
+    appendReportFieldCommands(commands, field_name, field.enabled, field.precision, field.below_m, field.above_m);
+}
+
+void appendReportFieldCommands(QStringList &commands, const QString &field_name, const HydraulicSimulationReportFieldM3PerH &field)
+{
+    appendReportFieldCommands(commands, field_name, field.enabled, field.precision, field.below_m3_per_h, field.above_m3_per_h);
+}
+
+void appendReportFieldCommands(QStringList &commands, const QString &field_name, const HydraulicSimulationReportFieldMm &field)
+{
+    appendReportFieldCommands(commands, field_name, field.enabled, field.precision, field.below_mm, field.above_mm);
+}
+
+void appendReportFieldCommands(QStringList &commands, const QString &field_name, const HydraulicSimulationReportFieldMPerS &field)
+{
+    appendReportFieldCommands(commands, field_name, field.enabled, field.precision, field.below_m_per_s, field.above_m_per_s);
+}
+
+void appendReportFieldCommands(QStringList &commands, const QString &field_name, const HydraulicSimulationReportFieldMPerKm &field)
+{
+    appendReportFieldCommands(commands, field_name, field.enabled, field.precision, field.below_m_per_km, field.above_m_per_km);
+}
+
+void appendReportFieldCommands(QStringList &commands, const QString &field_name, const HydraulicSimulationReportFieldFrictionFactor &field)
+{
+    appendReportFieldCommands(commands, field_name, field.enabled, field.precision, field.below_friction_factor, field.above_friction_factor);
 }
 
 void appendTypedReportFieldCommands(QStringList &commands, const HydraulicSimulationReportOptions &options)
@@ -147,9 +189,9 @@ void appendTypedReportFieldCommands(QStringList &commands, const HydraulicSimula
     appendReportFieldCommands(commands, QStringLiteral("F-FACTOR"), options.fields_link.friction);
 }
 
-HydraulicSimulationReportField effectiveFrictionReportField(const HydraulicSimulationReportOptions &options)
+HydraulicSimulationReportFieldFrictionFactor effectiveFrictionReportField(const HydraulicSimulationReportOptions &options)
 {
-    HydraulicSimulationReportField field = options.fields_link.friction;
+    HydraulicSimulationReportFieldFrictionFactor field = options.fields_link.friction;
     for (const QString &backend_command : options.backend_commands)
     {
         const QStringList tokens = backend_command.simplified().split(QChar(' '), Qt::SkipEmptyParts);
@@ -180,12 +222,97 @@ HydraulicSimulationReportField effectiveFrictionReportField(const HydraulicSimul
             field.precision = qRound(value);
         }
         else if (tokens.at(1).compare(QStringLiteral("BELOW"), Qt::CaseInsensitive) == 0)
-            field.below = value;
+            field.below_friction_factor = value;
         else if (tokens.at(1).compare(QStringLiteral("ABOVE"), Qt::CaseInsensitive) == 0)
-            field.above = value;
+            field.above_friction_factor = value;
     }
 
     return field;
+}
+
+QString mapNumber(double value)
+{
+    return QString::number(value, 'g', 15);
+}
+
+QString preserveMapLayoutSections(QString inp_text, const NetworkHydraulic &network)
+{
+    QStringList lines = inp_text.split(QChar('\n'));
+    QStringList retained_lines;
+    retained_lines.reserve(lines.size());
+
+    bool skip_section = false;
+    for (const QString &line : lines)
+    {
+        const QString trimmed = line.trimmed();
+        if (trimmed.startsWith(QChar('[')))
+        {
+            const bool map_section = trimmed.compare(QStringLiteral("[LABELS]"), Qt::CaseInsensitive) == 0
+                || trimmed.compare(QStringLiteral("[BACKDROP]"), Qt::CaseInsensitive) == 0;
+            skip_section = map_section;
+            if (map_section)
+                continue;
+        }
+        if (!skip_section)
+            retained_lines.append(line);
+    }
+
+    QStringList layout_lines;
+    const QHash<QUuid, QString> node_ids_by_uuid = reportNodeIdsByUuid(network);
+
+    if (!network.map_labels.isEmpty())
+    {
+        layout_lines.append(QStringLiteral("[LABELS]"));
+        for (const HydraulicMapLabel &label : network.map_labels)
+        {
+            QString row = QStringLiteral("%1 %2 \"%3\"")
+                .arg(mapNumber(label.coordinate_wgs84.longitude_deg),
+                    mapNumber(label.coordinate_wgs84.latitude_deg),
+                    label.text);
+            if (!label.anchor_node_uuid.isNull())
+            {
+                const QString anchor_id = node_ids_by_uuid.value(label.anchor_node_uuid);
+                if (!anchor_id.isEmpty())
+                    row += QStringLiteral(" %1").arg(anchor_id);
+            }
+            layout_lines.append(row);
+        }
+        layout_lines.append(QString());
+    }
+
+    if (network.map_backdrop.enabled)
+    {
+        layout_lines.append(QStringLiteral("[BACKDROP]"));
+        layout_lines.append(QStringLiteral("DIMENSIONS %1 %2 %3 %4")
+            .arg(mapNumber(network.map_backdrop.lower_left_wgs84.longitude_deg),
+                mapNumber(network.map_backdrop.lower_left_wgs84.latitude_deg),
+                mapNumber(network.map_backdrop.upper_right_wgs84.longitude_deg),
+                mapNumber(network.map_backdrop.upper_right_wgs84.latitude_deg)));
+        layout_lines.append(QStringLiteral("UNITS DEGREES"));
+        layout_lines.append(QStringLiteral("FILE %1").arg(network.map_backdrop.file));
+        layout_lines.append(QStringLiteral("OFFSET %1 %2")
+            .arg(mapNumber(network.map_backdrop.offset_longitude_deg),
+                mapNumber(network.map_backdrop.offset_latitude_deg)));
+        layout_lines.append(QString());
+    }
+
+    if (layout_lines.isEmpty())
+        return retained_lines.join(QChar('\n'));
+
+    int end_index = retained_lines.size();
+    for (int index = 0; index < retained_lines.size(); index++)
+    {
+        if (retained_lines.at(index).trimmed().compare(QStringLiteral("[END]"), Qt::CaseInsensitive) == 0)
+        {
+            end_index = index;
+            break;
+        }
+    }
+
+    for (int index = 0; index < layout_lines.size(); index++)
+        retained_lines.insert(end_index + index, layout_lines.at(index));
+
+    return retained_lines.join(QChar('\n'));
 }
 
 QString preserveFrictionReportField(QString inp_text, const HydraulicSimulationReportOptions &options)
@@ -654,6 +781,11 @@ HydraulicSimulationStatus EpanetProject::retrieveInpText(const NetworkHydraulic 
     // field from [REPORT]. Reinsert the effective configured value so reopening
     // the generated INP preserves the complete typed report configuration.
     inp_text = preserveFrictionReportField(inp_text, request.options_report);
+
+    // AOWIS hydraulic geometry uses canonical WGS84 longitude/latitude. EPANET
+    // [COORDINATES], [VERTICES], [LABELS], and [BACKDROP] therefore share that
+    // same degree-based map space in generated INP files.
+    inp_text = preserveMapLayoutSections(inp_text, request);
 
     return makeEpanetSuccess();
 }
