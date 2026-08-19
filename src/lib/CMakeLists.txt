@@ -11,6 +11,7 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/internal/epanet_network_preparer.cpp
     src/lib/internal/epanet_network_validator.cpp
     src/lib/internal/epanet_project.cpp
+    src/lib/internal/epanet_quality_result_reader.cpp
     src/lib/internal/epanet_report_collector.cpp
     src/lib/internal/epanet_result_reader.cpp
     src/lib/internal/epanet_status_helpers.cpp
@@ -38,6 +39,7 @@ set(AOWIS_SERVER_EPANET_INTERNAL_HEADERS
     src/lib/internal/epanet_network_preparer.h
     src/lib/internal/epanet_network_validator.h
     src/lib/internal/epanet_project.h
+    src/lib/internal/epanet_quality_result_reader.h
     src/lib/internal/epanet_report_collector.h
     src/lib/internal/epanet_result_reader.h
     src/lib/internal/epanet_status_helpers.h

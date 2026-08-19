@@ -503,6 +503,8 @@ NetworkHydraulic DummyNetworks::networkFull()
 {
     NetworkHydraulic network;
     network.uuid = QUuid::createUuid();
+    network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
+    network.options_quality.chemical_name = QStringLiteral("Chemical");
     
     // Curves
     HydraulicCurvePumpHead pump_head_curve;
@@ -700,6 +702,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     tank.volume_curve_uuid = tank_volume_curve.uuid;
     tank.can_overflow = true;
     tank.quality_source.type = HydraulicNodeQualitySourceType::MassBooster;
+    tank.quality_source.chemical_mass_flow_mg_per_min = 0.25;
     tank.mixing_model = HydraulicNodeTankMixingModel::FirstInFirstOut;
     network.nodes_tanks.append(tank);
     
@@ -833,9 +836,11 @@ NetworkHydraulic DummyNetworks::networkFull()
     loop_pipe_1.roughness_darcy_weisbach_mm = 0.26;
     loop_pipe_1.roughness_chezy_manning = 0.014;
     loop_pipe_1.minor_loss_coefficient = 0.4;
-    loop_pipe_1.override_reaction_coefficients = true;
-    loop_pipe_1.bulk_reaction_coefficient_per_day = -0.15;
-    loop_pipe_1.wall_reaction_coefficient_m_per_day = -0.05;
+    loop_pipe_1.override_reactions = true;
+    loop_pipe_1.bulk_reaction.coefficient = -0.15;
+    loop_pipe_1.bulk_reaction.order = 1.0;
+    loop_pipe_1.wall_reaction.coefficient = -0.05;
+    loop_pipe_1.wall_reaction.order = 1.0;
     
     HydraulicLinkPipe loop_pipe_2;
     loop_pipe_2.uuid = QUuid::createUuid();

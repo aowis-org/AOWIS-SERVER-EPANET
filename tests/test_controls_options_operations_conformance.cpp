@@ -1320,13 +1320,6 @@ void testOptionDemandMultiplier(TestContext &context)
     expectOption(context, network, EN_DEMANDMULT, 1.37);
 }
 
-void testOptionEmitterExponent(TestContext &context)
-{
-    NetworkHydraulic network = cleanNet1();
-    network.options_hydraulic.emitter_exponent = 0.73;
-    expectOption(context, network, EN_EMITEXPON, 0.73);
-}
-
 void testOptionEmitterBackflowDisabled(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
@@ -1623,9 +1616,8 @@ void registerControlsOptionsOperationsScenarios(ScenarioRegistry &registry)
     registry.add(ScenarioDefinition{"conformance-options-hydraulic-demand-multiplier", "Checks demand-multiplier mapping.", {"conformance", "hydraulic", "options"}, &testOptionDemandMultiplier});
     registry.add(ScenarioDefinition{"conformance-options-hydraulic-default-demand-pattern-none", "Checks the no-default-demand-pattern solver-option branch.", {"conformance", "hydraulic", "options"}, &testOptionDefaultDemandPatternNone});
     registry.add(ScenarioDefinition{"conformance-options-hydraulic-default-demand-pattern", "Checks default-demand-pattern solver-option mapping.", {"conformance", "hydraulic", "options"}, &testOptionDefaultDemandPattern});
-    registry.add(ScenarioDefinition{"conformance-options-hydraulic-emitter-exponent", "Checks emitter-exponent mapping.", {"conformance", "hydraulic", "options"}, &testOptionEmitterExponent});
-    registry.add(ScenarioDefinition{"conformance-options-hydraulic-emitter-backflow-disabled", "Checks disabled emitter-backflow mapping.", {"conformance", "hydraulic", "options"}, &testOptionEmitterBackflowDisabled});
-    registry.add(ScenarioDefinition{"conformance-options-hydraulic-emitter-backflow-enabled", "Checks enabled emitter-backflow mapping.", {"conformance", "hydraulic", "options"}, &testOptionEmitterBackflowEnabled});
+    registry.add(ScenarioDefinition{"conformance-options-hydraulic-emitter-backflow-disabled", "Checks disabled emitter-backflow mapping.", {"conformance", "hydraulic", "options", "emitter"}, &testOptionEmitterBackflowDisabled});
+    registry.add(ScenarioDefinition{"conformance-options-hydraulic-emitter-backflow-enabled", "Checks enabled emitter-backflow mapping.", {"conformance", "hydraulic", "options", "emitter"}, &testOptionEmitterBackflowEnabled});
     registry.add(ScenarioDefinition{"conformance-options-hydraulic-specific-gravity", "Checks specific-gravity mapping.", {"conformance", "hydraulic", "options"}, &testOptionSpecificGravity});
     registry.add(ScenarioDefinition{"conformance-options-hydraulic-relative-viscosity", "Checks relative-viscosity mapping.", {"conformance", "hydraulic", "options"}, &testOptionRelativeViscosity});
 

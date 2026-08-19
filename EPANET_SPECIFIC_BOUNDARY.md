@@ -7,9 +7,9 @@ The shared model no longer exposes EPANET-prefixed domain types. EPANET names ar
 - Repository, CMake target, include path, and server executable names containing `epanet`.
 - `EpanetRunner` and `EpanetSimulationManager`, because selecting either explicitly selects the EPANET backend.
 - `EpanetProject`, because it owns the native `EN_Project` handle.
-- `EpanetNetworkBuilder`, `EpanetHydraulicSolver`, `EpanetResultReader`, `EpanetIndexRegistry`, and `EpanetReportCollector`, because they translate to or operate on the native EPANET API.
+- `EpanetNetworkBuilder`, `EpanetHydraulicSolver`, `EpanetResultReader`, `EpanetQualityResultReader`, `EpanetIndexRegistry`, and `EpanetReportCollector`, because they translate to or operate on the native EPANET API.
 - `EpanetResolvers`, because it resolves generic tank input forms into the geometry required by EPANET.
-- `EpanetResultRun`, because it combines the generic result timeline with EPANET-native report lines.
+- `EpanetResultRun`, because it combines separate hydraulic and water-quality result timelines with EPANET-native report lines.
 - `makeEpanetStatus`, `makeEpanetError`, and `makeEpanetSuccess`, because they are backend-adapter helpers that populate the generic status structure.
 - Native `EN_*` constants and calls inside the adapter implementation.
 
@@ -49,7 +49,10 @@ The adapter initializes every native EPANET project with `EN_CMH` and explicitly
 - TCV settings: dimensionless loss coefficient.
 - PCV settings: `percent` open.
 - GPV head-loss curves are referenced by `head_loss_curve_uuid`; PCV valve-characteristic curves are referenced separately by `characteristic_curve_uuid`. Native GPV curve indices returned through `EN_SETTING` are backend identifiers and are not exposed as numeric AOWIS measurement results.
-- Junction emitter coefficient: `m3_per_h_per_m_exponent`.
+- Junction emitter relation: coefficient plus pressure exponent, representing `Q = C · p^n` with flow in `m3/h` and pressure head in `m`. The coefficient has no fixed standalone UCUM unit because its dimension depends on `n`.
+- Water-quality model values are quantity-specific: chemical concentration uses `mg/L`, water age uses `h`, source trace uses `%`, and chemical source mass flow uses `mg/min`. The former generic initial/result `quality` and source `strength` scalars are not part of the Model boundary.
+- Water-quality tolerance is quantity-specific for chemical concentration, water age, and source trace. AOWIS chemical concentration is canonical `mg/L`; the Model does not carry an arbitrary chemical-unit string.
+- Bulk and wall reaction coefficients are stored together with their reaction order because coefficient dimensions depend on that order. The coefficient itself therefore has no fixed standalone UCUM suffix unless a specific order is assumed.
 
 No m³/h-to-L/s conversion is performed by this adapter. `HydraulicSolverOptions` does not expose selectable native flow or pressure units; conversion to presentation or interchange units belongs outside the hydraulic solver.
 
@@ -67,9 +70,23 @@ Simple-control and rule values use quantity-specific Model fields. Pump settings
 
 Pumps and all seven EPANET 2.3 valve types are implemented, including their curves, patterns, energy inputs, geometry, hydraulic results, states, and pump energy summaries. EPANET has no pump-specific numeric constant-efficiency field, so the adapter represents that model option with a private one-point efficiency curve. EPANET also treats a pump-specific energy price of zero as inheritance from the global price; the adapter rejects that unrepresentable override explicitly.
 
-FAVAD leakage and control inputs are implemented in the builder path. Pipe fixed-area and pressure-dependent leakage parameters are validated and written to EPANET; pipe and junction leakage flows, the leakage-loss statistic, and leakage in the run flow balance are exposed in the simulation results. Junction emitters are written directly to EPANET using the canonical m³/h and meter-head backend units. Pipe roughness results are exposed through `roughness_hazen_williams`, `roughness_darcy_weisbach_mm`, or `roughness_chezy_manning`, according to the selected headloss formula.
+FAVAD leakage and control inputs are implemented in the builder path. Pipe fixed-area and pressure-dependent leakage parameters are validated and written to EPANET; pipe and junction leakage flows, the leakage-loss statistic, and leakage in the run flow balance are exposed in the simulation results. Junction emitters carry their coefficient and pressure exponent together. EPANET supports one network-wide emitter exponent, so enabled non-zero emitters must use the same exponent; the adapter writes that exponent to `EN_EMITEXPON` and each coefficient to `EN_EMITTER` in the canonical m³/h and meter-head backend units. Pipe roughness results are exposed through `roughness_hazen_williams`, `roughness_darcy_weisbach_mm`, or `roughness_chezy_manning`, according to the selected headloss formula.
 
 The bundled EPANET 2.3 headers expose `EN_R_POWER`, but its rule parser rejects pump `POWER` premises and its rule evaluator does not implement them. The adapter therefore rejects structured pump-power premises explicitly instead of forwarding a rule that cannot execute. Other implemented simple and rule-based controls are passed to EPANET normally.
+
+## Water-quality input boundary
+
+Q1 maps the typed AOWIS water-quality configuration into the live EPANET project before hydraulic execution. The adapter configures `None`, chemical, water-age, and source-trace analysis modes; canonical chemical units are `mg/L`. Initial node quality is selected from the quantity-specific Model field for the active analysis mode. Chemical concentration, mass-booster, flow-paced, and setpoint sources map to the corresponding EPANET source type, including optional source patterns. Tank mixing model/fraction, quality tolerance, relative diffusivity, quality timestep, reaction orders, limiting concentration, and pipe/tank reaction coefficients are also mapped. Source-trace node UUIDs and source-pattern UUIDs are resolved only after the referenced EPANET nodes/patterns exist.
+
+EPANET exposes reaction orders through the Toolkit but does not expose Toolkit setters for the INP-level `GLOBAL BULK`, `GLOBAL WALL`, or `ROUGHNESS CORRELATION` directives. AOWIS therefore writes the effective coefficient to every pipe/tank through `EN_KBULK`, `EN_KWALL`, and `EN_TANK_KBULK`. Per-entity overrides take precedence. When roughness correlation is enabled, the adapter applies EPANET's own formula for the selected hydraulic head-loss model (Hazen-Williams, Darcy-Weisbach, or Chezy-Manning). This preserves the live simulation state even though a subsequently generated INP may normalize a global/roughness rule into explicit per-entity reaction coefficients.
+
+EPANET reaction orders are network-wide. AOWIS stores each reaction coefficient together with its semantic order, but Q1 validation requires enabled per-pipe/per-tank overrides to use the corresponding network-wide order. EPANET wall reaction order is restricted to 0 or 1. Quality sources are accepted only for chemical analysis, and source-trace analysis requires an enabled trace-node reference.
+
+## Water-quality result boundary
+
+Water-quality results are intentionally separate from `HydraulicSimulationResultTimeline`. Hydraulic events and water-quality steps do not have to occur at the same times, so quality values are not embedded in hydraulic timestep results. `WaterQualitySimulationResultTimeline` carries its own analysis mode, status, validity, diagnostics, simulation start time, and timestep results. Its initial validity is `NotRun`, which distinguishes a quality analysis that has not executed from one that executed and failed.
+
+`EpanetQualityResultReader` is the dedicated backend reader for node quality, source mass flow, link quality, and quality mass balance. Q1 configures the complete quality input state, but the runner still does not execute the EPANET quality lifecycle. Until Q2 adds that lifecycle, hydraulic execution remains unchanged and the quality timeline remains `NotRun`.
 
 ## Enabled-state preparation
 

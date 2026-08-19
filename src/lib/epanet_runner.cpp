@@ -222,7 +222,10 @@ EpanetResultRun EpanetRunner::run(
     const std::function<bool()> &cancellation_requested) const
 {
     EpanetResultRun result;
-    result.result_timeline.simulation_start_utc = QDateTime::currentDateTimeUtc();
+    const QDateTime simulation_start_utc = QDateTime::currentDateTimeUtc();
+    result.result_timeline.simulation_start_utc = simulation_start_utc;
+    result.quality_result_timeline.analysis = request.options_quality.analysis;
+    result.quality_result_timeline.simulation_start_utc = simulation_start_utc;
 
     EpanetReportCollector report_collector;
     EpanetProject project;

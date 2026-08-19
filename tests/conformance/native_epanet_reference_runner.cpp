@@ -327,6 +327,7 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
 
         const int junction_index = nodeIndex(project, "11");
         checkEpanet(EN_setjuncdata(project, junction_index, 215.0, 34.0, "1"), "EN_setjuncdata(input-mapping junction)");
+        checkEpanet(EN_setoption(project, EN_EMITEXPON, 0.73), "EN_setoption(EN_EMITEXPON)");
         checkEpanet(EN_setnodevalue(project, junction_index, EN_EMITTER, 1.75), "EN_setnodevalue(EN_EMITTER)");
 
         double multipliers[] = {1.0, 1.05};

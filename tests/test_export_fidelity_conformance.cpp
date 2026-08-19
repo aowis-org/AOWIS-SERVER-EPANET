@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -670,6 +671,302 @@ void scenarioReportOptions(TestContext &context)
     // native EPANET. Exercise its parser/solver as an additional end-to-end check.
     checkEpanet(EN_solveH(native.handle()), "EN_solveH(report-options generated INP)");
 }
+
+void scenarioQualityInputNone(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    network.options_quality.analysis = WaterQualityAnalysisType::None;
+
+    NativeSavedProject native(network);
+    int quality_type = -1;
+    int trace_node = -1;
+    checkEpanet(EN_getqualtype(native.handle(), &quality_type, &trace_node), "EN_getqualtype(none)");
+    context.expectEqual(static_cast<std::int64_t>(quality_type), static_cast<std::int64_t>(EN_NONE), comparison("quality.analysis"));
+    context.expectEqual(static_cast<std::int64_t>(trace_node), std::int64_t{0}, comparison("quality.trace_node"));
+}
+
+void scenarioQualityTankMixingModels(TestContext &context)
+{
+    struct MixingCase
+    {
+        HydraulicNodeTankMixingModel model;
+        int backend_model;
+        double fraction;
+    };
+
+    const std::array<MixingCase, 4> cases = {{
+        {HydraulicNodeTankMixingModel::CompleteMix, EN_MIX1, 1.0},
+        {HydraulicNodeTankMixingModel::TwoCompartment, EN_MIX2, 0.4},
+        {HydraulicNodeTankMixingModel::FirstInFirstOut, EN_FIFO, 1.0},
+        {HydraulicNodeTankMixingModel::LastInFirstOut, EN_LIFO, 1.0}
+    }};
+
+    for (const MixingCase &mixing_case : cases)
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.nodes_tanks.isEmpty(), "tank-mixing fixture requires a tank");
+        if (network.nodes_tanks.isEmpty())
+            return;
+
+        network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
+        network.options_quality.chemical_name = QStringLiteral("Chlorine");
+        HydraulicNodeTank &tank = network.nodes_tanks.first();
+        tank.mixing_model = mixing_case.model;
+        tank.mixing_fraction = mixing_case.fraction;
+
+        NativeSavedProject native(network);
+        double value = 0.0;
+        const int tank_index = nodeIndex(native.handle(), tank.id);
+        checkEpanet(EN_getnodevalue(native.handle(), tank_index, EN_MIXMODEL, &value), "EN_getnodevalue(EN_MIXMODEL mapping)");
+        context.expectEqual(static_cast<std::int64_t>(value), static_cast<std::int64_t>(mixing_case.backend_model), comparison("tank.mixing_model", "Tank", tank.id.toStdString()));
+        if (mixing_case.model == HydraulicNodeTankMixingModel::TwoCompartment)
+        {
+            checkEpanet(EN_getnodevalue(native.handle(), tank_index, EN_MIXFRACTION, &value), "EN_getnodevalue(EN_MIXFRACTION mapping)");
+            context.expectNear(value, mixing_case.fraction, NumericTolerance{1.0e-12, 1.0e-9}, comparison("tank.mixing_fraction", "Tank", tank.id.toStdString()));
+        }
+    }
+}
+
+void scenarioQualityReactionMapping(TestContext &context)
+{
+    struct RoughnessCase
+    {
+        HydraulicHeadlossFormula formula;
+        double roughness_hazen_williams;
+        double roughness_darcy_weisbach_mm;
+        double roughness_chezy_manning;
+        double diameter_mm;
+        double roughness_factor;
+        double global_wall_coefficient;
+        double expected_wall_coefficient;
+    };
+
+    const double darcy_roughness_mm = 0.25;
+    const double darcy_diameter_mm = 250.0;
+    const std::array<RoughnessCase, 4> cases = {{
+        {HydraulicHeadlossFormula::HazenWilliams, 130.0, 0.0, 0.0, 250.0, -2.6, -0.1, -2.6 / 130.0},
+        {HydraulicHeadlossFormula::DarcyWeisbach, 0.0, darcy_roughness_mm, 0.0, darcy_diameter_mm, -2.6, -0.1, -2.6 / std::abs(std::log(darcy_roughness_mm / darcy_diameter_mm))},
+        {HydraulicHeadlossFormula::ChezyManning, 0.0, 0.0, 0.013, 250.0, -2.6, -0.1, -2.6 * 0.013},
+        {HydraulicHeadlossFormula::HazenWilliams, 130.0, 0.0, 0.0, 250.0, 0.0, -0.12, -0.12}
+    }};
+
+    for (const RoughnessCase &roughness_case : cases)
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.links_pipes.isEmpty(), "reaction-mapping fixture requires a pipe");
+        context.expect(!network.nodes_tanks.isEmpty(), "reaction-mapping fixture requires a tank");
+        if (network.links_pipes.isEmpty() || network.nodes_tanks.isEmpty())
+            return;
+
+        network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
+        network.options_quality.chemical_name = QStringLiteral("Chlorine");
+        network.options_hydraulic.headloss_formula = roughness_case.formula;
+        network.options_reaction.roughness_reaction_factor = roughness_case.roughness_factor;
+        network.options_reaction.global_pipe_wall_reaction.coefficient = roughness_case.global_wall_coefficient;
+        network.options_reaction.global_tank_bulk_reaction.coefficient = -0.33;
+
+        HydraulicLinkPipe &pipe = network.links_pipes.first();
+        pipe.override_reactions = false;
+        pipe.roughness_hazen_williams = roughness_case.roughness_hazen_williams;
+        pipe.roughness_darcy_weisbach_mm = roughness_case.roughness_darcy_weisbach_mm;
+        pipe.roughness_chezy_manning = roughness_case.roughness_chezy_manning;
+        pipe.diameter_mm = roughness_case.diameter_mm;
+
+        HydraulicNodeTank &tank = network.nodes_tanks.first();
+        tank.override_bulk_reaction = false;
+
+        NativeSavedProject native(network);
+        double value = 0.0;
+        checkEpanet(EN_getlinkvalue(native.handle(), linkIndex(native.handle(), pipe.id), EN_KWALL, &value), "EN_getlinkvalue(EN_KWALL reaction mapping)");
+        // EN_saveinpfile serializes reaction coefficients to six decimal places, so
+        // native reopen parity cannot assert tighter absolute precision than the INP representation.
+        context.expectNear(value, roughness_case.expected_wall_coefficient, NumericTolerance{1.0e-6, 1.0e-8}, comparison("pipe.wall_reaction.coefficient", "Pipe", pipe.id.toStdString()));
+        checkEpanet(EN_getnodevalue(native.handle(), nodeIndex(native.handle(), tank.id), EN_TANK_KBULK, &value), "EN_getnodevalue(EN_TANK_KBULK global)");
+        context.expectNear(value, -0.33, NumericTolerance{1.0e-12, 1.0e-9}, comparison("tank.bulk_reaction.global", "Tank", tank.id.toStdString()));
+    }
+}
+
+void scenarioQualityInputChemical(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
+    network.options_quality.chemical_name = QStringLiteral("Chlorine");
+    network.options_quality.chemical_tolerance_mg_per_l = 0.004;
+    network.options_quality.relative_diffusivity = 1.3;
+    network.timestep_quality_s = 180;
+
+    network.options_reaction.global_pipe_bulk_reaction.coefficient = -0.2;
+    network.options_reaction.global_pipe_bulk_reaction.order = 1.2;
+    network.options_reaction.global_pipe_wall_reaction.coefficient = -0.1;
+    network.options_reaction.global_pipe_wall_reaction.order = 1.0;
+    network.options_reaction.global_tank_bulk_reaction.coefficient = -0.3;
+    network.options_reaction.global_tank_bulk_reaction.order = 0.8;
+    network.options_reaction.limiting_concentration_mg_per_l = 0.15;
+    network.options_reaction.roughness_reaction_factor = -2.6;
+
+    HydraulicPatternTime source_pattern;
+    source_pattern.id = QStringLiteral("QPat");
+    source_pattern.uuid = QUuid::createUuid();
+    source_pattern.multipliers = {1.0, 1.25};
+    network.patterns_time.append(source_pattern);
+
+    context.expect(network.nodes_junctions.size() >= 3, "Net1 fixture should expose at least three junctions for quality-source mapping");
+    context.expect(!network.nodes_reservoirs.isEmpty(), "Net1 fixture should expose a reservoir for quality-source mapping");
+    context.expect(!network.nodes_tanks.isEmpty(), "Net1 fixture should expose a tank for quality mapping");
+    context.expect(network.links_pipes.size() >= 2, "Net1 fixture should expose at least two pipes for reaction mapping");
+    if (network.nodes_junctions.size() < 3 || network.nodes_reservoirs.isEmpty() || network.nodes_tanks.isEmpty() || network.links_pipes.size() < 2)
+        return;
+
+    HydraulicNodeReservoir &reservoir = network.nodes_reservoirs.first();
+    reservoir.initial_chemical_concentration_mg_per_l = 0.9;
+    reservoir.quality_source.type = HydraulicNodeQualitySourceType::Concentration;
+    reservoir.quality_source.chemical_concentration_mg_per_l = 1.1;
+    reservoir.quality_source.pattern_uuid = source_pattern.uuid;
+
+    HydraulicNodeJunction &mass = network.nodes_junctions[0];
+    mass.initial_chemical_concentration_mg_per_l = 0.25;
+    mass.quality_source.type = HydraulicNodeQualitySourceType::MassBooster;
+    mass.quality_source.chemical_mass_flow_mg_per_min = 12.0;
+
+    HydraulicNodeJunction &flow_paced = network.nodes_junctions[1];
+    flow_paced.quality_source.type = HydraulicNodeQualitySourceType::FlowPacedBooster;
+    flow_paced.quality_source.chemical_concentration_mg_per_l = 0.35;
+
+    HydraulicNodeJunction &setpoint = network.nodes_junctions[2];
+    setpoint.quality_source.type = HydraulicNodeQualitySourceType::SetpointBooster;
+    setpoint.quality_source.chemical_concentration_mg_per_l = 0.8;
+
+    HydraulicNodeTank &tank = network.nodes_tanks.first();
+    tank.initial_chemical_concentration_mg_per_l = 0.45;
+    tank.mixing_model = HydraulicNodeTankMixingModel::TwoCompartment;
+    tank.mixing_fraction = 0.65;
+    tank.override_bulk_reaction = true;
+    tank.bulk_reaction.coefficient = -0.55;
+    tank.bulk_reaction.order = network.options_reaction.global_tank_bulk_reaction.order;
+
+    HydraulicLinkPipe &global_pipe = network.links_pipes[0];
+    global_pipe.override_reactions = false;
+    HydraulicLinkPipe &override_pipe = network.links_pipes[1];
+    override_pipe.override_reactions = true;
+    override_pipe.bulk_reaction.coefficient = -0.7;
+    override_pipe.bulk_reaction.order = network.options_reaction.global_pipe_bulk_reaction.order;
+    override_pipe.wall_reaction.coefficient = -0.4;
+    override_pipe.wall_reaction.order = network.options_reaction.global_pipe_wall_reaction.order;
+
+    NativeSavedProject native(network);
+    int quality_type = -1;
+    int trace_node = -1;
+    std::array<char, EN_MAXID + 1> chemical_name{};
+    std::array<char, EN_MAXID + 1> chemical_units{};
+    checkEpanet(EN_getqualinfo(native.handle(), &quality_type, chemical_name.data(), chemical_units.data(), &trace_node), "EN_getqualinfo");
+    context.expectEqual(static_cast<std::int64_t>(quality_type), static_cast<std::int64_t>(EN_CHEM), comparison("quality.analysis"));
+    context.expectEqual(std::string_view(chemical_name.data()), std::string_view("Chlorine"), comparison("quality.chemical_name"));
+    context.expectEqual(std::string_view(chemical_units.data()), std::string_view("mg/L"), comparison("quality.chemical_units"));
+
+    double value = 0.0;
+    checkEpanet(EN_getoption(native.handle(), EN_TOLERANCE, &value), "EN_getoption(EN_TOLERANCE)");
+    context.expectNear(value, 0.004, NumericTolerance{1.0e-12, 1.0e-9}, comparison("quality.tolerance"));
+    checkEpanet(EN_getoption(native.handle(), EN_SP_DIFFUS, &value), "EN_getoption(EN_SP_DIFFUS)");
+    context.expectNear(value, 1.3, NumericTolerance{1.0e-12, 1.0e-9}, comparison("quality.relative_diffusivity"));
+    checkEpanet(EN_getoption(native.handle(), EN_BULKORDER, &value), "EN_getoption(EN_BULKORDER)");
+    context.expectNear(value, 1.2, NumericTolerance{1.0e-12, 1.0e-9}, comparison("reaction.bulk_order"));
+    checkEpanet(EN_getoption(native.handle(), EN_WALLORDER, &value), "EN_getoption(EN_WALLORDER)");
+    context.expectNear(value, 1.0, NumericTolerance{1.0e-12, 1.0e-9}, comparison("reaction.wall_order"));
+    checkEpanet(EN_getoption(native.handle(), EN_TANKORDER, &value), "EN_getoption(EN_TANKORDER)");
+    context.expectNear(value, 0.8, NumericTolerance{1.0e-12, 1.0e-9}, comparison("reaction.tank_order"));
+    checkEpanet(EN_getoption(native.handle(), EN_CONCENLIMIT, &value), "EN_getoption(EN_CONCENLIMIT)");
+    context.expectNear(value, 0.15, NumericTolerance{1.0e-12, 1.0e-9}, comparison("reaction.limiting_concentration_mg_per_l"));
+
+    long quality_step = 0;
+    checkEpanet(EN_gettimeparam(native.handle(), EN_QUALSTEP, &quality_step), "EN_gettimeparam(EN_QUALSTEP)");
+    context.expectEqual(static_cast<std::int64_t>(quality_step), std::int64_t{180}, comparison("quality.timestep_s"));
+
+    const int reservoir_index = nodeIndex(native.handle(), reservoir.id);
+    checkEpanet(EN_getnodevalue(native.handle(), reservoir_index, EN_INITQUAL, &value), "EN_getnodevalue(EN_INITQUAL reservoir)");
+    context.expectNear(value, 0.9, NumericTolerance{1.0e-10, 1.0e-9}, comparison("initial_quality", "Reservoir", reservoir.id.toStdString()));
+    checkEpanet(EN_getnodevalue(native.handle(), reservoir_index, EN_SOURCETYPE, &value), "EN_getnodevalue(EN_SOURCETYPE reservoir)");
+    context.expectEqual(static_cast<std::int64_t>(value), static_cast<std::int64_t>(EN_CONCEN), comparison("source.type", "Reservoir", reservoir.id.toStdString()));
+    checkEpanet(EN_getnodevalue(native.handle(), reservoir_index, EN_SOURCEQUAL, &value), "EN_getnodevalue(EN_SOURCEQUAL reservoir)");
+    context.expectNear(value, 1.1, NumericTolerance{1.0e-12, 1.0e-9}, comparison("source.concentration_mg_per_l", "Reservoir", reservoir.id.toStdString()));
+    checkEpanet(EN_getnodevalue(native.handle(), reservoir_index, EN_SOURCEPAT, &value), "EN_getnodevalue(EN_SOURCEPAT reservoir)");
+    context.expectEqual(static_cast<std::int64_t>(value), static_cast<std::int64_t>(patternIndex(native.handle(), source_pattern.id)), comparison("source.pattern", "Reservoir", reservoir.id.toStdString()));
+
+    const std::array<std::pair<const HydraulicNodeJunction *, int>, 3> source_nodes = {{
+        {&mass, EN_MASS}, {&flow_paced, EN_FLOWPACED}, {&setpoint, EN_SETPOINT}
+    }};
+    for (const std::pair<const HydraulicNodeJunction *, int> &entry : source_nodes)
+    {
+        const int index = nodeIndex(native.handle(), entry.first->id);
+        checkEpanet(EN_getnodevalue(native.handle(), index, EN_SOURCETYPE, &value), "EN_getnodevalue(EN_SOURCETYPE junction)");
+        context.expectEqual(static_cast<std::int64_t>(value), static_cast<std::int64_t>(entry.second), comparison("source.type", "Junction", entry.first->id.toStdString()));
+    }
+    checkEpanet(EN_getnodevalue(native.handle(), nodeIndex(native.handle(), mass.id), EN_SOURCEQUAL, &value), "EN_getnodevalue(EN_SOURCEQUAL mass)");
+    context.expectNear(value, 12.0, NumericTolerance{1.0e-12, 1.0e-9}, comparison("source.mass_mg_per_min", "Junction", mass.id.toStdString()));
+
+    const int tank_index = nodeIndex(native.handle(), tank.id);
+    checkEpanet(EN_getnodevalue(native.handle(), tank_index, EN_MIXMODEL, &value), "EN_getnodevalue(EN_MIXMODEL)");
+    context.expectEqual(static_cast<std::int64_t>(value), static_cast<std::int64_t>(EN_MIX2), comparison("tank.mixing_model", "Tank", tank.id.toStdString()));
+    checkEpanet(EN_getnodevalue(native.handle(), tank_index, EN_MIXFRACTION, &value), "EN_getnodevalue(EN_MIXFRACTION)");
+    context.expectNear(value, 0.65, NumericTolerance{1.0e-12, 1.0e-9}, comparison("tank.mixing_fraction", "Tank", tank.id.toStdString()));
+    checkEpanet(EN_getnodevalue(native.handle(), tank_index, EN_TANK_KBULK, &value), "EN_getnodevalue(EN_TANK_KBULK)");
+    context.expectNear(value, -0.55, NumericTolerance{1.0e-12, 1.0e-9}, comparison("tank.bulk_reaction.coefficient", "Tank", tank.id.toStdString()));
+
+    const int global_pipe_index = linkIndex(native.handle(), global_pipe.id);
+    checkEpanet(EN_getlinkvalue(native.handle(), global_pipe_index, EN_KBULK, &value), "EN_getlinkvalue(EN_KBULK global)");
+    context.expectNear(value, -0.2, NumericTolerance{1.0e-12, 1.0e-9}, comparison("pipe.bulk_reaction.coefficient", "Pipe", global_pipe.id.toStdString()));
+    checkEpanet(EN_getlinkvalue(native.handle(), global_pipe_index, EN_KWALL, &value), "EN_getlinkvalue(EN_KWALL roughness)");
+    context.expectNear(value, -2.6 / global_pipe.roughness_hazen_williams, NumericTolerance{1.0e-10, 1.0e-8}, comparison("pipe.wall_reaction.roughness_correlated", "Pipe", global_pipe.id.toStdString()));
+
+    const int override_pipe_index = linkIndex(native.handle(), override_pipe.id);
+    checkEpanet(EN_getlinkvalue(native.handle(), override_pipe_index, EN_KBULK, &value), "EN_getlinkvalue(EN_KBULK override)");
+    context.expectNear(value, -0.7, NumericTolerance{1.0e-12, 1.0e-9}, comparison("pipe.bulk_reaction.override", "Pipe", override_pipe.id.toStdString()));
+    checkEpanet(EN_getlinkvalue(native.handle(), override_pipe_index, EN_KWALL, &value), "EN_getlinkvalue(EN_KWALL override)");
+    context.expectNear(value, -0.4, NumericTolerance{1.0e-12, 1.0e-9}, comparison("pipe.wall_reaction.override", "Pipe", override_pipe.id.toStdString()));
+}
+
+void scenarioQualityInputWaterAge(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    network.options_quality.analysis = WaterQualityAnalysisType::WaterAge;
+    network.options_quality.water_age_tolerance_h = 0.025;
+    network.nodes_junctions.first().initial_water_age_h = 2.5;
+
+    NativeSavedProject native(network);
+    int quality_type = -1;
+    int trace_node = -1;
+    checkEpanet(EN_getqualtype(native.handle(), &quality_type, &trace_node), "EN_getqualtype(age)");
+    context.expectEqual(static_cast<std::int64_t>(quality_type), static_cast<std::int64_t>(EN_AGE), comparison("quality.analysis"));
+    double value = 0.0;
+    checkEpanet(EN_getoption(native.handle(), EN_TOLERANCE, &value), "EN_getoption(EN_TOLERANCE age)");
+    context.expectNear(value, 0.025, NumericTolerance{1.0e-12, 1.0e-9}, comparison("quality.water_age_tolerance_h"));
+    const HydraulicNodeJunction &junction = network.nodes_junctions.first();
+    checkEpanet(EN_getnodevalue(native.handle(), nodeIndex(native.handle(), junction.id), EN_INITQUAL, &value), "EN_getnodevalue(EN_INITQUAL age)");
+    context.expectNear(value, 2.5, NumericTolerance{1.0e-12, 1.0e-9}, comparison("initial_water_age_h", "Junction", junction.id.toStdString()));
+}
+
+void scenarioQualityInputSourceTrace(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    const HydraulicNodeReservoir &trace_source = network.nodes_reservoirs.first();
+    network.options_quality.analysis = WaterQualityAnalysisType::SourceTrace;
+    network.options_quality.trace_node_uuid = trace_source.uuid;
+    network.options_quality.source_trace_tolerance_percent = 0.2;
+    network.nodes_junctions.first().initial_source_trace_percent = 17.0;
+
+    NativeSavedProject native(network);
+    int quality_type = -1;
+    int trace_node = -1;
+    checkEpanet(EN_getqualtype(native.handle(), &quality_type, &trace_node), "EN_getqualtype(trace)");
+    context.expectEqual(static_cast<std::int64_t>(quality_type), static_cast<std::int64_t>(EN_TRACE), comparison("quality.analysis"));
+    context.expectEqual(static_cast<std::int64_t>(trace_node), static_cast<std::int64_t>(nodeIndex(native.handle(), trace_source.id)), comparison("quality.trace_node"));
+    double value = 0.0;
+    checkEpanet(EN_getoption(native.handle(), EN_TOLERANCE, &value), "EN_getoption(EN_TOLERANCE trace)");
+    context.expectNear(value, 0.2, NumericTolerance{1.0e-12, 1.0e-9}, comparison("quality.source_trace_tolerance_percent"));
+    const HydraulicNodeJunction &junction = network.nodes_junctions.first();
+    checkEpanet(EN_getnodevalue(native.handle(), nodeIndex(native.handle(), junction.id), EN_INITQUAL, &value), "EN_getnodevalue(EN_INITQUAL trace)");
+    context.expectNear(value, 17.0, NumericTolerance{1.0e-12, 1.0e-9}, comparison("initial_source_trace_percent", "Junction", junction.id.toStdString()));
+}
+
 }
 
 namespace AowisEpanetTests
@@ -696,6 +993,36 @@ void registerExportFidelityScenarios(ScenarioRegistry &registry)
         "Persist WGS84 node coordinates, link vertices, labels, and backdrop metadata through generated INP/native EPANET reopen.",
         {"conformance", "hydraulic", "upstream", "export", "coordinate"},
         &scenarioCoordinatesVertices});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-input-none",
+        "Maps an explicitly disabled water-quality analysis into EPANET.",
+        {"conformance", "quality", "mapping", "export"},
+        &scenarioQualityInputNone});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-input-tank-mixing-models",
+        "Maps every supported tank water-quality mixing model into EPANET.",
+        {"conformance", "quality", "mapping", "export"},
+        &scenarioQualityTankMixingModels});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-input-reactions",
+        "Maps global, override, and roughness-correlated reaction coefficients for every hydraulic headloss formula.",
+        {"conformance", "quality", "mapping", "export"},
+        &scenarioQualityReactionMapping});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-input-chemical",
+        "Maps chemical quality analysis, all source types, tank mixing, and reactions into a native-reopenable EPANET project.",
+        {"conformance", "quality", "mapping", "export"},
+        &scenarioQualityInputChemical});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-input-water-age",
+        "Maps water-age analysis, initial age, and age tolerance into EPANET.",
+        {"conformance", "quality", "mapping", "export"},
+        &scenarioQualityInputWaterAge});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-input-source-trace",
+        "Maps source-trace analysis, trace-node reference, initial trace percentage, and tolerance into EPANET.",
+        {"conformance", "quality", "mapping", "export"},
+        &scenarioQualityInputSourceTrace});
     registry.add(ScenarioDefinition{
         "conformance-export-report-options",
         "Persist general, selection, and typed report options in a native-reopenable generated INP.",

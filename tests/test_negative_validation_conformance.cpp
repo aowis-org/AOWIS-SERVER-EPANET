@@ -596,6 +596,102 @@ void scenarioInvalidNodeNumeric(TestContext &context)
     expectRejected(context, network, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("invalid numeric"));
 }
 
+void scenarioInvalidEmitterConfiguration(TestContext &context)
+{
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.nodes_junctions.isEmpty(), "invalid-emitter fixture requires a junction");
+        if (network.nodes_junctions.isEmpty())
+            return;
+
+        HydraulicNodeJunction &junction = network.nodes_junctions.first();
+        junction.emitter.coefficient = 1.0;
+        junction.emitter.pressure_exponent = 0.0;
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("invalid numeric value"));
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(network.nodes_junctions.size() >= 2, "inconsistent-emitter fixture requires two junctions");
+        if (network.nodes_junctions.size() < 2)
+            return;
+
+        HydraulicNodeJunction &junction_a = network.nodes_junctions[0];
+        HydraulicNodeJunction &junction_b = network.nodes_junctions[1];
+        junction_a.emitter.coefficient = 1.0;
+        junction_a.emitter.pressure_exponent = 0.5;
+        junction_b.emitter.coefficient = 1.0;
+        junction_b.emitter.pressure_exponent = 0.7;
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Junction, junction_b.id, junction_b.uuid, QStringLiteral("common pressure exponent"));
+    }
+}
+
+void scenarioInvalidQualityConfiguration(TestContext &context)
+{
+    {
+        NetworkHydraulic network = cleanNet1();
+        network.options_quality.analysis = WaterQualityAnalysisType::SourceTrace;
+        network.options_quality.trace_node_uuid = QUuid::createUuid();
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("source-trace node"));
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.nodes_junctions.isEmpty(), "quality-source mode fixture requires a junction");
+        if (network.nodes_junctions.isEmpty())
+            return;
+        network.options_quality.analysis = WaterQualityAnalysisType::WaterAge;
+        HydraulicNodeJunction &junction = network.nodes_junctions.first();
+        junction.quality_source.type = HydraulicNodeQualitySourceType::FlowPacedBooster;
+        junction.quality_source.chemical_concentration_mg_per_l = 0.5;
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("require chemical analysis"));
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
+        network.options_quality.chemical_name.clear();
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("chemical name"));
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.nodes_junctions.isEmpty(), "quality-source pattern fixture requires a junction");
+        if (network.nodes_junctions.isEmpty())
+            return;
+        network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
+        network.options_quality.chemical_name = QStringLiteral("Chlorine");
+        HydraulicNodeJunction &junction = network.nodes_junctions.first();
+        junction.quality_source.type = HydraulicNodeQualitySourceType::Concentration;
+        junction.quality_source.chemical_concentration_mg_per_l = 0.5;
+        junction.quality_source.pattern_uuid = QUuid::createUuid();
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("quality-source pattern"));
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.nodes_tanks.isEmpty(), "tank mixing fixture requires a tank");
+        if (network.nodes_tanks.isEmpty())
+            return;
+        HydraulicNodeTank &tank = network.nodes_tanks.first();
+        tank.mixing_fraction = 1.1;
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("invalid numeric"));
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.links_pipes.isEmpty(), "reaction-order fixture requires a pipe");
+        if (network.links_pipes.isEmpty())
+            return;
+        network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
+        network.options_quality.chemical_name = QStringLiteral("Chlorine");
+        HydraulicLinkPipe &pipe = network.links_pipes.first();
+        pipe.override_reactions = true;
+        pipe.bulk_reaction.order = network.options_reaction.global_pipe_bulk_reaction.order + 0.5;
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("network-wide EPANET bulk reaction order"));
+    }
+}
+
 void scenarioInvalidMapNumeric(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
@@ -891,6 +987,16 @@ void registerNegativeValidationScenarios(ScenarioRegistry &registry)
         "Reject a non-finite node hydraulic input before calling EPANET.",
         {"conformance", "hydraulic", "negative"},
         &scenarioInvalidNodeNumeric});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-invalid-emitter-configuration",
+        "Reject non-positive emitter exponents and per-junction exponent combinations that EPANET cannot represent.",
+        {"conformance", "hydraulic", "negative", "emitter"},
+        &scenarioInvalidEmitterConfiguration});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-invalid-quality-configuration",
+        "Reject missing source-trace references, quality sources outside chemical mode, and reaction orders EPANET cannot represent per entity.",
+        {"conformance", "quality", "negative"},
+        &scenarioInvalidQualityConfiguration});
     registry.add(ScenarioDefinition{
         "conformance-negative-invalid-map-numeric",
         "Reject out-of-range canonical WGS84 map-label coordinates before EPANET export.",

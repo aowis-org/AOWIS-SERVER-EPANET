@@ -36,6 +36,18 @@ bool resolveHeadlossFormula(HydraulicHeadlossFormula formula, int &backend_formu
     return false;
 }
 
+
+double emitterPressureExponent(const NetworkHydraulic &request)
+{
+    for (const HydraulicNodeJunction &junction : request.nodes_junctions)
+    {
+        if (junction.emitter.coefficient > 0.0)
+            return junction.emitter.pressure_exponent;
+    }
+
+    return 0.5;
+}
+
 bool resolveDemandModel(HydraulicDemandModel model, int &backend_model)
 {
     switch (model)
@@ -637,7 +649,7 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
     default:
         return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Unsupported unbalanced-action value"));
     }
-    const std::array<NumericOption, 18> options = {{
+    const std::array<NumericOption, 16> options = {{
         {EN_TRIALS, static_cast<double>(hydraulic.maximum_trials), "EN_TRIALS"},
         {EN_ACCURACY, hydraulic.accuracy, "EN_ACCURACY"},
         {EN_UNBALANCED, unbalanced_trials, "EN_UNBALANCED"},
@@ -647,12 +659,10 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
         {EN_HEADERROR, hydraulic.maximum_head_error_m, "EN_HEADERROR"},
         {EN_FLOWCHANGE, hydraulic.maximum_flow_change_m3_per_h, "EN_FLOWCHANGE"},
         {EN_DEMANDMULT, hydraulic.demand_multiplier, "EN_DEMANDMULT"},
-        {EN_EMITEXPON, hydraulic.emitter_exponent, "EN_EMITEXPON"},
+        {EN_EMITEXPON, emitterPressureExponent(request), "EN_EMITEXPON"},
         {EN_EMITBACKFLOW, static_cast<double>(hydraulic.emitters_can_backflow ? EN_TRUE : EN_FALSE), "EN_EMITBACKFLOW"},
         {EN_SP_GRAVITY, hydraulic.specific_gravity, "EN_SP_GRAVITY"},
         {EN_SP_VISCOS, hydraulic.relative_viscosity, "EN_SP_VISCOS"},
-        {EN_TOLERANCE, request.options_quality.tolerance, "EN_TOLERANCE"},
-        {EN_SP_DIFFUS, request.options_quality.relative_diffusivity, "EN_SP_DIFFUS"},
         {EN_GLOBALEFFIC, request.options_energy.global_pump_efficiency_percent, "EN_GLOBALEFFIC"},
         {EN_GLOBALPRICE, request.options_energy.global_energy_price_per_kw_h, "EN_GLOBALPRICE"},
         {EN_DEMANDCHARGE, request.options_energy.demand_charge_per_kw, "EN_DEMANDCHARGE"}

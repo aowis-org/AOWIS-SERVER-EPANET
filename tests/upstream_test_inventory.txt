@@ -28,7 +28,7 @@ external/epanet/tests/test_net_builder.cpp|test_save_net2|boost-case|wrapper-can
 external/epanet/tests/test_net_builder.cpp|test_reopen_net2|boost-case|wrapper-candidate|export-validation|Reopening the generated small network verifies INP persistence and hydraulic equivalence.
 external/epanet/tests/test_node.cpp|test_adddelete_node|boost-case|native-only|none|Mutable Toolkit node CRUD is not an EpanetRunner operation.
 external/epanet/tests/test_node.cpp|test_node_validate_id|boost-case|wrapper-candidate|export-validation|Invalid node IDs must produce an explicit adapter diagnostic.
-external/epanet/tests/test_node.cpp|test_junc_props|boost-case|wrapper-candidate|input-mapping|Junction elevation, demand, pattern, and emitter inputs map to AOWIS. Initial quality is excluded.
+external/epanet/tests/test_node.cpp|test_junc_props|boost-case|wrapper-candidate|input-mapping|Junction elevation, demand, pattern, emitter, and initial quality inputs map to AOWIS, quality execution remains a later conformance phase.
 external/epanet/tests/test_node.cpp|test_tank_props|boost-case|wrapper-candidate|input-mapping|Tank elevation, levels, diameter, and volume map to AOWIS tank inputs.
 external/epanet/tests/test_node.cpp|test_junc_props|boost-case|wrapper-candidate|net1|The after-step demand, head, and pressure values are Net1 hydraulic golden results. Quality is excluded.
 external/epanet/tests/test_node.cpp|test_tank_props|boost-case|wrapper-candidate|net1|The after-step tank demand, head, and pressure values are Net1 hydraulic golden results. Quality is excluded.

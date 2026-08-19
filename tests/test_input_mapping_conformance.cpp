@@ -176,7 +176,8 @@ void testJunctionReservoirInputs(TestContext &context)
     junction->terrain_elevation_m = 210.0;
     junction->elevation_offset_m = 5.0;
     junction->elevation_m = 0.0;
-    junction->emitter_coefficient_m3_per_h_per_m_exponent = 1.75;
+    junction->emitter.coefficient = 1.75;
+    junction->emitter.pressure_exponent = 0.73;
     context.expect(!junction->demands.isEmpty(), "junction 11 must retain its primary demand");
     if (junction->demands.isEmpty())
         return;
@@ -514,7 +515,7 @@ void registerInputMappingScenarios(ScenarioRegistry &registry)
     registry.add(ScenarioDefinition{
         "conformance-upstream-junction-reservoir-inputs",
         "Exercises non-default junction elevation/emitter input and patterned reservoir head through native EPANET and the AOWIS model path.",
-        {"conformance", "hydraulic", "upstream", "junction", "reservoir"},
+        {"conformance", "hydraulic", "upstream", "junction", "reservoir", "emitter"},
         &testJunctionReservoirInputs});
     registry.add(ScenarioDefinition{
         "conformance-upstream-demand-categories",

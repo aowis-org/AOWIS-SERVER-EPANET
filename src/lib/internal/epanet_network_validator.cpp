@@ -156,6 +156,8 @@ HydraulicSimulationStatusOperation numericValidationOperation(HydraulicSimulatio
         return HydraulicSimulationStatusOperation::AddCurve;
     case HydraulicSimulationStatusEntityType::HydraulicSolver:
         return HydraulicSimulationStatusOperation::ConfigureHydraulics;
+    case HydraulicSimulationStatusEntityType::QualitySolver:
+        return HydraulicSimulationStatusOperation::ConfigureQuality;
     case HydraulicSimulationStatusEntityType::Report:
         return HydraulicSimulationStatusOperation::ConfigureReport;
     case HydraulicSimulationStatusEntityType::Control:
@@ -466,8 +468,23 @@ QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulic &netw
 
     HydraulicSimulationStatus status;
 
+    if (network.options_quality.analysis == WaterQualityAnalysisType::SourceTrace)
+    {
+        status = validateReference(all_nodes, enabled_nodes, network.options_quality.trace_node_uuid, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("source-trace node"));
+        appendValidationFailure(failures, status);
+    }
+
+    const std::function<void(const HydraulicNodeQualitySource &, HydraulicSimulationStatusEntityType, const QString &, const QUuid &)> validate_quality_source_pattern = [&failures, &patterns](const HydraulicNodeQualitySource &source, HydraulicSimulationStatusEntityType entity_type, const QString &id, const QUuid &uuid)
+    {
+        if (source.type == HydraulicNodeQualitySourceType::None || source.pattern_uuid.isNull())
+            return;
+        const HydraulicSimulationStatus source_pattern_status = validatePatternReference(patterns, source.pattern_uuid, entity_type, id, uuid, QStringLiteral("quality-source pattern"), true);
+        appendValidationFailure(failures, source_pattern_status);
+    };
+
     for (const HydraulicNodeJunction &junction : enabled_network.nodes_junctions)
     {
+        validate_quality_source_pattern(junction.quality_source, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid);
         for (const HydraulicNodeJunctionDemand &demand : junction.demands)
         {
             if (demand.pattern_mode != HydraulicTimePatternMode::TimePattern)
@@ -479,6 +496,7 @@ QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulic &netw
 
     for (const HydraulicNodeReservoir &reservoir : enabled_network.nodes_reservoirs)
     {
+        validate_quality_source_pattern(reservoir.quality_source, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid);
         if (reservoir.head_pattern_mode != HydraulicTimePatternMode::TimePattern)
             continue;
         status = validatePatternReference(patterns, reservoir.head_pattern_uuid, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("head pattern"), false);
@@ -487,6 +505,7 @@ QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulic &netw
 
     for (const HydraulicNodeTank &tank : enabled_network.nodes_tanks)
     {
+        validate_quality_source_pattern(tank.quality_source, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid);
         if (tank.geometry_input_type != HydraulicNodeTankGeometryInputType::VolumeCurve)
             continue;
         status = validateCurveReference(tank_curves, tank.volume_curve_uuid, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("tank volume curve"), false);
@@ -654,6 +673,53 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
     QList<HydraulicSimulationStatus> failures;
     HydraulicSimulationStatus status;
 
+
+    const WaterQualitySolverOptions &quality = network.options_quality;
+    const WaterQualityReactionOptions &reactions = network.options_reaction;
+    status = validateFiniteNonNegative(quality.chemical_tolerance_mg_per_l, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_quality.chemical_tolerance_mg_per_l"));
+    appendValidationFailure(failures, status);
+    status = validateFiniteNonNegative(quality.water_age_tolerance_h, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_quality.water_age_tolerance_h"));
+    appendValidationFailure(failures, status);
+    status = validateFiniteNonNegative(quality.source_trace_tolerance_percent, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_quality.source_trace_tolerance_percent"));
+    appendValidationFailure(failures, status);
+    status = validateFiniteNonNegative(quality.relative_diffusivity, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_quality.relative_diffusivity"));
+    appendValidationFailure(failures, status);
+    status = validateFiniteNonNegative(reactions.global_pipe_bulk_reaction.order, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_pipe_bulk_reaction.order"));
+    appendValidationFailure(failures, status);
+    status = validateFiniteNonNegative(reactions.global_tank_bulk_reaction.order, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_tank_bulk_reaction.order"));
+    appendValidationFailure(failures, status);
+    status = validateFinite(reactions.global_pipe_bulk_reaction.coefficient, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_pipe_bulk_reaction.coefficient"));
+    appendValidationFailure(failures, status);
+    status = validateFinite(reactions.global_tank_bulk_reaction.coefficient, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_tank_bulk_reaction.coefficient"));
+    appendValidationFailure(failures, status);
+    status = validateFinite(reactions.global_pipe_wall_reaction.coefficient, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_pipe_wall_reaction.coefficient"));
+    appendValidationFailure(failures, status);
+    if (!std::isfinite(reactions.global_pipe_wall_reaction.order) || (reactions.global_pipe_wall_reaction.order != 0.0 && reactions.global_pipe_wall_reaction.order != 1.0))
+    {
+        failures.append(invalidNumeric(HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_pipe_wall_reaction.order"), QStringLiteral("must be either 0 or 1 for EPANET")));
+    }
+    status = validateFiniteNonNegative(reactions.limiting_concentration_mg_per_l, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.limiting_concentration_mg_per_l"));
+    appendValidationFailure(failures, status);
+    status = validateFinite(reactions.roughness_reaction_factor, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.roughness_reaction_factor"));
+    appendValidationFailure(failures, status);
+
+    if (quality.analysis == WaterQualityAnalysisType::Chemical && quality.chemical_name.trimmed().isEmpty())
+    {
+        failures.append(validationStatus(HydraulicSimulationStatusOperation::ConfigureQuality, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("Chemical water-quality analysis requires a chemical name")));
+    }
+
+    const std::function<void(const HydraulicNodeQualitySource &, HydraulicSimulationStatusEntityType, const QString &, const QUuid &)> validate_quality_source = [&failures, &quality](const HydraulicNodeQualitySource &source, HydraulicSimulationStatusEntityType entity_type, const QString &id, const QUuid &uuid)
+    {
+        HydraulicSimulationStatus source_status = validateFiniteNonNegative(source.chemical_concentration_mg_per_l, entity_type, id, uuid, QStringLiteral("quality_source.chemical_concentration_mg_per_l"));
+        appendValidationFailure(failures, source_status);
+        source_status = validateFiniteNonNegative(source.chemical_mass_flow_mg_per_min, entity_type, id, uuid, QStringLiteral("quality_source.chemical_mass_flow_mg_per_min"));
+        appendValidationFailure(failures, source_status);
+        if (source.type != HydraulicNodeQualitySourceType::None && quality.analysis != WaterQualityAnalysisType::Chemical)
+        {
+            failures.append(validationStatus(HydraulicSimulationStatusOperation::ConfigureQuality, entity_type, id, uuid, QStringLiteral("Water-quality sources require chemical analysis mode")));
+        }
+    };
+
     const HydraulicSolverOptions &hydraulic = network.options_hydraulic;
     const QList<QPair<QString, double>> hydraulic_values = {
         {QStringLiteral("minimum_pressure_head_m"), hydraulic.minimum_pressure_head_m},
@@ -664,7 +730,6 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         {QStringLiteral("maximum_head_error_m"), hydraulic.maximum_head_error_m},
         {QStringLiteral("maximum_flow_change_m3_per_h"), hydraulic.maximum_flow_change_m3_per_h},
         {QStringLiteral("demand_multiplier"), hydraulic.demand_multiplier},
-        {QStringLiteral("emitter_exponent"), hydraulic.emitter_exponent},
         {QStringLiteral("specific_gravity"), hydraulic.specific_gravity},
         {QStringLiteral("relative_viscosity"), hydraulic.relative_viscosity}
     };
@@ -827,6 +892,13 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
     {
         if (!junction.metadata.enabled)
             continue;
+        status = validateFiniteNonNegative(junction.initial_chemical_concentration_mg_per_l, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("initial_chemical_concentration_mg_per_l"));
+        appendValidationFailure(failures, status);
+        status = validateFiniteNonNegative(junction.initial_water_age_h, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("initial_water_age_h"));
+        appendValidationFailure(failures, status);
+        status = validateFiniteNonNegative(junction.initial_source_trace_percent, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("initial_source_trace_percent"));
+        appendValidationFailure(failures, status);
+        validate_quality_source(junction.quality_source, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid);
         if (junction.elevation_input_type == HydraulicNodeElevationInputType::TerrainElevationAndOffset)
         {
             status = validateFinite(junction.terrain_elevation_m, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("terrain_elevation_m"));
@@ -839,7 +911,9 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
             status = validateFinite(junction.elevation_m, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("elevation_m"));
             appendValidationFailure(failures, status);
         }
-        status = validateFiniteNonNegative(junction.emitter_coefficient_m3_per_h_per_m_exponent, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("emitter_coefficient_m3_per_h_per_m_exponent"));
+        status = validateFiniteNonNegative(junction.emitter.coefficient, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("emitter.coefficient"));
+        appendValidationFailure(failures, status);
+        status = validateFinitePositive(junction.emitter.pressure_exponent, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("emitter.pressure_exponent"));
         appendValidationFailure(failures, status);
         status = validateLongitudeDeg(junction.coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("coordinate_wgs84.longitude_deg"));
         appendValidationFailure(failures, status);
@@ -853,10 +927,43 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         }
     }
 
+    std::optional<double> active_emitter_pressure_exponent;
+    for (const HydraulicNodeJunction &junction : network.nodes_junctions)
+    {
+        if (!junction.metadata.enabled || junction.emitter.coefficient <= 0.0 || !std::isfinite(junction.emitter.pressure_exponent))
+            continue;
+
+        if (!active_emitter_pressure_exponent.has_value())
+        {
+            active_emitter_pressure_exponent = junction.emitter.pressure_exponent;
+            continue;
+        }
+
+        if (std::abs(active_emitter_pressure_exponent.value() - junction.emitter.pressure_exponent) > 1.0e-12)
+        {
+            failures.append(validationStatus(
+                HydraulicSimulationStatusOperation::ConfigureHydraulics,
+                HydraulicSimulationStatusEntityType::Junction,
+                junction.id,
+                junction.uuid,
+                QStringLiteral("Enabled junction emitters must use one common pressure exponent because EPANET exposes a network-wide emitter exponent"),
+                {QStringLiteral("emitter.pressure_exponent: %1; expected %2")
+                    .arg(junction.emitter.pressure_exponent, 0, 'g', 17)
+                    .arg(active_emitter_pressure_exponent.value(), 0, 'g', 17)}));
+        }
+    }
+
     for (const HydraulicNodeReservoir &reservoir : network.nodes_reservoirs)
     {
         if (!reservoir.metadata.enabled)
             continue;
+        status = validateFiniteNonNegative(reservoir.initial_chemical_concentration_mg_per_l, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("initial_chemical_concentration_mg_per_l"));
+        appendValidationFailure(failures, status);
+        status = validateFiniteNonNegative(reservoir.initial_water_age_h, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("initial_water_age_h"));
+        appendValidationFailure(failures, status);
+        status = validateFiniteNonNegative(reservoir.initial_source_trace_percent, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("initial_source_trace_percent"));
+        appendValidationFailure(failures, status);
+        validate_quality_source(reservoir.quality_source, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid);
         if (reservoir.head_input_type == HydraulicNodeElevationInputType::TerrainElevationAndOffset)
         {
             status = validateFinite(reservoir.terrain_elevation_m, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("terrain_elevation_m"));
@@ -879,6 +986,21 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
     {
         if (!tank.metadata.enabled)
             continue;
+        status = validateFiniteNonNegative(tank.initial_chemical_concentration_mg_per_l, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("initial_chemical_concentration_mg_per_l"));
+        appendValidationFailure(failures, status);
+        status = validateFiniteNonNegative(tank.initial_water_age_h, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("initial_water_age_h"));
+        appendValidationFailure(failures, status);
+        status = validateFiniteNonNegative(tank.initial_source_trace_percent, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("initial_source_trace_percent"));
+        appendValidationFailure(failures, status);
+        validate_quality_source(tank.quality_source, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid);
+        if (!std::isfinite(tank.mixing_fraction) || tank.mixing_fraction < 0.0 || tank.mixing_fraction > 1.0)
+            failures.append(invalidNumeric(HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("mixing_fraction"), QStringLiteral("must be finite and between 0 and 1")));
+        status = validateFinite(tank.bulk_reaction.coefficient, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("bulk_reaction.coefficient"));
+        appendValidationFailure(failures, status);
+        status = validateFiniteNonNegative(tank.bulk_reaction.order, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("bulk_reaction.order"));
+        appendValidationFailure(failures, status);
+        if (tank.override_bulk_reaction && std::isfinite(tank.bulk_reaction.order) && std::abs(tank.bulk_reaction.order - reactions.global_tank_bulk_reaction.order) > 1.0e-12)
+            failures.append(validationStatus(HydraulicSimulationStatusOperation::ConfigureQuality, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("Tank bulk reaction order must match the network-wide EPANET tank reaction order")));
 
         if (tank.elevation_input_type == HydraulicNodeTankElevationInputType::TerrainElevationAndOffset)
         {
@@ -922,6 +1044,18 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
     {
         if (!pipe.metadata.enabled)
             continue;
+        status = validateFinite(pipe.bulk_reaction.coefficient, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("bulk_reaction.coefficient"));
+        appendValidationFailure(failures, status);
+        status = validateFiniteNonNegative(pipe.bulk_reaction.order, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("bulk_reaction.order"));
+        appendValidationFailure(failures, status);
+        status = validateFinite(pipe.wall_reaction.coefficient, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("wall_reaction.coefficient"));
+        appendValidationFailure(failures, status);
+        if (!std::isfinite(pipe.wall_reaction.order) || (pipe.wall_reaction.order != 0.0 && pipe.wall_reaction.order != 1.0))
+            failures.append(invalidNumeric(HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("wall_reaction.order"), QStringLiteral("must be either 0 or 1 for EPANET")));
+        if (pipe.override_reactions && std::isfinite(pipe.bulk_reaction.order) && std::abs(pipe.bulk_reaction.order - reactions.global_pipe_bulk_reaction.order) > 1.0e-12)
+            failures.append(validationStatus(HydraulicSimulationStatusOperation::ConfigureQuality, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Pipe bulk reaction order must match the network-wide EPANET bulk reaction order")));
+        if (pipe.override_reactions && std::isfinite(pipe.wall_reaction.order) && std::abs(pipe.wall_reaction.order - reactions.global_pipe_wall_reaction.order) > 1.0e-12)
+            failures.append(validationStatus(HydraulicSimulationStatusOperation::ConfigureQuality, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Pipe wall reaction order must match the network-wide EPANET wall reaction order")));
         const double length_m = pipe.length_measured_m.value_or(pipe.length_calculated_m);
         status = validateFinitePositive(length_m, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("length_m"));
         appendValidationFailure(failures, status);

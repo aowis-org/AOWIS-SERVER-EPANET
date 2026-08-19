@@ -12,19 +12,18 @@ Included:
 - Junction, reservoir, tank, pipe, pump, valve, control, statistic, energy, and flow-balance results.
 - Diagnostics, invalid input, enabled state, and INP fidelity.
 
-Excluded from this conformance denominator for now:
+Excluded from the hydraulic conformance denominator for now:
 
-- Water-quality execution and results.
-- Chemical, age, trace, source, reaction, and tank-mixing quality configuration.
+- Water-quality execution and native quality-result comparison.
 - Native Toolkit project-handle CRUD and binary Output API functions that the high-level wrapper does not expose.
 
-An excluded field is not treated as covered. Water quality will receive its own conformance expansion later.
+Q1 separately proves water-quality **input mapping** under the `quality` label: analysis mode, typed initial quality, source types/strengths/patterns, tank mixing, quality options/timestep, and reaction configuration are native-read back from generated EPANET projects. Those mapping fields are evidence-backed but are not counted as hydraulic behavior. Native quality execution and differential result conformance begin in Q2 and later stages.
 
 ## Current claim
 
 The hydraulic conformance suite covers model-to-EPANET mapping, native differential behavior, export/native-reopen fidelity, deterministic negative validation, fixed-seed generated-network stress, stable CTest label groups, an optional isolated execution of the original upstream Boost suite, reproducible adapter line/branch coverage reporting, and a machine-checked field-level audit against the current AOWIS hydraulic Model headers.
 
-The default suite contains 162 executable hydraulic scenarios plus three framework/proof checks, for 165 CTest tests. The field audit currently inventories 468 fields across 57 hydraulic Model structs: 390 fields are in the completed hydraulic proof denominator, 42 are explicitly excluded as water-quality fields, 34 are explicitly excluded as non-EPANET application/cartographic metadata, and two are backend/runtime metadata that are not stable high-level hydraulic contract fields. Any added/removed Model struct or field that is not reflected in the audit policy fails the proof test.
+The Q1 default suite contains 166 executable hydraulic scenarios, eight water-quality contract/mapping/negative-validation scenarios, and three framework/proof checks, for 177 CTest tests. The field audit inventories 547 fields across 75 Model structs: 482 fields have registered evidence (the established hydraulic contract plus Q1 quality-input mapping), 49 quality execution/result fields remain explicitly excluded until Q2+, 14 are explicitly excluded as non-EPANET application/cartographic metadata, and two are backend/runtime metadata that are not stable high-level contract fields. Any added/removed audited Model struct or field that is not reflected in the audit policy fails the proof test.
 
 A complete hydraulic-conformance claim is permitted only when the default suite and the grouped proof commands below pass. Water quality remains explicitly outside this claim.
 
@@ -67,12 +66,13 @@ Grouped proof commands:
 ```bash
 ctest --test-dir build-linux-tests -L conformance --output-on-failure
 ctest --test-dir build-linux-tests -L contract --output-on-failure
+ctest --test-dir build-linux-tests -L quality --output-on-failure
 ctest --test-dir build-linux-tests -L negative --output-on-failure
 ctest --test-dir build-linux-tests -L upstream --output-on-failure
 ctest --test-dir build-linux-tests -L proof --output-on-failure
 ```
 
-`conformance` contains all 156 native-backed conformance scenarios, including the five export, twenty-three negative, and eight deterministic stress scenarios. `contract` contains the five wrapper contract/regression scenarios. `negative` contains the explicit invalid-input and reference-hardening scenarios. `proof` contains the scenario-manifest, upstream-inventory, and hydraulic field-audit checks. The `upstream` group always contains the source inventory and, when enabled as described below, the original upstream Boost suite.
+`conformance` contains all 161 native-backed hydraulic conformance scenarios, including the five export, twenty-nine negative, and eight deterministic stress scenarios. `contract` contains six wrapper contract/regression scenarios: five hydraulic contracts plus the Q0 water-quality Model boundary contract. `quality` currently selects that Q0 contract; later quality stages expand it with native-backed quality scenarios. `negative` contains the explicit invalid-input and reference-hardening scenarios. `proof` contains the scenario-manifest, upstream-inventory, and hydraulic field-audit checks. The `upstream` group always contains the source inventory and, when enabled as described below, the original upstream Boost suite.
 
 ### Optional original upstream Boost suite
 
@@ -186,7 +186,7 @@ Each case uses a fixed seed, two alternating junction-demand patterns, a six-hou
 | `aowis-server-epanet-conformance-upstream-demand-pattern` | Differential conformance | Default-pattern identity plus explicit demand-pattern multipliers/assignment and complete timeline comparison |
 | `aowis-server-epanet-conformance-upstream-simple-control` | Differential conformance | Upstream replacement low/high controls, final tank-head invariant, event identity, and complete timeline comparison |
 | `aowis-server-epanet-conformance-upstream-hydraulic-stepping` | Differential conformance | Explicit EN_runH/EN_nextH monotonic stepping and all intermediate event boundaries compared against the wrapper |
-| `aowis-server-epanet-conformance-upstream-junction-reservoir-inputs` | Differential conformance | Terrain-plus-offset junction elevation, emitter input, patterned demand, and patterned reservoir head compared through native and wrapper paths |
+| `aowis-server-epanet-conformance-upstream-junction-reservoir-inputs` | Differential conformance | Terrain-plus-offset junction elevation, dedicated emitter coefficient/exponent relation, patterned demand, and patterned reservoir head compared through native and wrapper paths |
 | `aowis-server-epanet-conformance-upstream-demand-categories` | Differential conformance | Multiple independently named demand categories with patterned and constant modes; proves constant categories remain constant under a global default pattern |
 | `aowis-server-epanet-conformance-upstream-tank-uniform-area` | Differential conformance | Uniform-area tank geometry, terrain-plus-offset bottom elevation, minimum volume, and initial hydraulic volume/head mapping |
 | `aowis-server-epanet-conformance-upstream-tank-volume-at-max` | Differential conformance | Volume-at-maximum-level tank geometry resolves to the equivalent native tank and matches initial volume/head |
@@ -255,7 +255,7 @@ Every matrix row advances through these states:
 | ID | Contract area | Hydraulic fields or behavior | Native EPANET path | Evidence areas | Current evidence | State |
 |---|---|---|---|---|---|---|
 | I-OPTIONS-TIME | Duration and timing | duration, hydraulic/quality/report/pattern/rule timesteps, pattern/report start, start clock time | `EN_settimeparam` | timing options; controls | Every Model timing field has an independent native readback scenario; timer/time-of-day execution also verifies event timing | Complete |
-| I-OPTIONS-HYDRAULIC | Solver configuration | headloss formula, demand model and limits, accuracy, trials, damping, status and convergence checks, demand multiplier/default pattern, emitter exponent/backflow, specific gravity, viscosity, unbalanced behavior | `EN_setoption`, `EN_setdemandmodel` | hydraulic options; input mapping | Every supported solver-option branch has an independent native readback test; all three headloss formulas are covered by the input-mapping and solver-option scenarios | Complete |
+| I-OPTIONS-HYDRAULIC | Solver configuration | headloss formula, demand model and limits, accuracy, trials, damping, status and convergence checks, demand multiplier/default pattern, emitter backflow, specific gravity, viscosity, unbalanced behavior | `EN_setoption`, `EN_setdemandmodel` | hydraulic options; input mapping | Every supported solver-option branch has an independent native readback test; all three headloss formulas are covered by the input-mapping and solver-option scenarios | Complete |
 | I-OPTIONS-ENERGY | Energy configuration | global efficiency and price, global price pattern, demand charge | `EN_setoption` energy options | pump energy | Global-efficiency/global-price-pattern/demand-charge differential scenario with independent native cost accumulation | Complete |
 | I-OPTIONS-REPORT | Report configuration | page, status, summary, messages, energy, node/link selection, typed fields, backend commands | `EN_setreport` and generated-INP/native reopen | report options; export fidelity | Report statistic, general flags, selected entities, every typed node/link field, precision/limits, and final backend overrides are verified through export/native parsing | Complete |
 | I-PATTERN | Time patterns | IDs, multipliers, comments, default demand pattern, demand/head/speed/price references | pattern Toolkit APIs | hydraulic behavior; pump; export fidelity | Demand/reservoir/pump/energy references are differential-tested; factor values and comments are additionally verified through generated-INP/native reopen | Complete |
@@ -272,6 +272,17 @@ Every matrix row advances through these states:
 | I-CONTROL-RULE | Structured rules | IF/AND/OR, object/variable/operator/value/status, THEN/ELSE, priority, source text, enabled state | rule Toolkit APIs | hydraulic behavior; controls/options/operations | IF/AND/OR; THEN/ELSE; status/setting/ACTIVE actions; preserved source text; priority conflict resolution; disabled rules; every supported object-variable and comparison operator; explicit POWER rejection | Complete |
 | I-PREPARATION | Snapshot preparation | disabled entity removal, control retention, invalid/disabled references, selected report entities | adapter preparation plus native counts | controls/options/operations; export fidelity; negative validation | Negative validation verifies generic disabled-node/link pruning, pruning from selected report entities, explicit rejection of enabled references to disabled entities, and deterministic broken-reference rejection before EPANET construction | Complete |
 | I-METADATA | Export and geometry fidelity | titles, comments, tags, generic curves, coordinates, vertices; map-position fields are explicitly non-EPANET | metadata, coordinate, vertex, and INP APIs | export fidelity; field audit | Native-reopen scenarios verify titles, node/link/pattern/curve comments, node/link tags, generic curves, WGS84 coordinates, and ordered vertices. The field audit explicitly classifies optional GUI map-position semantics as non-EPANET. | Complete |
+
+## Water-quality input mapping (Q1)
+
+These rows are a separate quality-input proof layer and do not change the hydraulic behavior claim above.
+
+| ID | Quality input family | Model fields / behavior | Native EPANET path | Evidence | State |
+|---|---|---|---|---|---|
+| QI-ANALYSIS | Analysis selection | none, chemical (`mg/L`), water age (`h`), source trace (`%`), trace node, mode-specific tolerance, relative diffusivity, quality timestep | `EN_setqualtype`, `EN_setoption`, `EN_settimeparam` | `conformance-quality-input-none`, `-chemical`, `-water-age`, `-source-trace` | Complete |
+| QI-NODE | Initial quality and sources | typed initial quality; concentration, mass, flow-paced, setpoint sources; optional source pattern | `EN_INITQUAL`, `EN_SOURCETYPE`, `EN_SOURCEQUAL`, `EN_SOURCEPAT` | `conformance-quality-input-chemical` plus invalid-quality validation | Complete |
+| QI-TANK | Tank quality configuration | all four mixing models, two-compartment fraction, tank bulk reaction override/default | `EN_MIXMODEL`, `EN_MIXFRACTION`, `EN_TANK_KBULK` | `conformance-quality-input-tank-mixing-models`, `-chemical`, `-reactions` | Complete |
+| QI-REACTION | Reaction configuration | pipe/tank global effective coefficients, per-entity overrides, bulk/wall/tank orders, limiting concentration, roughness correlation for H-W/D-W/C-M | `EN_BULKORDER`, `EN_WALLORDER`, `EN_TANKORDER`, `EN_CONCENLIMIT`, `EN_KBULK`, `EN_KWALL`, `EN_TANK_KBULK` | `conformance-quality-input-chemical`, `-reactions`, invalid-quality validation | Complete |
 
 ## Result coverage summary
 

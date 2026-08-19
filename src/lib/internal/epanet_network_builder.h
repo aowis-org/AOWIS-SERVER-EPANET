@@ -23,6 +23,8 @@ private:
     HydraulicSimulationStatus configureConstantDemandPattern(const NetworkHydraulic &request);
     HydraulicSimulationStatus configureDefaultDemandPattern(const NetworkHydraulic &request);
     HydraulicSimulationStatus configureGlobalEnergyPattern(const NetworkHydraulic &request);
+    HydraulicSimulationStatus configureWaterQualityAnalysis(const NetworkHydraulic &request);
+    HydraulicSimulationStatus configureWaterQualityReactions(const NetworkHydraulic &request);
     HydraulicSimulationStatus addCurveTankVolume(const HydraulicCurveTankVolume &curve);
     HydraulicSimulationStatus addCurvePumpHead(const HydraulicCurvePumpHead &curve);
     HydraulicSimulationStatus addCurvePumpEfficiency(const HydraulicCurvePumpEfficiency &curve);

@@ -4,6 +4,7 @@ set(AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS
     contract-timer-pump-energy
     contract-reject-pump-power-rule
     contract-steady-state-pump-energy
+    contract-quality-model-boundary
 )
 
 set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
@@ -116,7 +117,6 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-options-hydraulic-demand-multiplier
     conformance-options-hydraulic-default-demand-pattern-none
     conformance-options-hydraulic-default-demand-pattern
-    conformance-options-hydraulic-emitter-exponent
     conformance-options-hydraulic-emitter-backflow-disabled
     conformance-options-hydraulic-emitter-backflow-enabled
     conformance-options-hydraulic-specific-gravity
@@ -132,6 +132,12 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-export-patterns-curves
     conformance-export-coordinates-vertices
     conformance-export-report-options
+    conformance-quality-input-none
+    conformance-quality-input-chemical
+    conformance-quality-input-water-age
+    conformance-quality-input-source-trace
+    conformance-quality-input-tank-mixing-models
+    conformance-quality-input-reactions
     conformance-negative-duplicate-node-id
     conformance-negative-duplicate-link-id
     conformance-negative-duplicate-uuid
@@ -150,6 +156,8 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-negative-missing-typed-curve-references
     conformance-negative-invalid-pipe-numeric
     conformance-negative-invalid-node-numeric
+    conformance-negative-invalid-emitter-configuration
+    conformance-negative-invalid-quality-configuration
     conformance-negative-invalid-map-numeric
     conformance-negative-missing-map-label-anchor
     conformance-negative-invalid-pump-numeric
@@ -232,15 +240,25 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_TEST_SCEN
 endforeach()
 
 foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS)
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-quality-model-boundary")
+        set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;quality")
+    else()
+        set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic")
+    endif()
+
     set_tests_properties(
         aowis-server-epanet-${AOWIS_SERVER_EPANET_TEST_SCENARIO}
         PROPERTIES
-            LABELS "contract;hydraulic"
+            LABELS "${AOWIS_SERVER_EPANET_CONTRACT_LABELS}"
     )
 endforeach()
 
 foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS)
-    set(AOWIS_SERVER_EPANET_TEST_LABELS "conformance;hydraulic")
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-quality-|^conformance-negative-invalid-quality-")
+        set(AOWIS_SERVER_EPANET_TEST_LABELS "conformance;quality")
+    else()
+        set(AOWIS_SERVER_EPANET_TEST_LABELS "conformance;hydraulic")
+    endif()
 
     if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-negative-")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "negative")

@@ -88,7 +88,6 @@ Net1Fixture makeNet1Fixture()
     network.options_hydraulic.maximum_head_error_m = 0.0;
     network.options_hydraulic.maximum_flow_change_m3_per_h = 0.0;
     network.options_hydraulic.demand_multiplier = 1.0;
-    network.options_hydraulic.emitter_exponent = 0.5;
     network.options_hydraulic.specific_gravity = 1.0;
     network.options_hydraulic.relative_viscosity = 1.0;
 

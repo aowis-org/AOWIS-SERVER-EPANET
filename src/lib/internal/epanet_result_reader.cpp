@@ -407,9 +407,6 @@ HydraulicSimulationStatus EpanetResultReader::readLinksPumps(HydraulicSimulation
         status = readLinkValue(this->project, pump_index, EN_ENERGY, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Energy, QStringLiteral("Failed to get pump power"), pump_result.power_kw);
         if (!status.success)
             return status;
-        status = readLinkValue(this->project, pump_index, EN_LINKQUAL, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::Quality, QStringLiteral("Failed to get pump quality"), pump_result.quality);
-        if (!status.success)
-            return status;
 
         double appears_in_control = 0.0;
         status = readLinkValue(this->project, pump_index, EN_LINK_INCONTROL, HydraulicSimulationStatusStage::ReadPumpResults, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, HydraulicSimulationStatusProperty::None, QStringLiteral("Failed to read pump control membership"), appears_in_control);
@@ -480,9 +477,6 @@ HydraulicSimulationStatus EpanetResultReader::readLinksValves(HydraulicSimulatio
                 break;
             }
         }
-        status = readLinkValue(this->project, valve_index, EN_LINKQUAL, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::Quality, QStringLiteral("Failed to get valve quality"), valve_result.quality);
-        if (!status.success)
-            return status;
 
         double appears_in_control = 0.0;
         status = readLinkValue(this->project, valve_index, EN_LINK_INCONTROL, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::None, QStringLiteral("Failed to read valve control membership"), appears_in_control);
@@ -516,9 +510,6 @@ HydraulicSimulationStatus EpanetResultReader::readStatistics(HydraulicSimulation
     if (!status.success)
         return status;
 
-    status = readStatistic(this->project, EN_MASSBALANCE, QStringLiteral("Failed to get water-quality mass balance ratio"), result.statistics.quality_mass_balance_ratio);
-    if (!status.success)
-        return status;
 
     double deficient_nodes = 0.0;
     status = readStatistic(this->project, EN_DEFICIENTNODES, QStringLiteral("Failed to get pressure-deficient node count"), deficient_nodes);

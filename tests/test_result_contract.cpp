@@ -330,6 +330,65 @@ void testUnsupportedPumpPowerRule(TestContext &context)
     context.expect(run.result_timeline.results.isEmpty(), "unsupported pump POWER rule should not return hydraulic results");
 }
 
+
+void testWaterQualityModelBoundary(TestContext &context)
+{
+    HydraulicNodeJunction junction;
+    junction.initial_chemical_concentration_mg_per_l = 1.25;
+    junction.initial_water_age_h = 3.5;
+    junction.initial_source_trace_percent = 42.0;
+    junction.quality_source.type = HydraulicNodeQualitySourceType::MassBooster;
+    junction.quality_source.chemical_mass_flow_mg_per_min = 12.5;
+
+    context.expectNear(junction.initial_chemical_concentration_mg_per_l, 1.25, NumericTolerance{0.0, 0.0}, comparison("initial_chemical_concentration_mg_per_l"), "chemical initial quality should be expressed explicitly in mg/L");
+    context.expectNear(junction.initial_water_age_h, 3.5, NumericTolerance{0.0, 0.0}, comparison("initial_water_age_h"), "water-age initial quality should be expressed explicitly in hours");
+    context.expectNear(junction.initial_source_trace_percent, 42.0, NumericTolerance{0.0, 0.0}, comparison("initial_source_trace_percent"), "source-trace initial quality should be expressed explicitly as percent");
+    context.expectNear(junction.quality_source.chemical_mass_flow_mg_per_min, 12.5, NumericTolerance{0.0, 0.0}, comparison("chemical_mass_flow_mg_per_min"), "mass-booster source strength should be expressed explicitly in mg/min");
+
+    HydraulicNodeQualitySource concentration_source;
+    concentration_source.type = HydraulicNodeQualitySourceType::Concentration;
+    concentration_source.chemical_concentration_mg_per_l = 0.8;
+    context.expectNear(concentration_source.chemical_concentration_mg_per_l, 0.8, NumericTolerance{0.0, 0.0}, comparison("chemical_concentration_mg_per_l"), "concentration-source strength should be expressed explicitly in mg/L");
+
+    WaterQualityBulkReaction bulk_reaction;
+    bulk_reaction.coefficient = -0.15;
+    bulk_reaction.order = 1.4;
+    WaterQualityWallReaction wall_reaction;
+    wall_reaction.coefficient = -0.05;
+    wall_reaction.order = 0.0;
+    context.expectNear(bulk_reaction.coefficient, -0.15, NumericTolerance{0.0, 0.0}, comparison("bulk_reaction.coefficient"), "bulk reaction coefficient should be stored with its order");
+    context.expectNear(bulk_reaction.order, 1.4, NumericTolerance{0.0, 0.0}, comparison("bulk_reaction.order"), "bulk reaction order should be explicit");
+    context.expectNear(wall_reaction.order, 0.0, NumericTolerance{0.0, 0.0}, comparison("wall_reaction.order"), "wall reaction order should be explicit");
+
+    WaterQualitySolverOptions quality_options;
+    quality_options.analysis = WaterQualityAnalysisType::Chemical;
+    quality_options.chemical_tolerance_mg_per_l = 0.005;
+    quality_options.water_age_tolerance_h = 0.02;
+    quality_options.source_trace_tolerance_percent = 0.1;
+    context.expectNear(quality_options.chemical_tolerance_mg_per_l, 0.005, NumericTolerance{0.0, 0.0}, comparison("chemical_tolerance_mg_per_l"), "chemical tolerance should be quantity-specific");
+    context.expectNear(quality_options.water_age_tolerance_h, 0.02, NumericTolerance{0.0, 0.0}, comparison("water_age_tolerance_h"), "water-age tolerance should be quantity-specific");
+    context.expectNear(quality_options.source_trace_tolerance_percent, 0.1, NumericTolerance{0.0, 0.0}, comparison("source_trace_tolerance_percent"), "trace tolerance should be quantity-specific");
+
+    EpanetResultRun run;
+    context.expect(run.quality_result_timeline.validity == WaterQualitySimulationResultValidity::NotRun, "quality timeline should explicitly distinguish not-run from invalid");
+    context.expect(run.quality_result_timeline.results.isEmpty(), "a newly constructed quality timeline should contain no results");
+
+    WaterQualitySimulationResult result;
+    WaterQualitySimulationResultNodeJunction node_result;
+    node_result.chemical_concentration_mg_per_l = 0.75;
+    node_result.water_age_h = 4.0;
+    node_result.source_trace_percent = 65.0;
+    node_result.source_mass_flow_mg_per_min = 1.2;
+    result.nodes_junctions.append(node_result);
+    result.statistics.mass_balance_ratio = 0.9999;
+
+    context.expectNear(result.nodes_junctions.first().chemical_concentration_mg_per_l, 0.75, NumericTolerance{0.0, 0.0}, comparison("quality_result.chemical_concentration_mg_per_l"), "quality results should expose typed chemical concentration");
+    context.expectNear(result.nodes_junctions.first().water_age_h, 4.0, NumericTolerance{0.0, 0.0}, comparison("quality_result.water_age_h"), "quality results should expose typed water age");
+    context.expectNear(result.nodes_junctions.first().source_trace_percent, 65.0, NumericTolerance{0.0, 0.0}, comparison("quality_result.source_trace_percent"), "quality results should expose typed source trace");
+    context.expectNear(result.nodes_junctions.first().source_mass_flow_mg_per_min, 1.2, NumericTolerance{0.0, 0.0}, comparison("quality_result.source_mass_flow_mg_per_min"), "quality results should expose typed source mass flow");
+    context.expectNear(result.statistics.mass_balance_ratio, 0.9999, NumericTolerance{0.0, 0.0}, comparison("quality_result.mass_balance_ratio"), "quality mass balance should live in the quality result timeline");
+}
+
 void testSteadyStatePumpEnergyRegression(TestContext &context)
 {
     const NetworkHydraulic network = makePumpNetwork(false, 0);
@@ -381,5 +440,10 @@ void registerResultContractScenarios(ScenarioRegistry &registry)
         "Checks steady-state pump energy accumulation and flow balance.",
         {"contract", "hydraulic", "pump", "energy"},
         &testSteadyStatePumpEnergyRegression});
+    registry.add(ScenarioDefinition{
+        "contract-quality-model-boundary",
+        "Checks typed water-quality quantities, source strengths, reaction coefficient/order pairs, and the separate quality result timeline.",
+        {"contract", "quality", "model"},
+        &testWaterQualityModelBoundary});
 }
 }
