@@ -311,6 +311,8 @@ HydraulicSimulationStatus EpanetResultReader::readLinksPipes(HydraulicSimulation
         if (!status.success)
             return status;
 
+        // The Toolkit EN_HEADLOSS property is the total hydraulic-head difference across the link.
+        // EPANET's formatted pipe report presents head loss as a gradient instead; derive m/km below.
         status = readLinkValue(this->project, pipe_index, EN_HEADLOSS, HydraulicSimulationStatusStage::ReadPipeResults, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, HydraulicSimulationStatusProperty::Headloss, QStringLiteral("Failed to get pipe head loss"), pipe_result.head_loss_m);
         if (!status.success)
             return status;
@@ -432,6 +434,7 @@ HydraulicSimulationStatus EpanetResultReader::readLinksValves(HydraulicSimulatio
         HydraulicSimulationResultLinkValve valve_result;
         valve_result.id = valve.id;
         valve_result.uuid = valve.uuid;
+        valve_result.type = valve.type;
 
         HydraulicSimulationStatus status = readLinkValue(this->project, valve_index, EN_FLOW, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::Flow, QStringLiteral("Failed to get valve flow"), valve_result.flow_m3_per_h);
         if (!status.success)
@@ -450,9 +453,33 @@ HydraulicSimulationStatus EpanetResultReader::readLinksValves(HydraulicSimulatio
         valve_result.open = static_cast<int>(backend_status) != EN_CLOSED;
         valve_result.active = static_cast<int>(backend_status) > EN_OPEN;
 
-        status = readLinkValue(this->project, valve_index, EN_SETTING, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::Setting, QStringLiteral("Failed to get valve setting"), valve_result.setting);
-        if (!status.success)
-            return status;
+        if (valve.type != HydraulicLinkValveType::GPV)
+        {
+            double backend_setting = 0.0;
+            status = readLinkValue(this->project, valve_index, EN_SETTING, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::Setting, QStringLiteral("Failed to get valve setting"), backend_setting);
+            if (!status.success)
+                return status;
+
+            switch (valve.type)
+            {
+            case HydraulicLinkValveType::PRV:
+            case HydraulicLinkValveType::PSV:
+            case HydraulicLinkValveType::PBV:
+                valve_result.setting_pressure_head_m = backend_setting;
+                break;
+            case HydraulicLinkValveType::FCV:
+                valve_result.setting_flow_m3_per_h = backend_setting;
+                break;
+            case HydraulicLinkValveType::TCV:
+                valve_result.setting_loss_coefficient = backend_setting;
+                break;
+            case HydraulicLinkValveType::PCV:
+                valve_result.setting_position_percent = backend_setting;
+                break;
+            case HydraulicLinkValveType::GPV:
+                break;
+            }
+        }
         status = readLinkValue(this->project, valve_index, EN_LINKQUAL, HydraulicSimulationStatusStage::ReadValveResults, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, HydraulicSimulationStatusProperty::Quality, QStringLiteral("Failed to get valve quality"), valve_result.quality);
         if (!status.success)
             return status;

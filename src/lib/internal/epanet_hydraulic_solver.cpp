@@ -12,7 +12,7 @@ struct PumpEnergyAccumulator
 {
     double online_hours = 0.0;
     double efficiency_percent_hours = 0.0;
-    double kw_per_flow_hours = 0.0;
+    double energy_intensity_hours = 0.0;
     double power_kw_hours = 0.0;
     double peak_power_kw = 0.0;
     double total_cost = 0.0;
@@ -82,7 +82,8 @@ void accumulatePumpEnergy(const NetworkHydraulic &network, const HydraulicSimula
         accumulator.power_kw_hours += pump_result.power_kw * interval_hours;
         constexpr double minimum_energy_flow_m3_per_h = 1.0e-6 * 101.94;
         const double energy_flow_m3_per_h = std::max(minimum_energy_flow_m3_per_h, std::abs(pump_result.flow_m3_per_h));
-        accumulator.kw_per_flow_hours += pump_result.power_kw / energy_flow_m3_per_h * interval_hours;
+        // kW / (m3/h) is kWh/m3, the AOWIS canonical energy-intensity unit.
+        accumulator.energy_intensity_hours += pump_result.power_kw / energy_flow_m3_per_h * interval_hours;
         if (pump_result.power_kw > accumulator.peak_power_kw)
             accumulator.peak_power_kw = pump_result.power_kw;
         accumulator.total_cost += pumpEnergyCost(network, pump, result.time_elapsed_s) * pump_result.power_kw * interval_hours;
@@ -103,6 +104,7 @@ void storePumpEnergyUsage(const NetworkHydraulic &network, const QList<PumpEnerg
         HydraulicSimulationResultLinkPumpEnergyUsage usage;
         usage.pump_id = pump.id;
         usage.pump_uuid = pump.uuid;
+        usage.currency_iso4217 = network.options_energy.currency_iso4217;
         if (duration_hours > 0.0)
             usage.time_online_percent = accumulator.online_hours / duration_hours * 100.0;
         else if (accumulator.online_hours > 0.0)
@@ -110,7 +112,7 @@ void storePumpEnergyUsage(const NetworkHydraulic &network, const QList<PumpEnerg
         if (accumulator.online_hours > 0.0)
         {
             usage.average_efficiency_percent = accumulator.efficiency_percent_hours / accumulator.online_hours;
-            usage.average_kw_per_flow_unit = accumulator.kw_per_flow_hours / accumulator.online_hours;
+            usage.average_energy_intensity_kw_h_per_m3 = accumulator.energy_intensity_hours / accumulator.online_hours;
             usage.average_power_kw = accumulator.power_kw_hours / accumulator.online_hours;
         }
         usage.peak_power_kw = accumulator.peak_power_kw;
@@ -122,6 +124,7 @@ void storePumpEnergyUsage(const NetworkHydraulic &network, const QList<PumpEnerg
         result.energy_usage.energy_cost_per_day += usage.average_cost_per_day;
     }
 
+    result.energy_usage.currency_iso4217 = network.options_energy.currency_iso4217;
     result.energy_usage.peak_power_kw = system_accumulator.peak_power_kw;
     result.energy_usage.demand_charge_per_day = system_accumulator.peak_power_kw * network.options_energy.demand_charge_per_kw;
     result.energy_usage.total_cost_per_day = result.energy_usage.energy_cost_per_day + result.energy_usage.demand_charge_per_day;
@@ -384,6 +387,7 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(
             }
             else
             {
+                result.energy_usage.currency_iso4217 = this->network.options_energy.currency_iso4217;
                 timeline.results.append(result);
             }
         }

@@ -683,7 +683,7 @@ struct PumpEnergyAccumulator
     QString pump_id;
     double online_hours = 0.0;
     double efficiency_percent_hours = 0.0;
-    double kw_per_flow_hours = 0.0;
+    double energy_intensity_hours = 0.0;
     double power_kw_hours = 0.0;
     double peak_power_kw = 0.0;
     double total_cost = 0.0;
@@ -1135,7 +1135,7 @@ void accumulatePumpEnergy(EN_Project project, const NativeHydraulicResult &resul
         accumulator.power_kw_hours += pump.power_kw * interval_hours;
         constexpr double minimum_energy_flow_m3_per_h = 1.0e-6 * kCubicMetresPerHourPerCubicFootPerSecond;
         const double energy_flow_m3_per_h = std::max(minimum_energy_flow_m3_per_h, std::abs(pump.flow_m3_per_h));
-        accumulator.kw_per_flow_hours += pump.power_kw / energy_flow_m3_per_h * interval_hours;
+        accumulator.energy_intensity_hours += pump.power_kw / energy_flow_m3_per_h * interval_hours;
         accumulator.peak_power_kw = std::max(accumulator.peak_power_kw, pump.power_kw);
         accumulator.total_cost += nativePumpEnergyPrice(project, pump, time_s) * pump.power_kw * interval_hours;
         simultaneous_power_kw += pump.power_kw;
@@ -1156,7 +1156,7 @@ void storePumpEnergy(double duration_hours, double demand_charge_per_kw, const Q
         if (accumulator.online_hours > 0.0)
         {
             usage.average_efficiency_percent = accumulator.efficiency_percent_hours / accumulator.online_hours;
-            usage.average_kw_per_flow_unit = accumulator.kw_per_flow_hours / accumulator.online_hours;
+            usage.average_energy_intensity_kw_h_per_m3 = accumulator.energy_intensity_hours / accumulator.online_hours;
             usage.average_power_kw = accumulator.power_kw_hours / accumulator.online_hours;
         }
         usage.peak_power_kw = accumulator.peak_power_kw;

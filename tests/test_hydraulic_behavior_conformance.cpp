@@ -399,8 +399,8 @@ Net1Fixture pcvFixture()
     valve.type = HydraulicLinkValveType::PCV;
     valve.diameter_mm = 12.0 * 25.4;
     valve.minor_loss_coefficient = 0.19;
-    valve.setting = 35.0;
-    valve.setting_curve_uuid = curve.uuid;
+    valve.setting_position_percent = 35.0;
+    valve.characteristic_curve_uuid = curve.uuid;
     valve.initial_status = HydraulicLinkValveInitialStatus::Active;
     fixture.network.links_valves.append(valve);
 

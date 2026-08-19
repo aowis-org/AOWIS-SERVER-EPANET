@@ -37,17 +37,22 @@ The adapter initializes every native EPANET project with `EN_CMH` and explicitly
 - Velocity: `m_per_s`.
 - Simulation time values: `s`.
 - Pump power and demand charge basis: `kw`.
+- Pump energy intensity: AOWIS stores `kW.h/m3`; the wrapper computes it from canonical `kW` and `m3/h` values.
+- Energy prices and costs use the single `PumpEnergyOptions::currency_iso4217` billing currency. EPANET receives only the numeric price/charge values and performs no currency conversion; exchange-rate handling belongs to the AOWIS controller.
 - Pump efficiency: `percent`.
 - Pump and valve curves use the canonical units encoded by their point fields.
 - PRV, PSV, and PBV settings: pressure head in `m`.
 - FCV settings: `m3_per_h`.
 - TCV settings: dimensionless loss coefficient.
 - PCV settings: `percent` open.
+- GPV head-loss curves are referenced by `head_loss_curve_uuid`; PCV valve-characteristic curves are referenced separately by `characteristic_curve_uuid`. Native GPV curve indices returned through `EN_SETTING` are backend identifiers and are not exposed as numeric AOWIS measurement results.
 - Junction emitter coefficient: `m3_per_h_per_m_exponent`.
 
 No m³/h-to-L/s conversion is performed by this adapter. `HydraulicSolverOptions` does not expose selectable native flow or pressure units; conversion to presentation or interchange units belongs outside the hydraulic solver.
 
 Pipe roughness is selected according to `headloss_formula`: `roughness_hazen_williams` for Hazen-Williams, `roughness_darcy_weisbach_mm` for Darcy-Weisbach, and `roughness_chezy_manning` for Chezy-Manning.
+
+The Toolkit `EN_HEADLOSS` link result is the total hydraulic-head difference across the link in the configured head unit. For pipes, AOWIS stores this directly as `head_loss_m` and derives `head_loss_gradient_m_per_km` from the pipe length. This is distinct from EPANET's formatted pipe report, which presents pipe head loss as a per-length gradient.
 
 ## Model-boundary conventions and remaining issues
 

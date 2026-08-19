@@ -767,7 +767,7 @@ void testRuleActiveAction(TestContext &context)
     valve.node_uuid_from = replaced_pipe.node_uuid_from;
     valve.node_uuid_to = replaced_pipe.node_uuid_to;
     valve.type = HydraulicLinkValveType::PRV;
-    valve.setting = 20.0;
+    valve.setting_pressure_head_m = 20.0;
     valve.initial_status = HydraulicLinkValveInitialStatus::Active;
     valve.diameter_mm = 450.0;
     valve.minor_loss_coefficient = 0.15;

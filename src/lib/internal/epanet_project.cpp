@@ -431,28 +431,6 @@ HydraulicSimulationStatus EpanetProject::initialize(const NetworkHydraulic &requ
             return epanet_status;
     }
 
-    int configured_flow_unit = -1;
-    error = EN_getflowunits(this->project, &configured_flow_unit);
-    if (error != 0)
-    {
-        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_getflowunits"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to verify EPANET flow units"));
-        if (!epanet_status.success)
-            return epanet_status;
-    }
-    if (configured_flow_unit != EN_CMH)
-        return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("EPANET flow units do not match the required AOWIS m3/h backend contract"));
-
-    double configured_pressure_unit = -1.0;
-    error = EN_getoption(this->project, EN_PRESS_UNITS, &configured_pressure_unit);
-    if (error != 0)
-    {
-        const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(*this, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, QStringLiteral("EN_getoption(EN_PRESS_UNITS)"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to verify EPANET pressure-head units"));
-        if (!epanet_status.success)
-            return epanet_status;
-    }
-    if (static_cast<int>(configured_pressure_unit) != EN_METERS)
-        return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureHydraulics, HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("EPANET pressure units do not match the required AOWIS meter-head backend contract"));
-
     struct TimeParameter
     {
         int parameter;

@@ -134,6 +134,7 @@ NetworkHydraulic makePumpNetwork(bool with_timer_control, quint64 duration_s)
     network.duration_s = duration_s;
     network.timestep_hydraulic_s = 3600;
     network.timestep_report_s = 3600;
+    network.options_energy.currency_iso4217 = QStringLiteral("EUR");
     network.options_energy.global_pump_efficiency_percent = 80.0;
     network.options_energy.global_energy_price_per_kw_h = 0.25;
     network.options_energy.demand_charge_per_kw = 2.0;
@@ -282,6 +283,13 @@ void testTimerPumpControlAndEnergySummary(TestContext &context)
         context.expectNear(final_result.links_pump_energy_usage.first().time_online_percent, 50.0,
             NumericTolerance{0.0, 1.0e-4}, comparison("time_online_percent", final_result.time_elapsed_s, "Pump", final_result.links_pump_energy_usage.first().pump_id.toStdString()),
             "pump should be online for half of the run");
+    context.expectEqual(final_result.energy_usage.currency_iso4217.toStdString(), std::string("EUR"),
+        comparison("energy_usage.currency_iso4217", final_result.time_elapsed_s),
+        "system energy summary should preserve the configured ISO 4217 currency");
+    if (!final_result.links_pump_energy_usage.isEmpty())
+        context.expectEqual(final_result.links_pump_energy_usage.first().currency_iso4217.toStdString(), std::string("EUR"),
+            comparison("pump_energy.currency_iso4217", final_result.time_elapsed_s),
+            "pump energy summary should preserve the configured ISO 4217 currency");
     context.expect(final_result.energy_usage.peak_power_kw > 0.0, "system peak pump power should be returned");
     context.expectNear(final_result.energy_usage.demand_charge_per_day, final_result.energy_usage.peak_power_kw * 2.0,
         HydraulicQuantity::Cost, comparison("energy_usage.demand_charge_per_day", final_result.time_elapsed_s),

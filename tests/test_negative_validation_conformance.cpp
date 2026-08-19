@@ -380,7 +380,7 @@ void scenarioMissingValveCurve(TestContext &context)
     valve.diameter_mm = 200.0;
     valve.minor_loss_coefficient = 0.0;
     valve.initial_status = HydraulicLinkValveInitialStatus::Open;
-    valve.setting_curve_uuid = QUuid::createUuid();
+    valve.head_loss_curve_uuid = QUuid::createUuid();
 
     for (int index = 0; index < network.links_pipes.size(); index++)
     {
@@ -474,8 +474,8 @@ void scenarioInvalidValveNumeric(TestContext &context)
     valve.node_uuid_from = pipe->node_uuid_from;
     valve.node_uuid_to = pipe->node_uuid_to;
     valve.type = HydraulicLinkValveType::TCV;
-    valve.diameter_mm = std::numeric_limits<double>::quiet_NaN();
-    valve.setting = 1.0;
+    valve.diameter_mm = 200.0;
+    valve.setting_loss_coefficient = std::numeric_limits<double>::quiet_NaN();
     network.links_valves.append(valve);
 
     expectRejected(context, network, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("invalid numeric"));

@@ -111,7 +111,7 @@ struct NativePumpEnergyUsage
     QString pump_id;
     double time_online_percent = 0.0;
     double average_efficiency_percent = 0.0;
-    double average_kw_per_flow_unit = 0.0;
+    double average_energy_intensity_kw_h_per_m3 = 0.0;
     double average_power_kw = 0.0;
     double peak_power_kw = 0.0;
     double average_cost_per_day = 0.0;

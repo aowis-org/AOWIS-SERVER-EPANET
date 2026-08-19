@@ -45,13 +45,35 @@ QString HydraulicSimulationResultPrinter::toString(const HydraulicSimulationResu
         stream << "  " << tank.id << ": head=" << tank.hydraulic_head_m << " m, level=" << tank.water_level_m << " m, volume=" << tank.volume_m3 << " m3\n";
     stream << "Pipes:\n";
     for (const HydraulicSimulationResultLinkPipe &pipe : result.links_pipes)
-        stream << "  " << pipe.id << ": flow=" << pipe.flow_m3_per_h << " m3/h, leakage=" << pipe.leakage_flow_m3_per_h << " m3/h, velocity=" << pipe.velocity_m_per_s << " m/s, head_loss=" << pipe.head_loss_m << " m, unit_head_loss=" << pipe.head_loss_gradient_m_per_km << " m/km, friction_factor=" << pipe.friction_factor << '\n';
+        stream << "  " << pipe.id << ": flow=" << pipe.flow_m3_per_h << " m3/h, leakage=" << pipe.leakage_flow_m3_per_h << " m3/h, velocity=" << pipe.velocity_m_per_s << " m/s, head_loss=" << pipe.head_loss_m << " m, head_loss_gradient=" << pipe.head_loss_gradient_m_per_km << " m/km, friction_factor=" << pipe.friction_factor << '\n';
     stream << "Pumps:\n";
     for (const HydraulicSimulationResultLinkPump &pump : result.links_pumps)
         stream << "  " << pump.id << ": flow=" << pump.flow_m3_per_h << " m3/h, head_gain=" << pump.head_gain_m << " m, power=" << pump.power_kw << " kW, efficiency=" << pump.efficiency_percent << "%\n";
     stream << "Valves:\n";
     for (const HydraulicSimulationResultLinkValve &valve : result.links_valves)
-        stream << "  " << valve.id << ": flow=" << valve.flow_m3_per_h << " m3/h, head_loss=" << valve.head_loss_m << " m, setting=" << valve.setting << '\n';
+    {
+        stream << "  " << valve.id << ": flow=" << valve.flow_m3_per_h << " m3/h, head_loss=" << valve.head_loss_m << " m";
+        switch (valve.type)
+        {
+        case HydraulicLinkValveType::PRV:
+        case HydraulicLinkValveType::PSV:
+        case HydraulicLinkValveType::PBV:
+            stream << ", setting_pressure_head=" << valve.setting_pressure_head_m << " m";
+            break;
+        case HydraulicLinkValveType::FCV:
+            stream << ", setting_flow=" << valve.setting_flow_m3_per_h << " m3/h";
+            break;
+        case HydraulicLinkValveType::TCV:
+            stream << ", setting_loss_coefficient=" << valve.setting_loss_coefficient;
+            break;
+        case HydraulicLinkValveType::PCV:
+            stream << ", setting_position=" << valve.setting_position_percent << "%";
+            break;
+        case HydraulicLinkValveType::GPV:
+            break;
+        }
+        stream << '\n';
+    }
     stream << "Next event: " << timestepEventText(result.event_next.type) << " in " << result.event_next.time_until_event_s << " s";
     if (!result.event_next.tank_id.isEmpty())
         stream << ", tank=" << result.event_next.tank_id;
@@ -74,9 +96,19 @@ QString HydraulicSimulationResultPrinter::toString(const HydraulicSimulationResu
         stream << "System energy: peak=" << result.energy_usage.peak_power_kw
                << " kW, energy_cost/day=" << result.energy_usage.energy_cost_per_day
                << ", demand_charge/day=" << result.energy_usage.demand_charge_per_day
-               << ", total_cost/day=" << result.energy_usage.total_cost_per_day << '\n';
+               << ", total_cost/day=" << result.energy_usage.total_cost_per_day;
+        if (!result.energy_usage.currency_iso4217.isEmpty())
+            stream << ' ' << result.energy_usage.currency_iso4217;
+        stream << '\n';
         for (const HydraulicSimulationResultLinkPumpEnergyUsage &usage : result.links_pump_energy_usage)
-            stream << "  " << usage.pump_id << ": online=" << usage.time_online_percent << "%, efficiency=" << usage.average_efficiency_percent << "%, average_power=" << usage.average_power_kw << " kW, peak_power=" << usage.peak_power_kw << " kW, cost/day=" << usage.average_cost_per_day << '\n';
+        {
+            stream << "  " << usage.pump_id << ": online=" << usage.time_online_percent << "%, efficiency=" << usage.average_efficiency_percent
+                   << "%, energy_intensity=" << usage.average_energy_intensity_kw_h_per_m3 << " kWh/m3, average_power=" << usage.average_power_kw
+                   << " kW, peak_power=" << usage.peak_power_kw << " kW, cost/day=" << usage.average_cost_per_day;
+            if (!usage.currency_iso4217.isEmpty())
+                stream << ' ' << usage.currency_iso4217;
+            stream << '\n';
+        }
     }
     stream << "--------------------------------------------------\n";
     return output;

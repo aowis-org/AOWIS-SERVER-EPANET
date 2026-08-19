@@ -479,8 +479,35 @@ void compareValves(const NativeHydraulicResult &expected, const HydraulicSimulat
             comparison("open", expected.time_elapsed_s, "Valve", id));
         context.expectEqual(actual_valve->active, expected_valve.active,
             comparison("active", expected.time_elapsed_s, "Valve", id));
-        context.expectNear(actual_valve->setting, expected_valve.setting,
-            HydraulicQuantity::Setting, comparison("setting", expected.time_elapsed_s, "Valve", id));
+        if (model_valve != nullptr)
+        {
+            context.expectEqual(static_cast<std::int64_t>(actual_valve->type),
+                static_cast<std::int64_t>(model_valve->type),
+                comparison("type", expected.time_elapsed_s, "Valve", id));
+            switch (model_valve->type)
+            {
+            case HydraulicLinkValveType::PRV:
+            case HydraulicLinkValveType::PSV:
+            case HydraulicLinkValveType::PBV:
+                context.expectNear(actual_valve->setting_pressure_head_m, expected_valve.setting,
+                    HydraulicQuantity::HeadMetres, comparison("setting_pressure_head_m", expected.time_elapsed_s, "Valve", id));
+                break;
+            case HydraulicLinkValveType::FCV:
+                context.expectNear(actual_valve->setting_flow_m3_per_h, expected_valve.setting,
+                    HydraulicQuantity::FlowM3PerHour, comparison("setting_flow_m3_per_h", expected.time_elapsed_s, "Valve", id));
+                break;
+            case HydraulicLinkValveType::TCV:
+                context.expectNear(actual_valve->setting_loss_coefficient, expected_valve.setting,
+                    HydraulicQuantity::Setting, comparison("setting_loss_coefficient", expected.time_elapsed_s, "Valve", id));
+                break;
+            case HydraulicLinkValveType::PCV:
+                context.expectNear(actual_valve->setting_position_percent, expected_valve.setting,
+                    HydraulicQuantity::Setting, comparison("setting_position_percent", expected.time_elapsed_s, "Valve", id));
+                break;
+            case HydraulicLinkValveType::GPV:
+                break;
+            }
+        }
         context.expectEqual(actual_valve->appears_in_control, expected_valve.appears_in_control,
             comparison("appears_in_control", expected.time_elapsed_s, "Valve", id));
     }
@@ -563,12 +590,14 @@ void comparePumpEnergy(const NativeHydraulicResult &expected, const HydraulicSim
                 comparison("pump_uuid", expected.time_elapsed_s, "Pump", id));
         context.expectEqual(actual_usage->pump_id.toStdString(), id,
             comparison("pump_id", expected.time_elapsed_s, "Pump", id));
+        context.expectEqual(actual_usage->currency_iso4217.toStdString(), network.options_energy.currency_iso4217.toStdString(),
+            comparison("currency_iso4217", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_usage->time_online_percent, expected_usage.time_online_percent,
             HydraulicQuantity::Percent, comparison("time_online_percent", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_usage->average_efficiency_percent, expected_usage.average_efficiency_percent,
             HydraulicQuantity::Percent, comparison("average_efficiency_percent", expected.time_elapsed_s, "Pump", id));
-        context.expectNear(actual_usage->average_kw_per_flow_unit, expected_usage.average_kw_per_flow_unit,
-            NumericTolerance{1.0e-9, 1.0e-6}, comparison("average_kw_per_flow_unit", expected.time_elapsed_s, "Pump", id));
+        context.expectNear(actual_usage->average_energy_intensity_kw_h_per_m3, expected_usage.average_energy_intensity_kw_h_per_m3,
+            NumericTolerance{1.0e-9, 1.0e-6}, comparison("average_energy_intensity_kw_h_per_m3", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_usage->average_power_kw, expected_usage.average_power_kw,
             HydraulicQuantity::PowerKw, comparison("average_power_kw", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_usage->peak_power_kw, expected_usage.peak_power_kw,
@@ -578,7 +607,7 @@ void comparePumpEnergy(const NativeHydraulicResult &expected, const HydraulicSim
     }
 }
 
-void compareSummaries(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, TestContext &context)
+void compareSummaries(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context)
 {
     context.expectNear(actual.flow_balance.total_inflow_m3_per_h, expected.flow_balance.total_inflow_m3_per_h,
         HydraulicQuantity::FlowM3PerHour, comparison("flow_balance.total_inflow_m3_per_h", expected.time_elapsed_s));
@@ -596,6 +625,9 @@ void compareSummaries(const NativeHydraulicResult &expected, const HydraulicSimu
         HydraulicQuantity::FlowM3PerHour, comparison("flow_balance.storage_flow_m3_per_h", expected.time_elapsed_s));
     context.expectNear(actual.flow_balance.flow_balance_ratio, expected.flow_balance.flow_balance_ratio,
         HydraulicQuantity::Dimensionless, comparison("flow_balance.flow_balance_ratio", expected.time_elapsed_s));
+
+    context.expectEqual(actual.energy_usage.currency_iso4217.toStdString(), network.options_energy.currency_iso4217.toStdString(),
+        comparison("energy_usage.currency_iso4217", expected.time_elapsed_s));
 
     context.expectNear(actual.energy_usage.peak_power_kw, expected.energy_usage.peak_power_kw,
         HydraulicQuantity::PowerKw, comparison("energy_usage.peak_power_kw", expected.time_elapsed_s));
@@ -642,7 +674,7 @@ void compareHydraulicTimelines(const NativeHydraulicTimeline &expected,
         compareStatistics(expected_result, actual_result, context);
         compareEvent(expected_result, actual_result, network, context);
         comparePumpEnergy(expected_result, actual_result, network, context);
-        compareSummaries(expected_result, actual_result, context);
+        compareSummaries(expected_result, actual_result, network, context);
     }
 }
 }

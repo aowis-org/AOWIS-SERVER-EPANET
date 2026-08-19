@@ -399,6 +399,7 @@ void testPumpGlobalEnergy(TestContext &context)
     fixture.network.duration_s = 7200;
     fixture.network.timestep_pattern_s = 3600;
     disablePumpControls(fixture);
+    fixture.network.options_energy.currency_iso4217 = QStringLiteral("EUR");
     fixture.network.options_energy.global_pump_efficiency_percent = 82.0;
     fixture.network.options_energy.global_energy_price_per_kw_h = 0.2;
     fixture.network.options_energy.demand_charge_per_kw = 1.5;
@@ -430,6 +431,7 @@ void testPumpEnergyPattern(TestContext &context)
     fixture.network.duration_s = 7200;
     fixture.network.timestep_pattern_s = 3600;
     disablePumpControls(fixture);
+    fixture.network.options_energy.currency_iso4217 = QStringLiteral("USD");
     fixture.network.options_energy.global_pump_efficiency_percent = 80.0;
     fixture.network.options_energy.global_energy_price_per_kw_h = 0.1;
     fixture.network.options_energy.demand_charge_per_kw = 0.75;

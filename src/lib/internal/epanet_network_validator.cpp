@@ -516,12 +516,12 @@ QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulic &netw
 
         if (valve.type == HydraulicLinkValveType::GPV)
         {
-            status = validateCurveReference(valve_headloss_curves, valve.setting_curve_uuid, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("GPV head-loss curve"), false);
+            status = validateCurveReference(valve_headloss_curves, valve.head_loss_curve_uuid, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("GPV head-loss curve"), false);
             appendValidationFailure(failures, status);
         }
-        if (valve.type == HydraulicLinkValveType::PCV && !valve.setting_curve_uuid.isNull())
+        if (valve.type == HydraulicLinkValveType::PCV && !valve.characteristic_curve_uuid.isNull())
         {
-            status = validateCurveReference(valve_characteristic_curves, valve.setting_curve_uuid, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("PCV characteristic curve"), false);
+            status = validateCurveReference(valve_characteristic_curves, valve.characteristic_curve_uuid, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("PCV characteristic curve"), false);
             appendValidationFailure(failures, status);
         }
     }
@@ -929,10 +929,28 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         appendValidationFailure(failures, status);
         status = validateFiniteNonNegative(valve.minor_loss_coefficient, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("minor_loss_coefficient"));
         appendValidationFailure(failures, status);
-        if (valve.type != HydraulicLinkValveType::GPV)
+        switch (valve.type)
         {
-            status = validateFinite(valve.setting, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("setting"));
+        case HydraulicLinkValveType::PRV:
+        case HydraulicLinkValveType::PSV:
+        case HydraulicLinkValveType::PBV:
+            status = validateFinite(valve.setting_pressure_head_m, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("setting_pressure_head_m"));
             appendValidationFailure(failures, status);
+            break;
+        case HydraulicLinkValveType::FCV:
+            status = validateFinite(valve.setting_flow_m3_per_h, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("setting_flow_m3_per_h"));
+            appendValidationFailure(failures, status);
+            break;
+        case HydraulicLinkValveType::TCV:
+            status = validateFinite(valve.setting_loss_coefficient, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("setting_loss_coefficient"));
+            appendValidationFailure(failures, status);
+            break;
+        case HydraulicLinkValveType::PCV:
+            status = validateFinite(valve.setting_position_percent, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("setting_position_percent"));
+            appendValidationFailure(failures, status);
+            break;
+        case HydraulicLinkValveType::GPV:
+            break;
         }
         for (int index = 0; index < valve.vertices.size(); index++)
         {

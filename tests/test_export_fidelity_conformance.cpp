@@ -75,7 +75,7 @@ HydraulicLinkValve replacePipeWithMetadataValve(NetworkHydraulic &network, const
     valve.type = HydraulicLinkValveType::TCV;
     valve.diameter_mm = 200.0;
     valve.minor_loss_coefficient = 0.15;
-    valve.setting = 3.0;
+    valve.setting_loss_coefficient = 3.0;
     valve.initial_status = HydraulicLinkValveInitialStatus::Open;
     valve.metadata.comment = QStringLiteral("valve export comment");
     valve.metadata.tag = QStringLiteral("valve-tag");

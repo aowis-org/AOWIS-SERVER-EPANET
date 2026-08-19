@@ -739,7 +739,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     prv.node_uuid_from = junction_pump_out.uuid;
     prv.node_uuid_to = junction_prv_out.uuid;
     prv.type = HydraulicLinkValveType::PRV;
-    prv.setting = 38.0;
+    prv.setting_pressure_head_m = 38.0;
     prv.initial_status = HydraulicLinkValveInitialStatus::Active;
     prv.diameter_mm = 200.0;
     prv.minor_loss_coefficient = 0.2;
@@ -750,7 +750,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     psv.node_uuid_from = junction_prv_out.uuid;
     psv.node_uuid_to = junction_psv_out.uuid;
     psv.type = HydraulicLinkValveType::PSV;
-    psv.setting = 42.0;
+    psv.setting_pressure_head_m = 42.0;
     psv.initial_status = HydraulicLinkValveInitialStatus::Active;
     psv.diameter_mm = 200.0;
     psv.minor_loss_coefficient = 0.2;
@@ -761,7 +761,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     fcv.node_uuid_from = junction_psv_out.uuid;
     fcv.node_uuid_to = junction_fcv_out.uuid;
     fcv.type = HydraulicLinkValveType::FCV;
-    fcv.setting = 30.0;
+    fcv.setting_flow_m3_per_h = 30.0;
     fcv.initial_status = HydraulicLinkValveInitialStatus::Active;
     fcv.diameter_mm = 180.0;
     fcv.minor_loss_coefficient = 0.1;
@@ -772,7 +772,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     pbv.node_uuid_from = junction_fcv_out.uuid;
     pbv.node_uuid_to = junction_pbv_out.uuid;
     pbv.type = HydraulicLinkValveType::PBV;
-    pbv.setting = 5.0;
+    pbv.setting_pressure_head_m = 5.0;
     pbv.initial_status = HydraulicLinkValveInitialStatus::Active;
     pbv.diameter_mm = 180.0;
     pbv.minor_loss_coefficient = 0.1;
@@ -783,7 +783,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     tcv.node_uuid_from = junction_pbv_out.uuid;
     tcv.node_uuid_to = junction_tcv_out.uuid;
     tcv.type = HydraulicLinkValveType::TCV;
-    tcv.setting = 2.5;
+    tcv.setting_loss_coefficient = 2.5;
     tcv.initial_status = HydraulicLinkValveInitialStatus::Open;
     tcv.diameter_mm = 160.0;
     tcv.minor_loss_coefficient = 0.0;
@@ -794,7 +794,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     gpv.node_uuid_from = junction_tcv_out.uuid;
     gpv.node_uuid_to = junction_gpv_out.uuid;
     gpv.type = HydraulicLinkValveType::GPV;
-    gpv.setting_curve_uuid = gpv_headloss_curve.uuid;
+    gpv.head_loss_curve_uuid = gpv_headloss_curve.uuid;
     gpv.initial_status = HydraulicLinkValveInitialStatus::Active;
     gpv.diameter_mm = 160.0;
     gpv.minor_loss_coefficient = 0.0;
@@ -805,7 +805,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     pcv.node_uuid_from = junction_gpv_out.uuid;
     pcv.node_uuid_to = junction_pcv_out.uuid;
     pcv.type = HydraulicLinkValveType::PCV;
-    pcv.setting = 65.0;
+    pcv.setting_position_percent = 65.0;
     pcv.initial_status = HydraulicLinkValveInitialStatus::Closed;
     pcv.diameter_mm = 150.0;
     pcv.minor_loss_coefficient = 0.0;

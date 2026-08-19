@@ -86,7 +86,25 @@ Net1Fixture valveFixture(const QString &pipe_id, HydraulicLinkValveType type, do
     valve.type = type;
     valve.diameter_mm = diameter_mm;
     valve.minor_loss_coefficient = minor_loss_coefficient;
-    valve.setting = setting;
+    switch (type)
+    {
+    case HydraulicLinkValveType::PRV:
+    case HydraulicLinkValveType::PSV:
+    case HydraulicLinkValveType::PBV:
+        valve.setting_pressure_head_m = setting;
+        break;
+    case HydraulicLinkValveType::FCV:
+        valve.setting_flow_m3_per_h = setting;
+        break;
+    case HydraulicLinkValveType::TCV:
+        valve.setting_loss_coefficient = setting;
+        break;
+    case HydraulicLinkValveType::PCV:
+        valve.setting_position_percent = setting;
+        break;
+    case HydraulicLinkValveType::GPV:
+        break;
+    }
     valve.initial_status = initial_status;
     fixture.network.links_valves.append(valve);
     return fixture;
@@ -264,7 +282,7 @@ Net1Fixture gpvFixture()
         curve.points.append(point);
     }
     fixture.network.curves_valve_headloss.append(curve);
-    fixture.network.links_valves.first().setting_curve_uuid = curve.uuid;
+    fixture.network.links_valves.first().head_loss_curve_uuid = curve.uuid;
     return fixture;
 }
 

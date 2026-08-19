@@ -1610,7 +1610,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkValve(const HydraulicLink
 
     if (valve.type == HydraulicLinkValveType::GPV)
     {
-        const int curve_index = this->indices.curves_valve_headloss.value(valve.setting_curve_uuid, 0);
+        const int curve_index = this->indices.curves_valve_headloss.value(valve.head_loss_curve_uuid, 0);
         if (curve_index == 0)
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Could not resolve GPV head-loss curve UUID"));
         error = EN_setlinkvalue(this->project.handle(), valve_index, EN_GPV_CURVE, static_cast<double>(curve_index));
@@ -1623,9 +1623,30 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkValve(const HydraulicLink
     }
     else
     {
-        if (valve.type == HydraulicLinkValveType::PCV && (valve.setting < 0.0 || valve.setting > 100.0))
-            return makeEpanetStatus(HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("PCV position must be in [0, 100] percent"));
-        error = EN_setlinkvalue(this->project.handle(), valve_index, EN_INITSETTING, valve.setting);
+        double initial_setting = 0.0;
+        switch (valve.type)
+        {
+        case HydraulicLinkValveType::PRV:
+        case HydraulicLinkValveType::PSV:
+        case HydraulicLinkValveType::PBV:
+            initial_setting = valve.setting_pressure_head_m;
+            break;
+        case HydraulicLinkValveType::FCV:
+            initial_setting = valve.setting_flow_m3_per_h;
+            break;
+        case HydraulicLinkValveType::TCV:
+            initial_setting = valve.setting_loss_coefficient;
+            break;
+        case HydraulicLinkValveType::PCV:
+            initial_setting = valve.setting_position_percent;
+            if (initial_setting < 0.0 || initial_setting > 100.0)
+                return makeEpanetStatus(HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("PCV position must be in [0, 100] percent"));
+            break;
+        case HydraulicLinkValveType::GPV:
+            break;
+        }
+
+        error = EN_setlinkvalue(this->project.handle(), valve_index, EN_INITSETTING, initial_setting);
         if (error != 0)
         {
             const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::SetEntityMetadata, QStringLiteral("EN_setlinkvalue(EN_INITSETTING)"), HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to set valve setting"));
@@ -1633,9 +1654,9 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addLinkValve(const HydraulicLink
                 return epanet_status;
         }
 
-        if (valve.type == HydraulicLinkValveType::PCV && !valve.setting_curve_uuid.isNull())
+        if (valve.type == HydraulicLinkValveType::PCV && !valve.characteristic_curve_uuid.isNull())
         {
-            const int curve_index = this->indices.curves_valve_characteristic.value(valve.setting_curve_uuid, 0);
+            const int curve_index = this->indices.curves_valve_characteristic.value(valve.characteristic_curve_uuid, 0);
             if (curve_index == 0)
                 return makeEpanetStatus(HydraulicSimulationStatusStage::AddValve, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Could not resolve PCV characteristic curve UUID"));
             error = EN_setlinkvalue(this->project.handle(), valve_index, EN_PCV_CURVE, static_cast<double>(curve_index));
