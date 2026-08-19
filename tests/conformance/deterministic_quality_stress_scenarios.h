@@ -1,0 +1,11 @@
+#ifndef AOWIS_EPANET_DETERMINISTIC_QUALITY_STRESS_SCENARIOS_H
+#define AOWIS_EPANET_DETERMINISTIC_QUALITY_STRESS_SCENARIOS_H
+
+#include "conformance_test_framework.h"
+
+namespace AowisEpanetTests
+{
+void registerDeterministicQualityStressScenarios(ScenarioRegistry &registry);
+}
+
+#endif // AOWIS_EPANET_DETERMINISTIC_QUALITY_STRESS_SCENARIOS_H

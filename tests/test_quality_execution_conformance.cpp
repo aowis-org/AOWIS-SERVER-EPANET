@@ -5,12 +5,17 @@
 #include "conformance/net1_fixture.h"
 #include "conformance/quality_execution_scenarios.h"
 
+#include "../src/lib/internal/epanet_index_registry.h"
+#include "../src/lib/internal/epanet_network_builder.h"
+#include "../src/lib/internal/epanet_network_preparer.h"
+#include "../src/lib/internal/epanet_project.h"
+#include "../src/lib/internal/epanet_report_collector.h"
+
 #include <QByteArray>
-#include <QFile>
 #include <QHash>
-#include <QTemporaryDir>
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <stdexcept>
@@ -113,6 +118,116 @@ NetworkHydraulic qualityNetwork(WaterQualityAnalysisType analysis)
     return network;
 }
 
+void clearChemicalInputs(NetworkHydraulic &network)
+{
+    for (HydraulicNodeJunction &node : network.nodes_junctions)
+    {
+        node.initial_chemical_concentration_mg_per_l = 0.0;
+        node.quality_source = HydraulicNodeQualitySource();
+    }
+    for (HydraulicNodeReservoir &node : network.nodes_reservoirs)
+    {
+        node.initial_chemical_concentration_mg_per_l = 0.0;
+        node.quality_source = HydraulicNodeQualitySource();
+    }
+    for (HydraulicNodeTank &node : network.nodes_tanks)
+    {
+        node.initial_chemical_concentration_mg_per_l = 0.0;
+        node.quality_source = HydraulicNodeQualitySource();
+    }
+}
+
+NetworkHydraulic sourceTypeNetwork(HydraulicNodeQualitySourceType source_type)
+{
+    NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::Chemical);
+    clearChemicalInputs(network);
+    network.duration_s = 3600;
+    network.timestep_hydraulic_s = 1800;
+    network.timestep_quality_s = 300;
+
+    if (source_type == HydraulicNodeQualitySourceType::Concentration)
+    {
+        HydraulicNodeReservoir &reservoir = network.nodes_reservoirs.first();
+        reservoir.quality_source.type = source_type;
+        reservoir.quality_source.chemical_concentration_mg_per_l = 1.25;
+    }
+    else
+    {
+        HydraulicNodeJunction &junction = network.nodes_junctions.first();
+        junction.quality_source.type = source_type;
+        if (source_type == HydraulicNodeQualitySourceType::MassBooster)
+            junction.quality_source.chemical_mass_flow_mg_per_min = 12.0;
+        else
+            junction.quality_source.chemical_concentration_mg_per_l = 0.75;
+    }
+
+    return network;
+}
+
+NetworkHydraulic patternedSourceNetwork()
+{
+    NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
+    network.duration_s = 2400;
+    network.timestep_pattern_s = 600;
+    network.timestep_quality_s = 300;
+
+    HydraulicPatternTime pattern;
+    pattern.id = QStringLiteral("QualityPattern");
+    pattern.uuid = QUuid::createUuid();
+    pattern.multipliers = {0.25, 1.0, 1.75, 0.5};
+    network.patterns_time.append(pattern);
+    network.nodes_reservoirs.first().quality_source.pattern_uuid = pattern.uuid;
+    return network;
+}
+
+NetworkHydraulic tankMixingNetwork(HydraulicNodeTankMixingModel mixing_model)
+{
+    NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
+    network.duration_s = 6 * 3600;
+    network.timestep_hydraulic_s = 1800;
+    network.timestep_quality_s = 300;
+    HydraulicNodeTank &tank = network.nodes_tanks.first();
+    tank.initial_chemical_concentration_mg_per_l = 0.15;
+    tank.mixing_model = mixing_model;
+    tank.mixing_fraction = mixing_model == HydraulicNodeTankMixingModel::TwoCompartment ? 0.35 : 1.0;
+    return network;
+}
+
+NetworkHydraulic reactionNetwork(HydraulicHeadlossFormula formula)
+{
+    NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
+    network.duration_s = 4 * 3600;
+    network.options_hydraulic.headloss_formula = formula;
+    network.options_reaction.global_pipe_bulk_reaction.coefficient = -0.35;
+    network.options_reaction.global_pipe_bulk_reaction.order = 1.0;
+    network.options_reaction.global_pipe_wall_reaction.coefficient = -0.08;
+    network.options_reaction.global_pipe_wall_reaction.order = 1.0;
+    network.options_reaction.global_tank_bulk_reaction.coefficient = -0.20;
+    network.options_reaction.global_tank_bulk_reaction.order = 1.0;
+    network.options_reaction.limiting_concentration_mg_per_l = 0.10;
+    network.options_reaction.roughness_reaction_factor = -2.4;
+
+    if (!network.links_pipes.isEmpty())
+    {
+        HydraulicLinkPipe &override_pipe = network.links_pipes.first();
+        override_pipe.override_reactions = true;
+        override_pipe.bulk_reaction.coefficient = -0.55;
+        override_pipe.bulk_reaction.order = 1.0;
+        override_pipe.wall_reaction.coefficient = -0.22;
+        override_pipe.wall_reaction.order = 1.0;
+    }
+
+    if (!network.nodes_tanks.isEmpty())
+    {
+        HydraulicNodeTank &tank = network.nodes_tanks.first();
+        tank.override_bulk_reaction = true;
+        tank.bulk_reaction.coefficient = -0.45;
+        tank.bulk_reaction.order = 1.0;
+    }
+
+    return network;
+}
+
 NetworkHydraulic qualityCancellationNetwork()
 {
     NetworkHydraulic network;
@@ -191,67 +306,53 @@ class NativeQualityRun
 public:
     explicit NativeQualityRun(const NetworkHydraulic &network)
     {
-        const EpanetResultInp inp = EpanetRunner().retrieveInp(network);
-        if (!inp.status.success)
-            throw std::runtime_error((QStringLiteral("retrieveInp failed: ") + inp.status.message).toStdString());
-        if (!this->directory_.isValid())
-            throw std::runtime_error("Could not create native quality-run temporary directory");
+        // Q1 separately proves Model-to-EPANET input mapping. Build the runtime
+        // reference in memory so EN_saveinpfile rounding cannot contaminate
+        // the native-vs-AOWIS quality execution comparison.
+        NetworkHydraulic prepared_network;
+        QList<HydraulicSimulationStatus> validation_failures;
+        HydraulicSimulationStatus status = prepareEpanetNetwork(network, prepared_network, &validation_failures);
+        checkStatus(status, "prepareEpanetNetwork(native quality)");
 
-        const QString input_path = this->directory_.filePath(QStringLiteral("network.inp"));
-        QFile input_file(input_path);
-        if (!input_file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-            throw std::runtime_error("Could not write generated INP for native quality run");
-        const QByteArray input_text = inp.inp_text.toUtf8();
-        if (input_file.write(input_text) != input_text.size())
-            throw std::runtime_error("Could not write complete generated INP for native quality run");
-        input_file.close();
+        status = this->project_.create();
+        checkStatus(status, "EpanetProject::create(native quality)");
+        status = this->project_.initialize(prepared_network, this->report_collector_);
+        checkStatus(status, "EpanetProject::initialize(native quality)");
 
-        checkEpanet(EN_createproject(&this->project_), "EN_createproject(native quality)");
-        const QByteArray input_path_bytes = QFile::encodeName(input_path);
-        const QByteArray report_path_bytes = QFile::encodeName(this->directory_.filePath(QStringLiteral("network.rpt")));
-        const int open_error = EN_open(this->project_, input_path_bytes.constData(), report_path_bytes.constData(), "");
-        if (open_error != 0)
-        {
-            EN_deleteproject(this->project_);
-            this->project_ = nullptr;
-            checkEpanet(open_error, "EN_open(native quality)");
-        }
-        this->opened_ = true;
+        EpanetIndexRegistry indices;
+        EpanetNetworkBuilder builder(this->project_, indices);
+        status = builder.build(prepared_network);
+        checkStatus(status, "EpanetNetworkBuilder::build(native quality)");
 
-        checkEpanet(EN_solveH(this->project_), "EN_solveH(native quality)");
-        checkEpanet(EN_openQ(this->project_), "EN_openQ(native quality)");
+        checkEpanet(EN_solveH(this->project_.handle()), "EN_solveH(native quality)");
+        checkEpanet(EN_openQ(this->project_.handle()), "EN_openQ(native quality)");
         this->quality_open_ = true;
-        checkEpanet(EN_initQ(this->project_, EN_NOSAVE), "EN_initQ(native quality)");
+        checkEpanet(EN_initQ(this->project_.handle(), EN_NOSAVE), "EN_initQ(native quality)");
 
         long time_left_s = 0;
         do
         {
             long current_time_s = 0;
-            checkEpanet(EN_runQ(this->project_, &current_time_s), "EN_runQ(native quality)");
+            checkEpanet(EN_runQ(this->project_.handle(), &current_time_s), "EN_runQ(native quality)");
 
             NativeQualityStep step;
             step.time_s = current_time_s;
             collectNodeValues(network, step);
             collectLinkValues(network, step);
-            checkEpanet(EN_getstatistic(this->project_, EN_MASSBALANCE, &step.mass_balance_ratio), "EN_getstatistic(EN_MASSBALANCE native quality)");
+            checkEpanet(EN_getstatistic(this->project_.handle(), EN_MASSBALANCE, &step.mass_balance_ratio), "EN_getstatistic(EN_MASSBALANCE native quality)");
             this->steps_.append(step);
 
-            checkEpanet(EN_stepQ(this->project_, &time_left_s), "EN_stepQ(native quality)");
+            checkEpanet(EN_stepQ(this->project_.handle(), &time_left_s), "EN_stepQ(native quality)");
         } while (time_left_s > 0);
 
-        checkEpanet(EN_closeQ(this->project_), "EN_closeQ(native quality)");
+        checkEpanet(EN_closeQ(this->project_.handle()), "EN_closeQ(native quality)");
         this->quality_open_ = false;
     }
 
     ~NativeQualityRun()
     {
-        if (this->project_ == nullptr)
-            return;
         if (this->quality_open_)
-            EN_closeQ(this->project_);
-        if (this->opened_)
-            EN_close(this->project_);
-        EN_deleteproject(this->project_);
+            EN_closeQ(this->project_.handle());
     }
 
     NativeQualityRun(const NativeQualityRun &) = delete;
@@ -263,11 +364,19 @@ public:
     }
 
 private:
+    static void checkStatus(const HydraulicSimulationStatus &status, const char *operation)
+    {
+        if (status.success)
+            return;
+
+        throw std::runtime_error(std::string(operation) + " failed: " + status.message.toStdString());
+    }
+
     int nodeIndex(const QString &id) const
     {
         const QByteArray id_utf8 = id.toUtf8();
         int index = 0;
-        checkEpanet(EN_getnodeindex(this->project_, id_utf8.constData(), &index), "EN_getnodeindex(native quality)");
+        checkEpanet(EN_getnodeindex(this->project_.handle(), id_utf8.constData(), &index), "EN_getnodeindex(native quality)");
         return index;
     }
 
@@ -275,7 +384,7 @@ private:
     {
         const QByteArray id_utf8 = id.toUtf8();
         int index = 0;
-        checkEpanet(EN_getlinkindex(this->project_, id_utf8.constData(), &index), "EN_getlinkindex(native quality)");
+        checkEpanet(EN_getlinkindex(this->project_.handle(), id_utf8.constData(), &index), "EN_getlinkindex(native quality)");
         return index;
     }
 
@@ -285,12 +394,12 @@ private:
         {
             const int index = nodeIndex(id);
             double value = 0.0;
-            checkEpanet(EN_getnodevalue(this->project_, index, EN_QUALITY, &value), "EN_getnodevalue(EN_QUALITY native quality)");
+            checkEpanet(EN_getnodevalue(this->project_.handle(), index, EN_QUALITY, &value), "EN_getnodevalue(EN_QUALITY native quality)");
             step.node_quality.insert(id, value);
 
             if (nodeHasSource(network, id))
             {
-                checkEpanet(EN_getnodevalue(this->project_, index, EN_SOURCEMASS, &value), "EN_getnodevalue(EN_SOURCEMASS native quality)");
+                checkEpanet(EN_getnodevalue(this->project_.handle(), index, EN_SOURCEMASS, &value), "EN_getnodevalue(EN_SOURCEMASS native quality)");
                 step.node_source_mass_mg_per_min.insert(id, value);
             }
             else
@@ -313,7 +422,7 @@ private:
         {
             const int index = linkIndex(id);
             double value = 0.0;
-            checkEpanet(EN_getlinkvalue(this->project_, index, EN_LINKQUAL, &value), "EN_getlinkvalue(EN_LINKQUAL native quality)");
+            checkEpanet(EN_getlinkvalue(this->project_.handle(), index, EN_LINKQUAL, &value), "EN_getlinkvalue(EN_LINKQUAL native quality)");
             step.link_quality.insert(id, value);
         };
 
@@ -325,9 +434,8 @@ private:
             collect(link.id);
     }
 
-    QTemporaryDir directory_;
-    EN_Project project_ = nullptr;
-    bool opened_ = false;
+    EpanetReportCollector report_collector_;
+    EpanetProject project_;
     bool quality_open_ = false;
     QList<NativeQualityStep> steps_;
 };
@@ -403,6 +511,7 @@ void compareQualityTimeline(TestContext &context, const NetworkHydraulic &networ
     {
         const WaterQualitySimulationResult &actual_step = actual.results.at(index);
         const NativeQualityStep &expected_step = expected_steps.at(index);
+        context.expect(actual_step.status.success, "every returned quality timestep must carry a successful per-step status");
         context.expectEqual(static_cast<std::int64_t>(actual_step.time_elapsed_s), expected_step.time_s, comparison(expected_step.time_s, "time_elapsed_s"));
 
         compareNodeResults(context, actual_step.nodes_junctions, expected_step, actual.analysis, "Junction");
@@ -467,6 +576,103 @@ void scenarioQualityExecutionIndependentTimeline(TestContext &context)
     }
 }
 
+void scenarioQualityRuntimeSourceConcentration(TestContext &context)
+{
+    const NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
+    const EpanetResultRun run = EpanetRunner().run(network);
+    compareQualityTimeline(context, network, run);
+}
+
+void scenarioQualityRuntimeSourceMassBooster(TestContext &context)
+{
+    const NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::MassBooster);
+    const EpanetResultRun run = EpanetRunner().run(network);
+    compareQualityTimeline(context, network, run);
+}
+
+void scenarioQualityRuntimeSourceFlowPaced(TestContext &context)
+{
+    const NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::FlowPacedBooster);
+    const EpanetResultRun run = EpanetRunner().run(network);
+    compareQualityTimeline(context, network, run);
+}
+
+void scenarioQualityRuntimeSourceSetpoint(TestContext &context)
+{
+    const NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::SetpointBooster);
+    const EpanetResultRun run = EpanetRunner().run(network);
+    compareQualityTimeline(context, network, run);
+}
+
+void scenarioQualityRuntimeSourcePattern(TestContext &context)
+{
+    const NetworkHydraulic network = patternedSourceNetwork();
+    const EpanetResultRun run = EpanetRunner().run(network);
+    compareQualityTimeline(context, network, run);
+    context.expect(run.quality_result_timeline.results.size() == 8, "2400-second patterned source run at 300-second quality steps must return eight EN_runQ samples from time zero through 2100 seconds");
+}
+
+void scenarioQualityRuntimeTankMixingModels(TestContext &context)
+{
+    const std::array<HydraulicNodeTankMixingModel, 4> models = {{
+        HydraulicNodeTankMixingModel::CompleteMix,
+        HydraulicNodeTankMixingModel::TwoCompartment,
+        HydraulicNodeTankMixingModel::FirstInFirstOut,
+        HydraulicNodeTankMixingModel::LastInFirstOut
+    }};
+
+    for (const HydraulicNodeTankMixingModel model : models)
+    {
+        const NetworkHydraulic network = tankMixingNetwork(model);
+        const EpanetResultRun run = EpanetRunner().run(network);
+        compareQualityTimeline(context, network, run);
+    }
+}
+
+void scenarioQualityRuntimeReactions(TestContext &context)
+{
+    const std::array<HydraulicHeadlossFormula, 3> formulas = {{
+        HydraulicHeadlossFormula::HazenWilliams,
+        HydraulicHeadlossFormula::DarcyWeisbach,
+        HydraulicHeadlossFormula::ChezyManning
+    }};
+
+    for (const HydraulicHeadlossFormula formula : formulas)
+    {
+        const NetworkHydraulic network = reactionNetwork(formula);
+        const EpanetResultRun run = EpanetRunner().run(network);
+        compareQualityTimeline(context, network, run);
+    }
+}
+
+void scenarioQualityRuntimeLongMultistepContract(TestContext &context)
+{
+    NetworkHydraulic network = patternedSourceNetwork();
+    network.duration_s = 12 * 3600;
+    network.timestep_hydraulic_s = 3600;
+    network.timestep_quality_s = 300;
+    const EpanetResultRun run = EpanetRunner().run(network);
+    compareQualityTimeline(context, network, run);
+
+    context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "long quality run must preserve valid hydraulic results");
+    context.expect(run.quality_result_timeline.validity == WaterQualitySimulationResultValidity::Valid, "long quality run must produce a valid quality timeline");
+    context.expect(run.quality_result_timeline.results.size() == 144, "12-hour run at 300-second quality steps must return 144 EN_runQ samples from time zero through 42900 seconds");
+    for (int index = 0; index < run.quality_result_timeline.results.size(); index++)
+    {
+        const WaterQualitySimulationResult &step = run.quality_result_timeline.results.at(index);
+        context.expect(step.status.success, "every successfully returned quality timestep must carry a successful per-step status");
+        context.expect(std::isfinite(step.statistics.mass_balance_ratio), "quality mass-balance ratio must be finite at every returned timestep");
+        if (index == 0)
+        {
+            context.expectNear(step.statistics.mass_balance_ratio, 0.0, NumericTolerance{1.0e-12, 0.0}, comparison(0, "mass_balance_ratio.initial", "QualitySolver"));
+        }
+        else
+        {
+            context.expect(step.statistics.mass_balance_ratio > 0.0, "quality mass-balance ratio must be positive after the first EN_stepQ update");
+        }
+    }
+}
+
 void scenarioQualityExecutionCancellationPartial(TestContext &context)
 {
     const NetworkHydraulic network = qualityCancellationNetwork();
@@ -514,6 +720,46 @@ void registerQualityExecutionScenarios(ScenarioRegistry &registry)
         "Proves quality results retain their finer timestep independently of hydraulic events.",
         {"conformance", "quality", "execution", "timeline"},
         &scenarioQualityExecutionIndependentTimeline});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-runtime-source-concentration",
+        "Matches native EPANET runtime results for a concentration source.",
+        {"conformance", "quality", "runtime", "source", "differential"},
+        &scenarioQualityRuntimeSourceConcentration});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-runtime-source-mass-booster",
+        "Matches native EPANET runtime results for a mass-booster source.",
+        {"conformance", "quality", "runtime", "source", "differential"},
+        &scenarioQualityRuntimeSourceMassBooster});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-runtime-source-flow-paced",
+        "Matches native EPANET runtime results for a flow-paced booster source.",
+        {"conformance", "quality", "runtime", "source", "differential"},
+        &scenarioQualityRuntimeSourceFlowPaced});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-runtime-source-setpoint",
+        "Matches native EPANET runtime results for a setpoint-booster source.",
+        {"conformance", "quality", "runtime", "source", "differential"},
+        &scenarioQualityRuntimeSourceSetpoint});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-runtime-source-pattern",
+        "Matches native EPANET runtime dosing across changing source-pattern multipliers.",
+        {"conformance", "quality", "runtime", "source", "pattern", "differential"},
+        &scenarioQualityRuntimeSourcePattern});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-runtime-tank-mixing-models",
+        "Matches native EPANET runtime behavior for all four tank mixing models.",
+        {"conformance", "quality", "runtime", "tank", "mixing", "differential"},
+        &scenarioQualityRuntimeTankMixingModels});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-runtime-reactions",
+        "Matches native EPANET bulk, wall, tank, limiting-concentration, override, and roughness-correlated reaction execution.",
+        {"conformance", "quality", "runtime", "reaction", "differential"},
+        &scenarioQualityRuntimeReactions});
+    registry.add(ScenarioDefinition{
+        "conformance-quality-runtime-long-multistep-contract",
+        "Proves long quality stepping, per-step status, mass-balance finiteness, and hydraulic-result isolation.",
+        {"conformance", "quality", "runtime", "timeline", "contract", "differential"},
+        &scenarioQualityRuntimeLongMultistepContract});
     registry.add(ScenarioDefinition{
         "conformance-quality-execution-cancellation-partial",
         "Preserves completed hydraulics and partial quality results when cancellation occurs during quality stepping.",

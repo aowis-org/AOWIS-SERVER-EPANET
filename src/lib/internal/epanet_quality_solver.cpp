@@ -158,6 +158,7 @@ HydraulicSimulationStatus EpanetQualitySolver::run(
         }
         else
         {
+            result.status = makeEpanetSuccess();
             timeline.results.append(result);
         }
 

@@ -144,6 +144,21 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-quality-execution-source-trace
     conformance-quality-execution-independent-timeline
     conformance-quality-execution-cancellation-partial
+    conformance-quality-runtime-source-concentration
+    conformance-quality-runtime-source-mass-booster
+    conformance-quality-runtime-source-flow-paced
+    conformance-quality-runtime-source-setpoint
+    conformance-quality-runtime-source-pattern
+    conformance-quality-runtime-tank-mixing-models
+    conformance-quality-runtime-reactions
+    conformance-quality-runtime-long-multistep-contract
+    conformance-quality-stress-chain-chemical-pattern
+    conformance-quality-stress-branch-water-age
+    conformance-quality-stress-ring-source-trace
+    conformance-quality-stress-grid-reactions-dw
+    conformance-quality-stress-dual-source-reactions-hw
+    conformance-quality-stress-grid-large-long-cm
+    conformance-quality-stress-cancellation-positions
     conformance-negative-duplicate-node-id
     conformance-negative-duplicate-link-id
     conformance-negative-duplicate-uuid
@@ -197,8 +212,12 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/hydraulic_result_comparator.h
     conformance/generated_network_stress_fixture.cpp
     conformance/generated_network_stress_fixture.h
+    conformance/generated_quality_stress_fixture.cpp
+    conformance/generated_quality_stress_fixture.h
     conformance/native_epanet_reference_runner.cpp
     conformance/native_epanet_reference_runner.h
+    conformance/native_quality_reference_runner.cpp
+    conformance/native_quality_reference_runner.h
     conformance/net1_conformance_scenarios.h
     conformance/net1_fixture.cpp
     conformance/net1_fixture.h
@@ -212,6 +231,7 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/quality_execution_scenarios.h
     conformance/negative_validation_scenarios.h
     conformance/deterministic_stress_scenarios.h
+    conformance/deterministic_quality_stress_scenarios.h
     test_net1_conformance.cpp
     test_result_contract.cpp
     test_hydraulic_behavior_conformance.cpp
@@ -223,6 +243,7 @@ add_executable(aowis-server-epanet-conformance-tests
     test_quality_execution_conformance.cpp
     test_negative_validation_conformance.cpp
     test_deterministic_stress_conformance.cpp
+    test_deterministic_quality_stress_conformance.cpp
 )
 
 target_link_libraries(aowis-server-epanet-conformance-tests
@@ -272,7 +293,7 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "negative")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-export-")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "export")
-    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-stress-")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-stress-|^conformance-quality-stress-")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "stress")
     endif()
 

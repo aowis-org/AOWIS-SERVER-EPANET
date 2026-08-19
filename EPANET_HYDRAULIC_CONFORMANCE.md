@@ -17,13 +17,13 @@ Excluded from the hydraulic conformance denominator for now:
 - Water-quality execution and native quality-result comparison.
 - Native Toolkit project-handle CRUD and binary Output API functions that the high-level wrapper does not expose.
 
-Q1 separately proves water-quality **input mapping** under the `quality` label: analysis mode, typed initial quality, source types/strengths/patterns, tank mixing, quality options/timestep, and reaction configuration are native-read back from generated EPANET projects. Those mapping fields are evidence-backed but are not counted as hydraulic behavior. Native quality execution and differential result conformance begin in Q2 and later stages.
+Water-quality conformance is tracked separately under the `quality` label and does not change the hydraulic denominator. Q1 proves quality input mapping. Q2 proves the explicit saved-hydraulics quality lifecycle, typed result timeline, native differential execution for chemical/age/trace analysis, independent quality stepping, and cancellation. Q3 expands runtime differential coverage across all source families, patterned dosing, all tank mixing models, reaction/limiting/roughness behavior, and longer multi-step result-contract runs. Q4 adds independent fixed-seed generated-network quality differentials across multiple topologies, sizes, quality/hydraulic timestep ratios, reaction/source combinations, a 24-hour 100-junction case, and multiple cancellation positions.
 
 ## Current claim
 
 The hydraulic conformance suite covers model-to-EPANET mapping, native differential behavior, export/native-reopen fidelity, deterministic negative validation, fixed-seed generated-network stress, stable CTest label groups, an optional isolated execution of the original upstream Boost suite, reproducible adapter line/branch coverage reporting, and a machine-checked field-level audit against the current AOWIS hydraulic Model headers.
 
-The Q1 default suite contains 166 executable hydraulic scenarios, eight water-quality contract/mapping/negative-validation scenarios, and three framework/proof checks, for 177 CTest tests. The field audit inventories 547 fields across 75 Model structs: 482 fields have registered evidence (the established hydraulic contract plus Q1 quality-input mapping), 49 quality execution/result fields remain explicitly excluded until Q2+, 14 are explicitly excluded as non-EPANET application/cartographic metadata, and two are backend/runtime metadata that are not stable high-level contract fields. Any added/removed audited Model struct or field that is not reflected in the audit policy fails the proof test.
+After Q4 the default suite contains 198 CTest tests. The `hydraulic` label remains at 166 tests, while the separate `quality` label contains 29 contract, mapping, execution, runtime, stress, and negative-validation tests. The field audit inventories 547 fields across 75 Model structs: 531 fields have registered evidence, no quality field remains excluded solely because quality execution is unimplemented, 14 fields are explicitly excluded as non-EPANET application/cartographic metadata, and two are backend/runtime metadata that are not stable high-level contract fields. Any added/removed audited Model struct or field that is not reflected in the audit policy fails the proof test.
 
 A complete hydraulic-conformance claim is permitted only when the default suite and the grouped proof commands below pass. Water quality remains explicitly outside this claim.
 
@@ -72,7 +72,7 @@ ctest --test-dir build-linux-tests -L upstream --output-on-failure
 ctest --test-dir build-linux-tests -L proof --output-on-failure
 ```
 
-`conformance` contains all 161 native-backed hydraulic conformance scenarios, including the five export, twenty-nine negative, and eight deterministic stress scenarios. `contract` contains six wrapper contract/regression scenarios: five hydraulic contracts plus the Q0 water-quality Model boundary contract. `quality` currently selects that Q0 contract; later quality stages expand it with native-backed quality scenarios. `negative` contains the explicit invalid-input and reference-hardening scenarios. `proof` contains the scenario-manifest, upstream-inventory, and hydraulic field-audit checks. The `upstream` group always contains the source inventory and, when enabled as described below, the original upstream Boost suite.
+`conformance` contains the native-backed hydraulic and water-quality conformance scenarios; after Q4 it selects 189 tests. `contract` contains six wrapper contract/regression scenarios: five hydraulic contracts plus the Q0 water-quality Model boundary contract. `quality` selects 29 quality contract, input-mapping, execution, negative-validation, runtime, and generated-stress scenarios. `negative` contains the explicit invalid-input and reference-hardening scenarios. `proof` contains the scenario-manifest, upstream-inventory, and hydraulic field-audit checks. The `upstream` group always contains the source inventory and, when enabled as described below, the original upstream Boost suite.
 
 ### Optional original upstream Boost suite
 
@@ -294,6 +294,26 @@ Quality execution is kept on its own timestep/result timeline and does not chang
 | QE-TIMELINE | Independent quality timestep | quality samples occur at every quality step even when hydraulics are coarser | `EN_runQ`, `EN_stepQ` | `conformance-quality-execution-independent-timeline` | Complete |
 | QE-RESULTS | Typed node/link results | junction, reservoir, tank, pipe, pump, valve quality; configured-source mass flow; mass balance | `EN_QUALITY`, `EN_SOURCEMASS`, `EN_LINKQUAL`, `EN_MASSBALANCE` | chemical/age/trace native differential scenarios | Complete |
 | QE-CANCEL | Cancellation | preserves completed hydraulics and already-produced quality samples | stepwise quality lifecycle | `conformance-quality-execution-cancellation-partial` | Complete |
+| QE-SOURCES | Runtime source families | concentration, mass booster, flow-paced booster, setpoint booster, and patterned dosing | source properties + quality stepping | `conformance-quality-runtime-source-*` | Complete |
+| QE-MIXING | Runtime tank mixing | complete-mix, two-compartment, FIFO, and LIFO behavior | tank mixing model + quality stepping | `conformance-quality-runtime-tank-mixing-models` | Complete |
+| QE-REACTIONS | Runtime reactions | pipe bulk/wall, tank bulk, per-entity overrides, limiting concentration, roughness correlation under H-W/D-W/C-M | reaction configuration + quality stepping | `conformance-quality-runtime-reactions` | Complete |
+| QE-LONG-RUN | Long multi-step result contract | 12-hour 300-second quality timeline, per-step success status, finite positive mass balance, hydraulic-result isolation | `EN_runQ`, `EN_stepQ`, `EN_MASSBALANCE` | `conformance-quality-runtime-long-multistep-contract` | Complete |
+
+## Water-quality deterministic stress proof (Q4)
+
+Q4 uses an independent fixed-seed generator that writes the native EPANET INP directly from the generated specification instead of exporting the AOWIS-built project. Quality values are written at full double precision, so the differential path does not include the INP re-serialization rounding that would otherwise accumulate over long water-quality runs.
+
+| Scenario | Quality stress dimension |
+|---|---|
+| `conformance-quality-stress-chain-chemical-pattern` | 12-junction H-W chain, chemical transport, patterned concentration source, 300 s quality / 1800 s hydraulic steps |
+| `conformance-quality-stress-branch-water-age` | 31-junction D-W branching tree, nonzero initial water age, 600 s quality / 3600 s hydraulic steps |
+| `conformance-quality-stress-ring-source-trace` | 24-junction C-M ring/chord topology, source trace, 120 s quality / 1200 s hydraulic steps |
+| `conformance-quality-stress-grid-reactions-dw` | 7x7 D-W grid, patterned chemical source, global reactions, roughness-correlated wall reactions, per-pipe overrides |
+| `conformance-quality-stress-dual-source-reactions-hw` | 6x8 dual-source H-W mesh, independent source patterns and reaction-heavy execution |
+| `conformance-quality-stress-grid-large-long-cm` | 10x10 / 100-junction C-M grid, 24-hour chemical timeline |
+| `conformance-quality-stress-cancellation-positions` | Three distinct mid-quality cancellation positions with completed hydraulics preserved |
+
+Every generated differential compares every returned node/link quality value, configured-source mass flow, quality timestamp, per-step status, and quality mass-balance ratio against raw Toolkit execution of the independent native INP. Byte-identical fixture regeneration is also asserted for every fixed seed.
 
 ## Result coverage summary
 
@@ -357,4 +377,4 @@ A hydraulic-complete claim is allowed only when every included summary row is `C
 
 The original upstream Boost suite and coverage reports are optional independent proof layers: enable and run them for release/audit evidence when their external dependencies are available. They do not silently change the hydraulic denominator.
 
-After a clean full-suite acceptance run, this document permits the scoped hydraulic-conformance claim stated above. Water quality remains the next conformance expansion and is intentionally outside the hydraulic proof described here.
+After a clean full-suite acceptance run, this document permits the scoped hydraulic-conformance claim stated above. Water-quality conformance remains a separately labelled claim rather than changing the hydraulic denominator; Q0-Q4 now cover its Model boundary, input mapping, execution lifecycle/results, runtime feature depth, and deterministic generated-network stress proof.
