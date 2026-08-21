@@ -4,34 +4,23 @@
 #include <QHostAddress>
 #include <QHttpServerResponse>
 
-#include <aowis/epanet/dummy/dummy_networks.h>
-#include <aowis/epanet/epanet_runner.h>
-#include <aowis/epanet/utility/hydraulic_simulation_result_printer.h>
-#include <aowis/epanet/utility/hydraulic_simulation_status_printer.h>
+#include <aowis/epanet/epanet_simulation_manager.h>
 
-Server::Server(QCoreApplication *app, QObject *parent)
-    : QObject(parent), app(app)
+Server::Server(QObject *parent)
+    : QObject(parent)
 {
+    this->simulation_manager = new EpanetSimulationManager(this);
     setupRoutes();
 }
 
 void Server::setupRoutes()
 {
-    const NetworkHydraulic network = DummyNetworks::networkTanks();
-
-    EpanetRunner runner;
-    const EpanetResultRun run_result = runner.run(network);
-
-    HydraulicSimulationStatusPrinter::print(run_result.result_timeline.status);
-    HydraulicSimulationResultPrinter::print(run_result.result_timeline);
-    qDebug().noquote() << run_result.report_lines.join('\n');
-
     this->http.route("/status", []()
     {
         return QHttpServerResponse("AOWIS EPANET server", QHttpServerResponse::StatusCode::Ok);
     });
 
-    this->tcp = new QTcpServer(this->app);
+    this->tcp = new QTcpServer(this);
     if (!this->tcp->listen(QHostAddress::Any, 8122))
     {
         qWarning() << "Failed to listen on port 8122";

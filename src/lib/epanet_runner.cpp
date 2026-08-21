@@ -1,277 +1,136 @@
 #include <aowis/epanet/epanet_runner.h>
 
-#include "internal/epanet_hydraulic_solver.h"
-#include "internal/epanet_index_registry.h"
-#include "internal/epanet_network_builder.h"
-#include "internal/epanet_network_preparer.h"
-#include "internal/epanet_project.h"
-#include "internal/epanet_quality_result_reader.h"
-#include "internal/epanet_quality_solver.h"
-#include "internal/epanet_report_collector.h"
-#include "internal/epanet_result_reader.h"
+#include "internal/epanet_batch_executor.h"
+#include "internal/epanet_diagnostic_helpers.h"
+#include "internal/epanet_hydraulic_run_configurator.h"
+#include "internal/epanet_inp_exporter.h"
+#include "internal/epanet_prepared_project.h"
+#include "internal/epanet_quality_run_configurator.h"
+#include "internal/epanet_report_configurator.h"
+#include "internal/epanet_result_finalizer.h"
+#include "internal/epanet_single_run_executor.h"
 #include "internal/epanet_status_helpers.h"
 
 #include <utility>
 
 #include <QDateTime>
-#include <QList>
 
 namespace
 {
-HydraulicSimulationDiagnostic diagnosticFromStatus(const HydraulicSimulationStatus &status)
-{
-    HydraulicSimulationDiagnostic diagnostic;
-    diagnostic.severity = status.backend_error_code > 0 && status.backend_error_code < 100
-        ? HydraulicSimulationDiagnosticSeverity::Warning
-        : HydraulicSimulationDiagnosticSeverity::Error;
-    diagnostic.stage = status.stage;
-    diagnostic.operation = status.operation;
-    diagnostic.property = status.property;
-    diagnostic.entity = status.entity;
-    diagnostic.message = status.message;
-    diagnostic.details = status.details;
-    diagnostic.backend_name = status.backend_name;
-    diagnostic.backend_error_code = status.backend_error_code;
-    diagnostic.backend_operation = status.backend_operation;
-    diagnostic.message_backend = status.message_backend;
-    return diagnostic;
-}
-
-bool diagnosticsEquivalent(const HydraulicSimulationDiagnostic &left, const HydraulicSimulationDiagnostic &right)
-{
-    return left.stage == right.stage
-        && left.operation == right.operation
-        && left.entity.uuid == right.entity.uuid
-        && left.entity.type == right.entity.type
-        && left.backend_error_code == right.backend_error_code
-        && left.backend_operation == right.backend_operation
-        && left.message == right.message
-        && left.details == right.details
-        && left.message_backend == right.message_backend;
-}
-
-void appendDiagnosticIfUnique(QList<HydraulicSimulationDiagnostic> &diagnostics, const HydraulicSimulationDiagnostic &diagnostic)
-{
-    for (const HydraulicSimulationDiagnostic &existing : diagnostics)
-    {
-        if (diagnosticsEquivalent(existing, diagnostic))
-            return;
-    }
-
-    diagnostics.append(diagnostic);
-}
-
-bool diagnosticInvalidatesResults(const HydraulicSimulationDiagnostic &diagnostic)
-{
-    if (diagnostic.severity != HydraulicSimulationDiagnosticSeverity::Error
-        && diagnostic.severity != HydraulicSimulationDiagnosticSeverity::Fatal)
-    {
-        return false;
-    }
-
-    switch (diagnostic.stage)
-    {
-    case HydraulicSimulationStatusStage::CloseHydraulics:
-    case HydraulicSimulationStatusStage::CloseQuality:
-    case HydraulicSimulationStatusStage::SaveHydraulics:
-    case HydraulicSimulationStatusStage::GenerateReport:
-    case HydraulicSimulationStatusStage::Cleanup:
-        return false;
-    default:
-        return true;
-    }
-}
-
-void finalizeResultValidity(HydraulicSimulationResultTimeline &timeline)
-{
-    bool has_invalidating_diagnostic = false;
-    for (const HydraulicSimulationDiagnostic &diagnostic : timeline.diagnostics)
-    {
-        if (diagnosticInvalidatesResults(diagnostic))
-        {
-            has_invalidating_diagnostic = true;
-            break;
-        }
-    }
-
-    if (has_invalidating_diagnostic)
-    {
-        timeline.validity = timeline.results.isEmpty()
-            ? HydraulicSimulationResultValidity::Invalid
-            : HydraulicSimulationResultValidity::Partial;
-        return;
-    }
-
-    timeline.validity = timeline.results.isEmpty()
-        ? HydraulicSimulationResultValidity::Invalid
-        : HydraulicSimulationResultValidity::Valid;
-}
-
-void finalizeQualityResultValidity(WaterQualitySimulationResultTimeline &timeline)
-{
-    if (timeline.analysis == WaterQualityAnalysisType::None)
-    {
-        timeline.validity = WaterQualitySimulationResultValidity::NotRun;
-        return;
-    }
-
-    bool has_invalidating_diagnostic = false;
-    for (const HydraulicSimulationDiagnostic &diagnostic : timeline.diagnostics)
-    {
-        if (diagnosticInvalidatesResults(diagnostic))
-        {
-            has_invalidating_diagnostic = true;
-            break;
-        }
-    }
-
-    if (has_invalidating_diagnostic)
-    {
-        timeline.validity = timeline.results.isEmpty()
-            ? WaterQualitySimulationResultValidity::Invalid
-            : WaterQualitySimulationResultValidity::Partial;
-        return;
-    }
-
-    timeline.validity = timeline.results.isEmpty()
-        ? WaterQualitySimulationResultValidity::Invalid
-        : WaterQualitySimulationResultValidity::Valid;
-}
-
-void appendProjectDiagnostics(
-    QList<HydraulicSimulationDiagnostic> &target,
-    const QList<HydraulicSimulationDiagnostic> &source,
-    qsizetype begin_index,
-    qsizetype end_index)
-{
-    const qsizetype bounded_begin = qMax<qsizetype>(0, begin_index);
-    const qsizetype bounded_end = qMin<qsizetype>(source.size(), end_index);
-    for (qsizetype index = bounded_begin; index < bounded_end; index++)
-        appendDiagnosticIfUnique(target, source.at(index));
-}
-
-void appendReportDiagnostics(QList<HydraulicSimulationDiagnostic> &diagnostics, const QStringList &report_lines)
-{
-    for (const QString &line : report_lines)
-    {
-        const QString trimmed = line.trimmed();
-        if (trimmed.isEmpty())
-            continue;
-
-        HydraulicSimulationDiagnostic diagnostic;
-        if (trimmed.contains(QStringLiteral("ERROR"), Qt::CaseInsensitive))
-            diagnostic.severity = HydraulicSimulationDiagnosticSeverity::Error;
-        else if (trimmed.contains(QStringLiteral("WARNING"), Qt::CaseInsensitive))
-            diagnostic.severity = HydraulicSimulationDiagnosticSeverity::Warning;
-        else
-            continue;
-
-        diagnostic.stage = HydraulicSimulationStatusStage::GenerateReport;
-        diagnostic.operation = HydraulicSimulationStatusOperation::GenerateReport;
-        diagnostic.entity.type = HydraulicSimulationStatusEntityType::Report;
-        diagnostic.message = trimmed;
-        diagnostic.backend_name = QStringLiteral("EPANET");
-        diagnostic.backend_operation = QStringLiteral("report callback");
-        appendDiagnosticIfUnique(diagnostics, diagnostic);
-    }
-}
-
 bool cancellationRequested(const std::function<bool()> &cancellation_requested)
 {
     return cancellation_requested && cancellation_requested();
 }
 
-EpanetResultRun finishCancelledRun(
-    EpanetResultRun result,
-    const EpanetReportCollector &report_collector,
-    bool hydraulics_complete = false,
-    bool quality_attempted = false,
-    bool quality_complete = false)
-{
-    result.cancelled = true;
-    result.report_lines = report_collector.lines();
-
-    if (!hydraulics_complete)
-    {
-        result.result_timeline.validity = result.result_timeline.results.isEmpty()
-            ? HydraulicSimulationResultValidity::Invalid
-            : HydraulicSimulationResultValidity::Partial;
-    }
-
-    if (quality_attempted && !quality_complete && result.quality_result_timeline.analysis != WaterQualityAnalysisType::None)
-    {
-        result.quality_result_timeline.validity = result.quality_result_timeline.results.isEmpty()
-            ? WaterQualitySimulationResultValidity::Invalid
-            : WaterQualitySimulationResultValidity::Partial;
-    }
-
-    return result;
-}
-
-EpanetResultInp finishInp(EpanetResultInp result, const HydraulicSimulationStatus &status, const EpanetReportCollector &report_collector)
+EpanetResultInp finishInp(
+    EpanetResultInp result,
+    const HydraulicSimulationStatus &status,
+    const EpanetPreparedProject &prepared_project)
 {
     result.status = status;
-    result.report_lines = report_collector.lines();
+    result.report_lines = prepared_project.reportCollector().lines();
     return result;
 }
 
-EpanetResultRun finishRun(EpanetResultRun result, const HydraulicSimulationStatus &status, const EpanetProject &project, const EpanetReportCollector &report_collector)
+
+EpanetResultBatch initializeBatchResult(const EpanetBatchPlan &plan, const QDateTime &simulation_start_utc)
 {
-    result.result_timeline.status = status;
-    result.report_lines = report_collector.lines();
+    EpanetResultBatch result;
+    result.status = makeEpanetSuccess();
 
-    for (const HydraulicSimulationDiagnostic &diagnostic : project.diagnostics())
-        appendDiagnosticIfUnique(result.result_timeline.diagnostics, diagnostic);
+    for (const HydraulicHeadlossFormula formula : plan.headloss_formulas)
+    {
+        EpanetBatchHydraulicResult hydraulic_result;
+        hydraulic_result.headloss_formula = formula;
+        hydraulic_result.result_timeline.simulation_start_utc = simulation_start_utc;
 
-    if (!status.success)
-        appendDiagnosticIfUnique(result.result_timeline.diagnostics, diagnosticFromStatus(status));
+        for (const WaterQualitySolverOptions &quality_options : plan.quality_runs)
+        {
+            EpanetBatchQualityResult quality_result;
+            quality_result.options = quality_options;
+            quality_result.result_timeline.analysis = quality_options.analysis;
+            quality_result.result_timeline.simulation_start_utc = simulation_start_utc;
+            hydraulic_result.quality_results.append(quality_result);
+        }
 
-    appendReportDiagnostics(result.result_timeline.diagnostics, result.report_lines);
-    finalizeResultValidity(result.result_timeline);
+        result.hydraulic_runs.append(hydraulic_result);
+    }
+
     return result;
 }
 
-HydraulicSimulationStatus prepareProject(const NetworkHydraulic &request, NetworkHydraulic &prepared_request, EpanetProject &project, EpanetReportCollector &report_collector, EpanetIndexRegistry &indices)
+void markBatchPendingState(EpanetResultBatch &result, EpanetBatchRunState state)
 {
-    QList<HydraulicSimulationStatus> validation_failures;
-    HydraulicSimulationStatus status = prepareEpanetNetwork(request, prepared_request, &validation_failures);
-    for (const HydraulicSimulationStatus &validation_failure : validation_failures)
-        project.appendDiagnostic(diagnosticFromStatus(validation_failure));
+    for (EpanetBatchHydraulicResult &hydraulic_result : result.hydraulic_runs)
+    {
+        if (hydraulic_result.state == EpanetBatchRunState::Pending)
+            hydraulic_result.state = state;
 
+        for (EpanetBatchQualityResult &quality_result : hydraulic_result.quality_results)
+        {
+            if (quality_result.state == EpanetBatchRunState::Pending)
+                quality_result.state = state;
+        }
+    }
+}
+
+EpanetResultBatch cancelledBatch(EpanetResultBatch result, const EpanetPreparedProject &prepared_project)
+{
+    result.cancelled = true;
+    result.state = EpanetBatchRunState::Cancelled;
+    markBatchPendingState(result, EpanetBatchRunState::Cancelled);
+    appendEpanetDiagnostics(result.diagnostics, prepared_project.project().diagnostics());
+    return result;
+}
+
+EpanetResultBatch failedBatch(
+    EpanetResultBatch result,
+    const HydraulicSimulationStatus &status,
+    const EpanetPreparedProject &prepared_project)
+{
+    result.status = status;
+    result.state = EpanetBatchRunState::Error;
+    markBatchPendingState(result, EpanetBatchRunState::Skipped);
+    appendEpanetDiagnostics(result.diagnostics, prepared_project.project().diagnostics());
+    if (!status.success)
+        appendEpanetDiagnosticIfUnique(result.diagnostics, epanetDiagnosticFromStatus(status));
+    return result;
+}
+HydraulicSimulationStatus configureProjectRun(EpanetPreparedProject &prepared_project)
+{
+    HydraulicSimulationStatus status = configureEpanetHydraulicRun(
+        prepared_project.project(),
+        prepared_project.network(),
+        prepared_project.indices());
     if (!status.success)
         return status;
 
-    status = project.create();
-    if (!status.success)
-        return status;
-
-    status = project.initialize(prepared_request, report_collector);
-    if (!status.success)
-        return status;
-
-    EpanetNetworkBuilder network_builder(project, indices);
-    return network_builder.build(prepared_request);
+    return configureEpanetQualityRun(
+        prepared_project.project(),
+        prepared_project.network(),
+        prepared_project.indices());
 }
 }
 
 EpanetResultInp EpanetRunner::retrieveInp(const NetworkHydraulic &request) const
 {
     EpanetResultInp result;
-    EpanetReportCollector report_collector;
-    EpanetProject project;
-    EpanetIndexRegistry indices;
-    NetworkHydraulic prepared_request;
+    EpanetPreparedProject prepared_project;
 
-    HydraulicSimulationStatus status = prepareProject(request, prepared_request, project, report_collector, indices);
+    HydraulicSimulationStatus status = prepared_project.prepare(request);
     if (!status.success)
-        return finishInp(std::move(result), status, report_collector);
+        return finishInp(std::move(result), status, prepared_project);
 
-    status = project.configureReport(prepared_request);
+    status = configureProjectRun(prepared_project);
     if (!status.success)
-        return finishInp(std::move(result), status, report_collector);
+        return finishInp(std::move(result), status, prepared_project);
 
-    status = project.retrieveInpText(prepared_request, result.inp_text);
-    return finishInp(std::move(result), status, report_collector);
+    status = configureEpanetReport(prepared_project.project(), prepared_project.network());
+    if (!status.success)
+        return finishInp(std::move(result), status, prepared_project);
+
+    status = retrieveEpanetInpText(prepared_project.project(), prepared_project.network(), result.inp_text);
+    return finishInp(std::move(result), status, prepared_project);
 }
 
 EpanetResultRun EpanetRunner::run(const NetworkHydraulic &request) const
@@ -289,103 +148,63 @@ EpanetResultRun EpanetRunner::run(
     result.quality_result_timeline.analysis = request.options_quality.analysis;
     result.quality_result_timeline.simulation_start_utc = simulation_start_utc;
 
-    EpanetReportCollector report_collector;
-    EpanetProject project;
-    EpanetIndexRegistry indices;
-    NetworkHydraulic prepared_request;
+    EpanetPreparedProject prepared_project;
 
     if (cancellationRequested(cancellation_requested))
-        return finishCancelledRun(std::move(result), report_collector);
+        return finalizeEpanetCancelledRun(std::move(result), prepared_project);
 
-    HydraulicSimulationStatus status = prepareProject(request, prepared_request, project, report_collector, indices);
+    HydraulicSimulationStatus status = prepared_project.prepare(request);
     if (cancellationRequested(cancellation_requested))
-        return finishCancelledRun(std::move(result), report_collector);
+        return finalizeEpanetCancelledRun(std::move(result), prepared_project);
 
     if (!status.success)
-        return finishRun(std::move(result), status, project, report_collector);
+        return finalizeEpanetFailedRun(std::move(result), status, prepared_project);
 
-    EpanetResultReader result_reader(project, prepared_request, indices);
-    EpanetHydraulicSolver hydraulic_solver(project, prepared_request, result_reader);
-    bool cancelled = false;
-    status = hydraulic_solver.run(result.result_timeline, cancellation_requested, cancelled);
-    if (cancelled || cancellationRequested(cancellation_requested))
-        return finishCancelledRun(std::move(result), report_collector);
-
-    if (!status.success)
-        return finishRun(std::move(result), status, project, report_collector);
-
-    int error = EN_saveH(project.handle());
-    if (cancellationRequested(cancellation_requested))
-        return finishCancelledRun(std::move(result), report_collector);
-
-    if (error != 0)
-    {
-        status = processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::SaveHydraulics, HydraulicSimulationStatusOperation::SaveHydraulics, QStringLiteral("EN_saveH"), HydraulicSimulationStatusEntityType::HydraulicSolver, QString(), QStringLiteral("Failed to save EPANET hydraulic results"));
-        if (!status.success)
-            return finishRun(std::move(result), status, project, report_collector);
-    }
-
-    // Hydraulics are complete before quality starts. Freeze their diagnostics and
-    // validity here so later quality diagnostics cannot invalidate a valid hydraulic
-    // timeline.
-    const qsizetype quality_diagnostic_begin = project.diagnostics().size();
-    result.result_timeline.status = makeEpanetSuccess();
-    appendProjectDiagnostics(result.result_timeline.diagnostics, project.diagnostics(), 0, quality_diagnostic_begin);
-    finalizeResultValidity(result.result_timeline);
-
-    bool quality_attempted = false;
-    if (prepared_request.options_quality.analysis != WaterQualityAnalysisType::None)
-    {
-        quality_attempted = true;
-        EpanetQualityResultReader quality_result_reader(project, prepared_request, indices);
-        EpanetQualitySolver quality_solver(project, prepared_request, quality_result_reader);
-        status = quality_solver.run(result.quality_result_timeline, cancellation_requested, cancelled);
-
-        const qsizetype quality_diagnostic_end = project.diagnostics().size();
-        appendProjectDiagnostics(result.quality_result_timeline.diagnostics, project.diagnostics(), quality_diagnostic_begin, quality_diagnostic_end);
-        if (!status.success)
-            appendDiagnosticIfUnique(result.quality_result_timeline.diagnostics, diagnosticFromStatus(status));
-        result.quality_result_timeline.status = status;
-
-        if (cancelled)
-        {
-            result.quality_result_timeline.validity = result.quality_result_timeline.results.isEmpty()
-                ? WaterQualitySimulationResultValidity::Invalid
-                : WaterQualitySimulationResultValidity::Partial;
-            return finishCancelledRun(std::move(result), report_collector, true, true, false);
-        }
-
-        finalizeQualityResultValidity(result.quality_result_timeline);
-        if (cancellationRequested(cancellation_requested))
-            return finishCancelledRun(std::move(result), report_collector, true, true, true);
-    }
-    else
-    {
-        result.quality_result_timeline.status = makeEpanetSuccess();
-        result.quality_result_timeline.validity = WaterQualitySimulationResultValidity::NotRun;
-    }
-
-    const qsizetype report_diagnostic_begin = project.diagnostics().size();
-    error = EN_report(project.handle());
-    if (cancellationRequested(cancellation_requested))
-        return finishCancelledRun(std::move(result), report_collector, true, quality_attempted, true);
-
-    if (error != 0)
-    {
-        const HydraulicSimulationStatus report_status = processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, QStringLiteral("EN_report"), HydraulicSimulationStatusEntityType::Report, QString(), QStringLiteral("Failed to generate EPANET report"));
-        if (!report_status.success)
-        {
-            result.result_timeline.status = report_status;
-            appendDiagnosticIfUnique(result.result_timeline.diagnostics, diagnosticFromStatus(report_status));
-        }
-    }
-
-    appendProjectDiagnostics(result.result_timeline.diagnostics, project.diagnostics(), report_diagnostic_begin, project.diagnostics().size());
-    result.report_lines = report_collector.lines();
-    appendReportDiagnostics(result.result_timeline.diagnostics, result.report_lines);
-    finalizeResultValidity(result.result_timeline);
-    if (result.result_timeline.status.backend_name.isEmpty())
-        result.result_timeline.status = makeEpanetSuccess();
-
-    return result;
+    EpanetSingleRunExecutor executor(prepared_project);
+    return executor.run(std::move(result), cancellation_requested);
 }
+
+EpanetResultBatch EpanetRunner::runBatch(const EpanetBatchRequest &request) const
+{
+    return runBatch(request, std::function<bool()>());
+}
+
+EpanetResultBatch EpanetRunner::runBatch(
+    const EpanetBatchRequest &request,
+    const std::function<bool()> &cancellation_requested) const
+{
+    const QDateTime simulation_start_utc = QDateTime::currentDateTimeUtc();
+    EpanetResultBatch result = initializeBatchResult(request.plan, simulation_start_utc);
+    EpanetPreparedProject prepared_project;
+
+    if (request.plan.headloss_formulas.isEmpty())
+    {
+        const HydraulicSimulationStatus status = makeEpanetStatus(
+            HydraulicSimulationStatusStage::ConfigureOptions,
+            HydraulicSimulationStatusOperation::ConfigureHydraulics,
+            HydraulicSimulationStatusEntityType::HydraulicSolver,
+            QString(),
+            QStringLiteral("EPANET batch execution requires at least one headloss formula"));
+        return failedBatch(std::move(result), status, prepared_project);
+    }
+
+    if (cancellationRequested(cancellation_requested))
+        return cancelledBatch(std::move(result), prepared_project);
+
+    NetworkHydraulic preparation_network = request.network;
+    preparation_network.options_hydraulic.headloss_formula = request.plan.headloss_formulas.first();
+    preparation_network.options_quality.analysis = WaterQualityAnalysisType::None;
+    preparation_network.options_quality.trace_node_uuid = QUuid();
+
+    const HydraulicSimulationStatus status = prepared_project.prepare(preparation_network);
+    if (cancellationRequested(cancellation_requested))
+        return cancelledBatch(std::move(result), prepared_project);
+
+    if (!status.success)
+        return failedBatch(std::move(result), status, prepared_project);
+
+    appendEpanetDiagnostics(result.diagnostics, prepared_project.project().diagnostics());
+    EpanetBatchExecutor executor(prepared_project);
+    return executor.run(std::move(result), cancellation_requested);
+}
+

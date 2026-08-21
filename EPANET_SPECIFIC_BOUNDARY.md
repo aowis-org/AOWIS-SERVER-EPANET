@@ -6,8 +6,9 @@ The shared model no longer exposes EPANET-prefixed domain types. EPANET names ar
 
 - Repository, CMake target, include path, and server executable names containing `epanet`.
 - `EpanetRunner` and `EpanetSimulationManager`, because selecting either explicitly selects the EPANET backend.
+- `EpanetBatchRequest`, `EpanetBatchPlan`, `EpanetResultBatch`, and the batch child-result/state types, because they describe EPANET backend execution orchestration rather than solver-neutral hydraulic domain data.
 - `EpanetProject`, because it owns the native `EN_Project` handle.
-- `EpanetNetworkBuilder`, `EpanetHydraulicSolver`, `EpanetQualitySolver`, `EpanetResultReader`, `EpanetQualityResultReader`, `EpanetIndexRegistry`, and `EpanetReportCollector`, because they translate to or operate on the native EPANET API.
+- `EpanetNetworkBuilder`, `EpanetHydraulicRunConfigurator`, `EpanetQualityRunConfigurator`, `EpanetHydraulicSolver`, `EpanetQualitySolver`, `EpanetResultReader`, `EpanetQualityResultReader`, `EpanetIndexRegistry`, and `EpanetReportCollector`, because they translate to or operate on the native EPANET API.
 - `EpanetResolvers`, because it resolves generic tank input forms into the geometry required by EPANET.
 - `EpanetResultRun`, because it combines separate hydraulic and water-quality result timelines with EPANET-native report lines.
 - `makeEpanetStatus`, `makeEpanetError`, and `makeEpanetSuccess`, because they are backend-adapter helpers that populate the generic status structure.

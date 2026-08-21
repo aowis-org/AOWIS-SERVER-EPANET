@@ -5,10 +5,13 @@
 #include "conformance/net1_fixture.h"
 #include "conformance/quality_execution_scenarios.h"
 
+#include "../src/lib/internal/epanet_hydraulic_run_configurator.h"
 #include "../src/lib/internal/epanet_index_registry.h"
 #include "../src/lib/internal/epanet_network_builder.h"
 #include "../src/lib/internal/epanet_network_preparer.h"
 #include "../src/lib/internal/epanet_project.h"
+#include "../src/lib/internal/epanet_project_initializer.h"
+#include "../src/lib/internal/epanet_quality_run_configurator.h"
 #include "../src/lib/internal/epanet_report_collector.h"
 
 #include <QByteArray>
@@ -316,13 +319,18 @@ public:
 
         status = this->project_.create();
         checkStatus(status, "EpanetProject::create(native quality)");
-        status = this->project_.initialize(prepared_network, this->report_collector_);
-        checkStatus(status, "EpanetProject::initialize(native quality)");
+        status = initializeEpanetProject(this->project_, prepared_network, this->report_collector_);
+        checkStatus(status, "initializeEpanetProject(native quality)");
 
         EpanetIndexRegistry indices;
         EpanetNetworkBuilder builder(this->project_, indices);
         status = builder.build(prepared_network);
         checkStatus(status, "EpanetNetworkBuilder::build(native quality)");
+
+        status = configureEpanetHydraulicRun(this->project_, prepared_network, indices);
+        checkStatus(status, "configureEpanetHydraulicRun(native quality)");
+        status = configureEpanetQualityRun(this->project_, prepared_network, indices);
+        checkStatus(status, "configureEpanetQualityRun(native quality)");
 
         checkEpanet(EN_solveH(this->project_.handle()), "EN_solveH(native quality)");
         checkEpanet(EN_openQ(this->project_.handle()), "EN_openQ(native quality)");

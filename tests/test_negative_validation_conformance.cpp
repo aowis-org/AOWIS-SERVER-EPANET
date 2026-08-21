@@ -637,18 +637,6 @@ void scenarioInvalidQualityConfiguration(TestContext &context)
 
     {
         NetworkHydraulic network = cleanNet1();
-        context.expect(!network.nodes_junctions.isEmpty(), "quality-source mode fixture requires a junction");
-        if (network.nodes_junctions.isEmpty())
-            return;
-        network.options_quality.analysis = WaterQualityAnalysisType::WaterAge;
-        HydraulicNodeJunction &junction = network.nodes_junctions.first();
-        junction.quality_source.type = HydraulicNodeQualitySourceType::FlowPacedBooster;
-        junction.quality_source.chemical_concentration_mg_per_l = 0.5;
-        expectRejected(context, network, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("require chemical analysis"));
-    }
-
-    {
-        NetworkHydraulic network = cleanNet1();
         network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
         network.options_quality.chemical_name.clear();
         expectRejected(context, network, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("chemical name"));
@@ -994,7 +982,7 @@ void registerNegativeValidationScenarios(ScenarioRegistry &registry)
         &scenarioInvalidEmitterConfiguration});
     registry.add(ScenarioDefinition{
         "conformance-negative-invalid-quality-configuration",
-        "Reject missing source-trace references, quality sources outside chemical mode, and reaction orders EPANET cannot represent per entity.",
+        "Reject missing source-trace references, invalid chemical-analysis configuration, and reaction orders EPANET cannot represent per entity.",
         {"conformance", "quality", "negative"},
         &scenarioInvalidQualityConfiguration});
     registry.add(ScenarioDefinition{

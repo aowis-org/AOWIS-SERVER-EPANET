@@ -1,5 +1,7 @@
 #include "epanet_quality_solver.h"
 
+#include "epanet_diagnostic_helpers.h"
+
 #include "epanet_project.h"
 #include "epanet_quality_result_reader.h"
 #include "epanet_status_helpers.h"
@@ -11,23 +13,6 @@ bool cancellationRequested(const std::function<bool()> &cancellation_requested)
     return cancellation_requested && cancellation_requested();
 }
 
-HydraulicSimulationDiagnostic diagnosticFromQualityStatus(const HydraulicSimulationStatus &status, HydraulicSimulationDiagnosticSeverity severity)
-{
-    HydraulicSimulationDiagnostic diagnostic;
-    diagnostic.severity = severity;
-    diagnostic.stage = status.stage;
-    diagnostic.operation = status.operation;
-    diagnostic.property = status.property;
-    diagnostic.entity = status.entity;
-    diagnostic.message = status.message;
-    diagnostic.details = status.details;
-    diagnostic.backend_name = status.backend_name;
-    diagnostic.backend_error_code = status.backend_error_code;
-    diagnostic.backend_operation = status.backend_operation;
-    diagnostic.message_backend = status.message_backend;
-    return diagnostic;
-}
-
 void collectQualityFailure(WaterQualitySimulationResultTimeline &timeline, HydraulicSimulationStatus status, HydraulicSimulationStatus &first_failure, HydraulicSimulationDiagnosticSeverity severity, long simulation_time_s = -1)
 {
     if (status.success)
@@ -36,7 +21,7 @@ void collectQualityFailure(WaterQualitySimulationResultTimeline &timeline, Hydra
     if (simulation_time_s >= 0)
         status.details.append(QStringLiteral("Simulation time: %1 s").arg(simulation_time_s));
 
-    timeline.diagnostics.append(diagnosticFromQualityStatus(status, severity));
+    timeline.diagnostics.append(epanetDiagnosticFromStatus(status, severity));
     if (first_failure.success)
         first_failure = status;
 }

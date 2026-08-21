@@ -708,16 +708,12 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         failures.append(validationStatus(HydraulicSimulationStatusOperation::ConfigureQuality, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("Chemical water-quality analysis requires a chemical name")));
     }
 
-    const std::function<void(const HydraulicNodeQualitySource &, HydraulicSimulationStatusEntityType, const QString &, const QUuid &)> validate_quality_source = [&failures, &quality](const HydraulicNodeQualitySource &source, HydraulicSimulationStatusEntityType entity_type, const QString &id, const QUuid &uuid)
+    const std::function<void(const HydraulicNodeQualitySource &, HydraulicSimulationStatusEntityType, const QString &, const QUuid &)> validate_quality_source = [&failures](const HydraulicNodeQualitySource &source, HydraulicSimulationStatusEntityType entity_type, const QString &id, const QUuid &uuid)
     {
         HydraulicSimulationStatus source_status = validateFiniteNonNegative(source.chemical_concentration_mg_per_l, entity_type, id, uuid, QStringLiteral("quality_source.chemical_concentration_mg_per_l"));
         appendValidationFailure(failures, source_status);
         source_status = validateFiniteNonNegative(source.chemical_mass_flow_mg_per_min, entity_type, id, uuid, QStringLiteral("quality_source.chemical_mass_flow_mg_per_min"));
         appendValidationFailure(failures, source_status);
-        if (source.type != HydraulicNodeQualitySourceType::None && quality.analysis != WaterQualityAnalysisType::Chemical)
-        {
-            failures.append(validationStatus(HydraulicSimulationStatusOperation::ConfigureQuality, entity_type, id, uuid, QStringLiteral("Water-quality sources require chemical analysis mode")));
-        }
     };
 
     const HydraulicSolverOptions &hydraulic = network.options_hydraulic;

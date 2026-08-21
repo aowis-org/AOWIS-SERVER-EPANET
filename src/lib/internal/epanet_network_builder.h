@@ -23,8 +23,6 @@ private:
     HydraulicSimulationStatus configureConstantDemandPattern(const NetworkHydraulic &request);
     HydraulicSimulationStatus configureDefaultDemandPattern(const NetworkHydraulic &request);
     HydraulicSimulationStatus configureGlobalEnergyPattern(const NetworkHydraulic &request);
-    HydraulicSimulationStatus configureWaterQualityAnalysis(const NetworkHydraulic &request);
-    HydraulicSimulationStatus configureWaterQualityReactions(const NetworkHydraulic &request);
     HydraulicSimulationStatus addCurveTankVolume(const HydraulicCurveTankVolume &curve);
     HydraulicSimulationStatus addCurvePumpHead(const HydraulicCurvePumpHead &curve);
     HydraulicSimulationStatus addCurvePumpEfficiency(const HydraulicCurvePumpEfficiency &curve);
@@ -34,7 +32,7 @@ private:
     HydraulicSimulationStatus addNodeReservoir(const HydraulicNodeReservoir &reservoir);
     HydraulicSimulationStatus addNodeJunction(const HydraulicNodeJunction &junction);
     HydraulicSimulationStatus addNodeTank(const HydraulicNodeTank &tank);
-    HydraulicSimulationStatus addLinkPipe(const HydraulicLinkPipe &pipe, HydraulicHeadlossFormula headloss_formula);
+    HydraulicSimulationStatus addLinkPipe(const HydraulicLinkPipe &pipe);
     HydraulicSimulationStatus addLinkPump(const HydraulicLinkPump &pump);
     HydraulicSimulationStatus addLinkValve(const HydraulicLinkValve &valve);
     HydraulicSimulationStatus addControlSimple(const HydraulicControlSimple &control);

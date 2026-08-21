@@ -6,15 +6,14 @@
 
 #include <QMetaObject>
 #include <QMetaType>
+#include <QMutexLocker>
 #include <QRunnable>
 #include <QThread>
 
 EpanetSimulationManager::EpanetSimulationManager(QObject *parent)
     : QObject(parent)
 {
-    qRegisterMetaType<HydraulicSimulationResultTimeline>();
-    qRegisterMetaType<HydraulicSimulationStatus>();
-    qRegisterMetaType<QStringList>();
+    qRegisterMetaType<EpanetResultBatch>();
     qRegisterMetaType<QUuid>();
     this->thread_pool.setMaxThreadCount(std::max(1, QThread::idealThreadCount()));
 }
@@ -22,19 +21,33 @@ EpanetSimulationManager::EpanetSimulationManager(QObject *parent)
 EpanetSimulationManager::~EpanetSimulationManager()
 {
     this->shutting_down.store(true);
+    cancelAll();
     this->thread_pool.clear();
     this->thread_pool.waitForDone();
+
+    QMutexLocker<QMutex> locker(&this->simulations_mutex);
+    this->cancellation_flags.clear();
 }
 
-QUuid EpanetSimulationManager::submit(const NetworkHydraulic &request)
+QUuid EpanetSimulationManager::submit(const EpanetBatchRequest &request)
 {
     const QUuid simulation_id = QUuid::createUuid();
+    const std::shared_ptr<std::atomic_bool> cancellation_flag = std::make_shared<std::atomic_bool>(false);
+
+    {
+        QMutexLocker<QMutex> locker(&this->simulations_mutex);
+        this->cancellation_flags.insert(simulation_id, cancellation_flag);
+    }
+
     emit signalSimulationQueued(simulation_id);
 
-    QRunnable *task = QRunnable::create([this, simulation_id, request]()
+    QRunnable *task = QRunnable::create([this, simulation_id, request, cancellation_flag]()
     {
         if (this->shutting_down.load())
+        {
+            removeSimulation(simulation_id);
             return;
+        }
 
         QMetaObject::invokeMethod(this, [this, simulation_id]()
         {
@@ -43,25 +56,44 @@ QUuid EpanetSimulationManager::submit(const NetworkHydraulic &request)
         }, Qt::QueuedConnection);
 
         EpanetRunner runner;
-        EpanetResultRun run_result = runner.run(request);
-
-        QMetaObject::invokeMethod(this, [this, simulation_id, run_result = std::move(run_result)]() mutable
+        EpanetResultBatch result = runner.runBatch(request, [this, cancellation_flag]()
         {
-            if (this->shutting_down.load())
-                return;
+            return this->shutting_down.load() || cancellation_flag->load();
+        });
 
-            if (run_result.result_timeline.status.success)
-                emit signalSimulationFinished(simulation_id, std::move(run_result.result_timeline), std::move(run_result.report_lines));
-            else
-            {
-                emit signalSimulationFailed(simulation_id, run_result.result_timeline.status, run_result.report_lines);
-                emit signalSimulationFailedWithResults(simulation_id, std::move(run_result.result_timeline), std::move(run_result.report_lines));
-            }
+        removeSimulation(simulation_id);
+
+        QMetaObject::invokeMethod(this, [this, simulation_id, result = std::move(result)]() mutable
+        {
+            if (!this->shutting_down.load())
+                emit signalSimulationCompleted(simulation_id, std::move(result));
         }, Qt::QueuedConnection);
     });
 
     this->thread_pool.start(task);
     return simulation_id;
+}
+
+bool EpanetSimulationManager::cancel(const QUuid &simulation_id)
+{
+    QMutexLocker<QMutex> locker(&this->simulations_mutex);
+    const QHash<QUuid, std::shared_ptr<std::atomic_bool>>::const_iterator it = this->cancellation_flags.constFind(simulation_id);
+    if (it == this->cancellation_flags.constEnd())
+        return false;
+
+    it.value()->store(true);
+    return true;
+}
+
+void EpanetSimulationManager::cancelAll()
+{
+    QMutexLocker<QMutex> locker(&this->simulations_mutex);
+    QHash<QUuid, std::shared_ptr<std::atomic_bool>>::const_iterator it = this->cancellation_flags.constBegin();
+    while (it != this->cancellation_flags.constEnd())
+    {
+        it.value()->store(true);
+        ++it;
+    }
 }
 
 void EpanetSimulationManager::setMaxWorkerCount(int count)
@@ -72,4 +104,16 @@ void EpanetSimulationManager::setMaxWorkerCount(int count)
 int EpanetSimulationManager::maxWorkerCount() const
 {
     return this->thread_pool.maxThreadCount();
+}
+
+int EpanetSimulationManager::activeSimulationCount() const
+{
+    QMutexLocker<QMutex> locker(&this->simulations_mutex);
+    return this->cancellation_flags.size();
+}
+
+void EpanetSimulationManager::removeSimulation(const QUuid &simulation_id)
+{
+    QMutexLocker<QMutex> locker(&this->simulations_mutex);
+    this->cancellation_flags.remove(simulation_id);
 }

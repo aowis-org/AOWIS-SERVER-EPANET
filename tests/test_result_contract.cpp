@@ -1,3 +1,5 @@
+#include <aowis/epanet/epanet_batch_request.h>
+#include <aowis/epanet/epanet_result_batch.h>
 #include <aowis/epanet/epanet_runner.h>
 
 #include "conformance/conformance_test_framework.h"
@@ -389,6 +391,119 @@ void testWaterQualityModelBoundary(TestContext &context)
     context.expectNear(result.statistics.mass_balance_ratio, 0.9999, NumericTolerance{0.0, 0.0}, comparison("quality_result.mass_balance_ratio"), "quality mass balance should live in the quality result timeline");
 }
 
+void testBatchExecutionEnvelope(TestContext &context)
+{
+    EpanetBatchRequest request;
+    request.network = makeJunctionNetwork();
+    request.plan.headloss_formulas.append(HydraulicHeadlossFormula::HazenWilliams);
+    request.plan.headloss_formulas.append(HydraulicHeadlossFormula::DarcyWeisbach);
+    request.plan.headloss_formulas.append(HydraulicHeadlossFormula::ChezyManning);
+
+    WaterQualitySolverOptions chemical;
+    chemical.analysis = WaterQualityAnalysisType::Chemical;
+    chemical.chemical_name = QStringLiteral("Chlorine");
+    request.plan.quality_runs.append(chemical);
+
+    WaterQualitySolverOptions water_age;
+    water_age.analysis = WaterQualityAnalysisType::WaterAge;
+    request.plan.quality_runs.append(water_age);
+
+    WaterQualitySolverOptions trace_first;
+    trace_first.analysis = WaterQualityAnalysisType::SourceTrace;
+    trace_first.trace_node_uuid = QUuid::createUuid();
+    request.plan.quality_runs.append(trace_first);
+
+    WaterQualitySolverOptions trace_second;
+    trace_second.analysis = WaterQualityAnalysisType::SourceTrace;
+    trace_second.trace_node_uuid = QUuid::createUuid();
+    request.plan.quality_runs.append(trace_second);
+
+    context.expectEqual(static_cast<std::int64_t>(request.plan.headloss_formulas.size()), std::int64_t{3}, comparison("batch.headloss_formulas.size"), "batch request should preserve all requested headloss formulas");
+    context.expectEqual(static_cast<std::int64_t>(request.plan.quality_runs.size()), std::int64_t{4}, comparison("batch.quality_runs.size"), "batch request should preserve independent quality runs");
+    context.expect(request.plan.quality_runs.at(2).trace_node_uuid != request.plan.quality_runs.at(3).trace_node_uuid, "batch request should support multiple source-trace runs with different trace nodes");
+
+    EpanetResultBatch result;
+    result.state = EpanetBatchRunState::Running;
+
+    for (const HydraulicHeadlossFormula formula : request.plan.headloss_formulas)
+    {
+        EpanetBatchHydraulicResult hydraulic_result;
+        hydraulic_result.headloss_formula = formula;
+        hydraulic_result.state = EpanetBatchRunState::Success;
+
+        for (const WaterQualitySolverOptions &quality_options : request.plan.quality_runs)
+        {
+            EpanetBatchQualityResult quality_result;
+            quality_result.options = quality_options;
+            quality_result.result_timeline.analysis = quality_options.analysis;
+            quality_result.state = EpanetBatchRunState::Success;
+            hydraulic_result.quality_results.append(quality_result);
+        }
+
+        result.hydraulic_runs.append(hydraulic_result);
+    }
+
+    result.state = EpanetBatchRunState::Success;
+
+    context.expectEqual(static_cast<std::int64_t>(result.hydraulic_runs.size()), std::int64_t{3}, comparison("batch.hydraulic_runs.size"), "batch result should hold one result branch per requested headloss formula");
+    context.expectEqual(static_cast<std::int64_t>(result.hydraulic_runs.first().quality_results.size()), std::int64_t{4}, comparison("batch.quality_results.size"), "each hydraulic branch should hold all requested quality analyses");
+    context.expect(result.hydraulic_runs.first().quality_results.at(0).options.analysis == WaterQualityAnalysisType::Chemical, "quality result should retain the options that identify its analysis");
+    context.expect(result.hydraulic_runs.first().quality_results.at(2).options.trace_node_uuid == trace_first.trace_node_uuid, "source-trace result should retain its trace-node identity");
+    context.expect(result.hydraulic_runs.first().quality_results.at(3).options.trace_node_uuid == trace_second.trace_node_uuid, "multiple source-trace results should remain independently identifiable");
+}
+
+
+void testBatchSequentialExecution(TestContext &context)
+{
+    NetworkHydraulic network = makeJunctionNetwork();
+    network.timestep_quality_s = 300;
+    network.links_pipes[0].roughness_darcy_weisbach_mm = 0.15;
+    network.links_pipes[0].roughness_chezy_manning = 0.012;
+
+    EpanetBatchRequest request;
+    request.network = network;
+    request.plan.headloss_formulas.append(HydraulicHeadlossFormula::HazenWilliams);
+    request.plan.headloss_formulas.append(HydraulicHeadlossFormula::DarcyWeisbach);
+    request.plan.headloss_formulas.append(HydraulicHeadlossFormula::ChezyManning);
+
+    WaterQualitySolverOptions chemical;
+    chemical.analysis = WaterQualityAnalysisType::Chemical;
+    chemical.chemical_name = QStringLiteral("Chlorine");
+    request.plan.quality_runs.append(chemical);
+
+    WaterQualitySolverOptions water_age;
+    water_age.analysis = WaterQualityAnalysisType::WaterAge;
+    request.plan.quality_runs.append(water_age);
+
+    WaterQualitySolverOptions source_trace;
+    source_trace.analysis = WaterQualityAnalysisType::SourceTrace;
+    source_trace.trace_node_uuid = network.nodes_reservoirs.first().uuid;
+    request.plan.quality_runs.append(source_trace);
+
+    const EpanetResultBatch result = EpanetRunner().runBatch(request);
+    context.expect(!result.cancelled, "batch execution should complete without cancellation");
+    context.expect(result.state == EpanetBatchRunState::Success, "batch execution should complete successfully");
+    context.expectEqual(static_cast<std::int64_t>(result.hydraulic_runs.size()), std::int64_t{3}, comparison("batch.hydraulic_runs.size"), "batch execution should return one hydraulic branch per requested formula");
+
+    for (qsizetype hydraulic_index = 0; hydraulic_index < result.hydraulic_runs.size(); hydraulic_index++)
+    {
+        const EpanetBatchHydraulicResult &hydraulic_result = result.hydraulic_runs.at(hydraulic_index);
+        context.expect(hydraulic_result.state == EpanetBatchRunState::Success, "each hydraulic batch branch should succeed");
+        context.expect(hydraulic_result.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "each hydraulic batch branch should return valid numerical results");
+        context.expect(!hydraulic_result.result_timeline.results.isEmpty(), "each hydraulic batch branch should contain numerical results");
+        context.expectEqual(static_cast<std::int64_t>(hydraulic_result.quality_results.size()), std::int64_t{3}, comparison("batch.quality_results.size"), "each hydraulic branch should run all requested quality analyses");
+
+        for (qsizetype quality_index = 0; quality_index < hydraulic_result.quality_results.size(); quality_index++)
+        {
+            const EpanetBatchQualityResult &quality_result = hydraulic_result.quality_results.at(quality_index);
+            context.expect(quality_result.state == EpanetBatchRunState::Success, "each quality child should succeed");
+            context.expect(quality_result.result_timeline.validity == WaterQualitySimulationResultValidity::Valid, "each quality child should return valid numerical results");
+            context.expect(!quality_result.result_timeline.results.isEmpty(), "each quality child should contain numerical results");
+            context.expect(quality_result.result_timeline.analysis == quality_result.options.analysis, "each quality child should retain its requested analysis identity");
+        }
+    }
+}
+
 void testSteadyStatePumpEnergyRegression(TestContext &context)
 {
     const NetworkHydraulic network = makePumpNetwork(false, 0);
@@ -445,5 +560,15 @@ void registerResultContractScenarios(ScenarioRegistry &registry)
         "Checks typed water-quality quantities, source strengths, reaction coefficient/order pairs, and the separate quality result timeline.",
         {"contract", "quality", "model"},
         &testWaterQualityModelBoundary});
+    registry.add(ScenarioDefinition{
+        "conformance-batch-sequential-basic",
+        "Checks sequential batch execution across all headloss formulas and multiple quality analyses on one prepared EPANET project.",
+        {"conformance", "hydraulic", "quality", "batch"},
+        &testBatchSequentialExecution});
+    registry.add(ScenarioDefinition{
+        "contract-batch-execution-envelope",
+        "Checks the EPANET batch request/result envelope for multiple headloss formulas, quality analyses, and repeated source-trace runs.",
+        {"contract", "hydraulic", "quality", "batch"},
+        &testBatchExecutionEnvelope});
 }
 }

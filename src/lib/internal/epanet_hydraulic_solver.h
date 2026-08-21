@@ -21,8 +21,6 @@ public:
         bool &cancelled);
 
 private:
-    HydraulicSimulationStatus configureReport() const;
-
     EpanetProject &project;
     const NetworkHydraulic &network;
     const EpanetResultReader &result_reader;

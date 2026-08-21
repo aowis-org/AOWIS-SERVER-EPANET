@@ -1,5 +1,8 @@
 #include "epanet_hydraulic_solver.h"
+
+#include "epanet_diagnostic_helpers.h"
 #include "epanet_project.h"
+#include "epanet_report_configurator.h"
 #include "epanet_result_reader.h"
 #include "epanet_status_helpers.h"
 
@@ -203,23 +206,6 @@ void storeFlowBalance(const FlowBalanceAccumulator &accumulator, HydraulicSimula
         flow_balance.flow_balance_ratio = adjusted_outflow / adjusted_inflow;
 }
 
-HydraulicSimulationDiagnostic diagnosticFromHydraulicStatus(const HydraulicSimulationStatus &status, HydraulicSimulationDiagnosticSeverity severity)
-{
-    HydraulicSimulationDiagnostic diagnostic;
-    diagnostic.severity = severity;
-    diagnostic.stage = status.stage;
-    diagnostic.operation = status.operation;
-    diagnostic.property = status.property;
-    diagnostic.entity = status.entity;
-    diagnostic.message = status.message;
-    diagnostic.details = status.details;
-    diagnostic.backend_name = status.backend_name;
-    diagnostic.backend_error_code = status.backend_error_code;
-    diagnostic.backend_operation = status.backend_operation;
-    diagnostic.message_backend = status.message_backend;
-    return diagnostic;
-}
-
 void collectHydraulicFailure(EpanetProject &project, HydraulicSimulationStatus status, HydraulicSimulationStatus &first_failure, HydraulicSimulationDiagnosticSeverity severity, long simulation_time_s = -1)
 {
     if (status.success)
@@ -228,7 +214,7 @@ void collectHydraulicFailure(EpanetProject &project, HydraulicSimulationStatus s
     if (simulation_time_s >= 0)
         status.details.append(QStringLiteral("Simulation time: %1 s").arg(simulation_time_s));
 
-    project.appendDiagnostic(diagnosticFromHydraulicStatus(status, severity));
+    project.appendDiagnostic(epanetDiagnosticFromStatus(status, severity));
     if (first_failure.success)
         first_failure = status;
 }
@@ -253,11 +239,6 @@ EpanetHydraulicSolver::EpanetHydraulicSolver(EpanetProject &project, const Netwo
 {
 }
 
-HydraulicSimulationStatus EpanetHydraulicSolver::configureReport() const
-{
-    return this->project.configureReport(this->network);
-}
-
 HydraulicSimulationStatus EpanetHydraulicSolver::run(
     HydraulicSimulationResultTimeline &timeline,
     const std::function<bool()> &cancellation_requested,
@@ -271,7 +252,7 @@ HydraulicSimulationStatus EpanetHydraulicSolver::run(
         return makeEpanetSuccess();
     }
 
-    HydraulicSimulationStatus status = configureReport();
+    HydraulicSimulationStatus status = configureEpanetReport(this->project, this->network);
     if (!status.success)
         return status;
 

@@ -8,9 +8,6 @@
 #include <aowis/model/hydraulic/hydraulic_simulation_diagnostics.h>
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
 
-class EpanetReportCollector;
-struct NetworkHydraulic;
-
 class EpanetProject
 {
 public:
@@ -21,9 +18,6 @@ public:
     EpanetProject &operator=(const EpanetProject &) = delete;
 
     HydraulicSimulationStatus create();
-    HydraulicSimulationStatus initialize(const NetworkHydraulic &request, EpanetReportCollector &report_collector);
-    HydraulicSimulationStatus configureReport(const NetworkHydraulic &request) const;
-    HydraulicSimulationStatus retrieveInpText(const NetworkHydraulic &request, QString &inp_text) const;
     EN_Project handle() const;
     QString errorMessage(int error_code) const;
     const QList<HydraulicSimulationDiagnostic> &diagnostics() const;

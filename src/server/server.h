@@ -1,22 +1,23 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#include <QCoreApplication>
-#include <QHttpServer>
 #include <QObject>
+#include <QHttpServer>
 #include <QTcpServer>
+
+class EpanetSimulationManager;
 
 class Server : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit Server(QCoreApplication *app, QObject *parent = nullptr);
+    explicit Server(QObject *parent = nullptr);
 
 private:
     void setupRoutes();
 
-    QCoreApplication *app = nullptr;
+    EpanetSimulationManager *simulation_manager = nullptr;
     QHttpServer http;
     QTcpServer *tcp = nullptr;
 };

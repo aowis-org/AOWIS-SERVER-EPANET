@@ -6,10 +6,12 @@ The shared AOWIS hydraulic model is solver-neutral. This repository is the EPANE
 
 ## Architecture
 
-- `EpanetRunner`: synchronous EPANET adapter entry point. It accepts `NetworkHydraulic` and returns a generic `HydraulicSimulationResultTimeline` together with the native EPANET report.
-- `EpanetSimulationManager`: asynchronous Qt queue around `EpanetRunner`.
-- `EpanetProject`: RAII ownership and configuration of the native `EN_Project` handle.
-- `EpanetNetworkBuilder`: converts generic hydraulic model entities into EPANET nodes, links, and curves.
+- `EpanetRunner`: synchronous EPANET adapter entry point. `run()` executes one hydraulic/quality configuration; `runBatch()` prepares one native project and executes the requested hydraulic and quality analyses sequentially.
+- `EpanetSimulationManager`: asynchronous Qt queue for `EpanetBatchRequest`. Each submitted batch has its own cancellation token and produces one complete `EpanetResultBatch`.
+- `EpanetProject`: RAII ownership of the native `EN_Project` handle.
+- `EpanetNetworkBuilder`: converts generic hydraulic model entities into the static EPANET network topology and entity data.
+- `EpanetHydraulicRunConfigurator`: applies the selected headloss formula and its formula-specific pipe roughness values.
+- `EpanetQualityRunConfigurator`: applies the selected water-quality mode, initial values, sources, mixing, and reactions.
 - `EpanetIndexRegistry`: stores native EPANET indices while the network is built.
 - `EpanetHydraulicSolver`: owns the native hydraulic-session lifecycle and report configuration.
 - `EpanetResultReader`: converts native EPANET result values into generic hydraulic result structures.
@@ -25,6 +27,15 @@ if (!result.result_timeline.status.success)
 else
     HydraulicSimulationResultPrinter::print(result.result_timeline);
 ```
+
+
+### Batch execution
+
+`EpanetBatchRequest` separates the network definition from the requested solver analyses. The batch runner constructs the native EPANET network once, executes each requested headloss formula sequentially, and reuses that formula's saved hydraulic solution for its requested quality analyses.
+
+`EpanetSimulationManager` is the asynchronous service boundary for this operation. `submit()` returns a simulation UUID, `cancel()` requests cancellation of one batch, `cancelAll()` requests cancellation of all queued/running batches, and `signalSimulationCompleted` returns the complete aggregate result regardless of whether the aggregate state is success, warning, error, or cancelled. Completed sub-results remain in the returned batch.
+
+The standalone HTTP executable currently exposes only the `/status` liveness route. Solver execution is intentionally kept out of `server.cpp`; a future transport route should deserialize a batch request, submit it to `EpanetSimulationManager`, and serialize the final `EpanetResultBatch`.
 
 ## Backend diagnostics
 
