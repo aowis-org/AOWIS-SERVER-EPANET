@@ -6,11 +6,10 @@ The shared model no longer exposes EPANET-prefixed domain types. EPANET names ar
 
 - Repository, CMake target, include path, and server executable names containing `epanet`.
 - `EpanetRunner` and `EpanetSimulationManager`, because selecting either explicitly selects the EPANET backend.
-- `EpanetBatchRequest`, `EpanetBatchPlan`, `EpanetResultBatch`, and the batch child-result/state types, because they describe EPANET backend execution orchestration rather than solver-neutral hydraulic domain data.
+- `EpanetRunRequest`, `EpanetResultRun`, `EpanetQualityResult`, and `EpanetRunState`, because they describe EPANET backend execution orchestration around solver-neutral hydraulic and quality timelines.
 - `EpanetProject`, because it owns the native `EN_Project` handle.
 - `EpanetNetworkBuilder`, `EpanetHydraulicRunConfigurator`, `EpanetQualityRunConfigurator`, `EpanetHydraulicSolver`, `EpanetQualitySolver`, `EpanetResultReader`, `EpanetQualityResultReader`, `EpanetIndexRegistry`, and `EpanetReportCollector`, because they translate to or operate on the native EPANET API.
 - `EpanetResolvers`, because it resolves generic tank input forms into the geometry required by EPANET.
-- `EpanetResultRun`, because it combines separate hydraulic and water-quality result timelines with EPANET-native report lines.
 - `makeEpanetStatus`, `makeEpanetError`, and `makeEpanetSuccess`, because they are backend-adapter helpers that populate the generic status structure.
 - Native `EN_*` constants and calls inside the adapter implementation.
 
@@ -81,7 +80,7 @@ Q1 maps the typed AOWIS water-quality configuration into the live EPANET project
 
 EPANET exposes reaction orders through the Toolkit but does not expose Toolkit setters for the INP-level `GLOBAL BULK`, `GLOBAL WALL`, or `ROUGHNESS CORRELATION` directives. AOWIS therefore writes the effective coefficient to every pipe/tank through `EN_KBULK`, `EN_KWALL`, and `EN_TANK_KBULK`. Per-entity overrides take precedence. When roughness correlation is enabled, the adapter applies EPANET's own formula for the selected hydraulic head-loss model (Hazen-Williams, Darcy-Weisbach, or Chezy-Manning). This preserves the live simulation state even though a subsequently generated INP may normalize a global/roughness rule into explicit per-entity reaction coefficients.
 
-EPANET reaction orders are network-wide. AOWIS stores each reaction coefficient together with its semantic order, but Q1 validation requires enabled per-pipe/per-tank overrides to use the corresponding network-wide order. EPANET wall reaction order is restricted to 0 or 1. Quality sources are accepted only for chemical analysis, and source-trace analysis requires an enabled trace-node reference.
+EPANET reaction orders are network-wide. AOWIS stores each reaction coefficient together with its semantic order, but Q1 validation requires enabled per-pipe/per-tank overrides to use the corresponding network-wide order. EPANET wall reaction order is restricted to 0 or 1. Configured chemical quality sources may remain present while another quality analysis is selected; they are applied only during chemical runs. Source-trace analysis requires an enabled trace-node reference.
 
 ## Water-quality result boundary
 

@@ -13,7 +13,7 @@
 EpanetSimulationManager::EpanetSimulationManager(QObject *parent)
     : QObject(parent)
 {
-    qRegisterMetaType<EpanetResultBatch>();
+    qRegisterMetaType<EpanetResultRun>();
     qRegisterMetaType<QUuid>();
     this->thread_pool.setMaxThreadCount(std::max(1, QThread::idealThreadCount()));
 }
@@ -29,7 +29,7 @@ EpanetSimulationManager::~EpanetSimulationManager()
     this->cancellation_flags.clear();
 }
 
-QUuid EpanetSimulationManager::submit(const EpanetBatchRequest &request)
+QUuid EpanetSimulationManager::submit(const EpanetRunRequest &request)
 {
     const QUuid simulation_id = QUuid::createUuid();
     const std::shared_ptr<std::atomic_bool> cancellation_flag = std::make_shared<std::atomic_bool>(false);
@@ -56,7 +56,7 @@ QUuid EpanetSimulationManager::submit(const EpanetBatchRequest &request)
         }, Qt::QueuedConnection);
 
         EpanetRunner runner;
-        EpanetResultBatch result = runner.runBatch(request, [this, cancellation_flag]()
+        EpanetResultRun result = runner.run(request, [this, cancellation_flag]()
         {
             return this->shutting_down.load() || cancellation_flag->load();
         });

@@ -90,7 +90,6 @@ double initialQualityValue(const WaterQualitySolverOptions &options, const NodeT
     case WaterQualityAnalysisType::WaterAge:
         return node.initial_water_age_h;
     case WaterQualityAnalysisType::SourceTrace:
-        return node.initial_source_trace_percent;
     case WaterQualityAnalysisType::None:
         return 0.0;
     }
@@ -193,6 +192,8 @@ HydraulicSimulationStatus configureQualityAnalysis(
     const EpanetIndexRegistry &indices)
 {
     const WaterQualitySolverOptions &options = request.options_quality;
+    const bool has_initial_node_quality = options.analysis == WaterQualityAnalysisType::Chemical
+        || options.analysis == WaterQualityAnalysisType::WaterAge;
     int backend_analysis = 0;
     if (!resolveWaterQualityAnalysisType(options.analysis, backend_analysis))
         return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureQuality, HydraulicSimulationStatusEntityType::QualitySolver, QString(), QStringLiteral("Unsupported water-quality analysis type"));
@@ -278,9 +279,13 @@ HydraulicSimulationStatus configureQualityAnalysis(
     for (const HydraulicNodeJunction &node : request.nodes_junctions)
     {
         const int node_index = indices.nodes_junctions.value(node.uuid, 0);
-        HydraulicSimulationStatus status = configure_initial(node_index, initialQualityValue(options, node), HydraulicSimulationStatusEntityType::Junction, node.id, node.uuid);
-        if (!status.success)
-            return status;
+        HydraulicSimulationStatus status = makeEpanetSuccess();
+        if (has_initial_node_quality)
+        {
+            status = configure_initial(node_index, initialQualityValue(options, node), HydraulicSimulationStatusEntityType::Junction, node.id, node.uuid);
+            if (!status.success)
+                return status;
+        }
         status = configure_source(node_index, node.quality_source, HydraulicSimulationStatusEntityType::Junction, node.id, node.uuid);
         if (!status.success)
             return status;
@@ -289,9 +294,13 @@ HydraulicSimulationStatus configureQualityAnalysis(
     for (const HydraulicNodeReservoir &node : request.nodes_reservoirs)
     {
         const int node_index = indices.nodes_reservoirs.value(node.uuid, 0);
-        HydraulicSimulationStatus status = configure_initial(node_index, initialQualityValue(options, node), HydraulicSimulationStatusEntityType::Reservoir, node.id, node.uuid);
-        if (!status.success)
-            return status;
+        HydraulicSimulationStatus status = makeEpanetSuccess();
+        if (has_initial_node_quality)
+        {
+            status = configure_initial(node_index, initialQualityValue(options, node), HydraulicSimulationStatusEntityType::Reservoir, node.id, node.uuid);
+            if (!status.success)
+                return status;
+        }
         status = configure_source(node_index, node.quality_source, HydraulicSimulationStatusEntityType::Reservoir, node.id, node.uuid);
         if (!status.success)
             return status;
@@ -300,9 +309,13 @@ HydraulicSimulationStatus configureQualityAnalysis(
     for (const HydraulicNodeTank &node : request.nodes_tanks)
     {
         const int node_index = indices.nodes_tanks.value(node.uuid, 0);
-        HydraulicSimulationStatus status = configure_initial(node_index, initialQualityValue(options, node), HydraulicSimulationStatusEntityType::Tank, node.id, node.uuid);
-        if (!status.success)
-            return status;
+        HydraulicSimulationStatus status = makeEpanetSuccess();
+        if (has_initial_node_quality)
+        {
+            status = configure_initial(node_index, initialQualityValue(options, node), HydraulicSimulationStatusEntityType::Tank, node.id, node.uuid);
+            if (!status.success)
+                return status;
+        }
         status = configure_source(node_index, node.quality_source, HydraulicSimulationStatusEntityType::Tank, node.id, node.uuid);
         if (!status.success)
             return status;

@@ -892,8 +892,6 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         appendValidationFailure(failures, status);
         status = validateFiniteNonNegative(junction.initial_water_age_h, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("initial_water_age_h"));
         appendValidationFailure(failures, status);
-        status = validateFiniteNonNegative(junction.initial_source_trace_percent, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("initial_source_trace_percent"));
-        appendValidationFailure(failures, status);
         validate_quality_source(junction.quality_source, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid);
         if (junction.elevation_input_type == HydraulicNodeElevationInputType::TerrainElevationAndOffset)
         {
@@ -957,8 +955,6 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         appendValidationFailure(failures, status);
         status = validateFiniteNonNegative(reservoir.initial_water_age_h, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("initial_water_age_h"));
         appendValidationFailure(failures, status);
-        status = validateFiniteNonNegative(reservoir.initial_source_trace_percent, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, QStringLiteral("initial_source_trace_percent"));
-        appendValidationFailure(failures, status);
         validate_quality_source(reservoir.quality_source, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid);
         if (reservoir.head_input_type == HydraulicNodeElevationInputType::TerrainElevationAndOffset)
         {
@@ -985,8 +981,6 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         status = validateFiniteNonNegative(tank.initial_chemical_concentration_mg_per_l, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("initial_chemical_concentration_mg_per_l"));
         appendValidationFailure(failures, status);
         status = validateFiniteNonNegative(tank.initial_water_age_h, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("initial_water_age_h"));
-        appendValidationFailure(failures, status);
-        status = validateFiniteNonNegative(tank.initial_source_trace_percent, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("initial_source_trace_percent"));
         appendValidationFailure(failures, status);
         validate_quality_source(tank.quality_source, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid);
         if (!std::isfinite(tank.mixing_fraction) || tank.mixing_fraction < 0.0 || tank.mixing_fraction > 1.0)

@@ -10,8 +10,8 @@
 #include <QThreadPool>
 #include <QUuid>
 
-#include <aowis/epanet/epanet_batch_request.h>
-#include <aowis/epanet/epanet_result_batch.h>
+#include <aowis/epanet/epanet_result_run.h>
+#include <aowis/epanet/epanet_run_request.h>
 
 class EpanetSimulationManager : public QObject
 {
@@ -21,7 +21,7 @@ public:
     explicit EpanetSimulationManager(QObject *parent = nullptr);
     ~EpanetSimulationManager() override;
 
-    QUuid submit(const EpanetBatchRequest &request);
+    QUuid submit(const EpanetRunRequest &request);
     bool cancel(const QUuid &simulation_id);
     void cancelAll();
 
@@ -32,7 +32,7 @@ public:
 signals:
     void signalSimulationQueued(QUuid simulation_id);
     void signalSimulationStarted(QUuid simulation_id);
-    void signalSimulationCompleted(QUuid simulation_id, EpanetResultBatch result);
+    void signalSimulationCompleted(QUuid simulation_id, EpanetResultRun result);
 
 private:
     void removeSimulation(const QUuid &simulation_id);

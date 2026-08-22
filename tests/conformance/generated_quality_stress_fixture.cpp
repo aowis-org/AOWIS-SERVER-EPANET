@@ -234,8 +234,6 @@ void applyNodeSpecification(HydraulicNodeJunction &node, const QualityNodeSpecif
         node.initial_chemical_concentration_mg_per_l = quality.initial_value;
     else if (analysis == WaterQualityAnalysisType::WaterAge)
         node.initial_water_age_h = quality.initial_value;
-    else if (analysis == WaterQualityAnalysisType::SourceTrace)
-        node.initial_source_trace_percent = quality.initial_value;
 
     node.quality_source.type = quality.source_type;
     if (quality.source_type == HydraulicNodeQualitySourceType::MassBooster)
@@ -251,8 +249,6 @@ void applyNodeSpecification(HydraulicNodeReservoir &node, const QualityNodeSpeci
         node.initial_chemical_concentration_mg_per_l = quality.initial_value;
     else if (analysis == WaterQualityAnalysisType::WaterAge)
         node.initial_water_age_h = quality.initial_value;
-    else if (analysis == WaterQualityAnalysisType::SourceTrace)
-        node.initial_source_trace_percent = quality.initial_value;
 
     node.quality_source.type = quality.source_type;
     if (quality.source_type == HydraulicNodeQualitySourceType::MassBooster)

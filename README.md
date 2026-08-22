@@ -6,8 +6,8 @@ The shared AOWIS hydraulic model is solver-neutral. This repository is the EPANE
 
 ## Architecture
 
-- `EpanetRunner`: synchronous EPANET adapter entry point. `run()` executes one hydraulic/quality configuration; `runBatch()` prepares one native project and executes the requested hydraulic and quality analyses sequentially.
-- `EpanetSimulationManager`: asynchronous Qt queue for `EpanetBatchRequest`. Each submitted batch has its own cancellation token and produces one complete `EpanetResultBatch`.
+- `EpanetRunner`: synchronous EPANET adapter entry point. `run(const EpanetRunRequest &)` executes one hydraulic configuration from `NetworkHydraulic`, followed by zero or more requested quality analyses that reuse the saved hydraulic solution.
+- `EpanetSimulationManager`: asynchronous Qt queue for `EpanetRunRequest` jobs. Each job owns independent cooperative-cancellation state and completes with one `EpanetResultRun`.
 - `EpanetProject`: RAII ownership of the native `EN_Project` handle.
 - `EpanetNetworkBuilder`: converts generic hydraulic model entities into the static EPANET network topology and entity data.
 - `EpanetHydraulicRunConfigurator`: applies the selected headloss formula and its formula-specific pipe roughness values.
@@ -19,8 +19,15 @@ The shared AOWIS hydraulic model is solver-neutral. This repository is the EPANE
 - `HydraulicSimulationResultPrinter` and `HydraulicSimulationStatusPrinter`: print the solver-neutral model result and status types.
 
 ```cpp
+EpanetRunRequest request;
+request.network = network;
+
+WaterQualitySolverOptions water_age;
+water_age.analysis = WaterQualityAnalysisType::WaterAge;
+request.quality_runs.append(water_age);
+
 EpanetRunner runner;
-const EpanetResultRun result = runner.run(network);
+const EpanetResultRun result = runner.run(request);
 
 if (!result.result_timeline.status.success)
     HydraulicSimulationStatusPrinter::print(result.result_timeline.status);
@@ -29,13 +36,13 @@ else
 ```
 
 
-### Batch execution
+### Multi-quality execution contract
 
-`EpanetBatchRequest` separates the network definition from the requested solver analyses. The batch runner constructs the native EPANET network once, executes each requested headloss formula sequentially, and reuses that formula's saved hydraulic solution for its requested quality analyses.
+`EpanetRunRequest` contains one `NetworkHydraulic` and an ordered list of `WaterQualitySolverOptions`. The network's `options_hydraulic.headloss_formula` is the single hydraulic formula for that run. `EpanetResultRun` contains one hydraulic result timeline plus zero or more `EpanetQualityResult` children. Multiple source-trace runs remain independently identifiable through their quality options.
 
-`EpanetSimulationManager` is the asynchronous service boundary for this operation. `submit()` returns a simulation UUID, `cancel()` requests cancellation of one batch, `cancelAll()` requests cancellation of all queued/running batches, and `signalSimulationCompleted` returns the complete aggregate result regardless of whether the aggregate state is success, warning, error, or cancelled. Completed sub-results remain in the returned batch.
+The execution contract has exactly one hydraulic run. Multiple headloss formulas are not represented as branches of one request; callers choose one formula through `NetworkHydraulic::options_hydraulic.headloss_formula`. The executor saves that hydraulic solution once and reuses it for each requested quality analysis.
 
-The standalone HTTP executable currently exposes only the `/status` liveness route. Solver execution is intentionally kept out of `server.cpp`; a future transport route should deserialize a batch request, submit it to `EpanetSimulationManager`, and serialize the final `EpanetResultBatch`.
+The standalone HTTP executable currently exposes only the `/status` liveness route. Solver execution is intentionally kept out of `server.cpp`; a future transport route should submit `EpanetRunRequest` jobs through `EpanetSimulationManager` and consume `EpanetResultRun` results.
 
 ## Backend diagnostics
 

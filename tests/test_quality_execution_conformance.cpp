@@ -556,6 +556,43 @@ void scenarioQualityExecutionWaterAge(TestContext &context)
     const NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::WaterAge);
     const EpanetResultRun run = EpanetRunner().run(network);
     compareQualityTimeline(context, network, run);
+
+    NetworkHydraulic steady_state_network = qualityNetwork(WaterQualityAnalysisType::WaterAge);
+    steady_state_network.duration_s = 0;
+
+    EpanetRunRequest steady_state_request;
+    steady_state_request.network = steady_state_network;
+    steady_state_request.quality_runs.append(steady_state_network.options_quality);
+
+    const EpanetResultRun steady_state_run = EpanetRunner().run(steady_state_request);
+    context.expect(steady_state_run.state == EpanetRunState::Success, "steady-state water-age run must complete successfully");
+    context.expect(steady_state_run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "steady-state water-age run must retain valid hydraulics");
+    context.expectEqual(
+        static_cast<std::int64_t>(steady_state_run.quality_results.size()),
+        std::int64_t{1},
+        comparison(0, "steady-state-water-age.quality_results.size"),
+        "steady-state water-age run must return its requested quality result");
+    if (steady_state_run.quality_results.size() != 1)
+        return;
+
+    const EpanetQualityResult &quality_result = steady_state_run.quality_results.constFirst();
+    context.expect(quality_result.state == EpanetRunState::Success, "steady-state water-age child must complete successfully");
+    context.expect(quality_result.result_timeline.status.success, "steady-state water-age timeline must have successful status");
+    context.expect(quality_result.result_timeline.validity == WaterQualitySimulationResultValidity::Valid, "steady-state water-age timeline must be valid");
+    context.expect(quality_result.result_timeline.diagnostics.isEmpty(), "steady-state water-age timeline must not contain EPANET read/report errors");
+    context.expectEqual(
+        static_cast<std::int64_t>(quality_result.result_timeline.results.size()),
+        std::int64_t{1},
+        comparison(0, "steady-state-water-age.results.size"),
+        "steady-state water-age run must return the time-zero quality state exactly once");
+    if (!quality_result.result_timeline.results.isEmpty())
+    {
+        context.expectEqual(
+            static_cast<std::int64_t>(quality_result.result_timeline.results.constFirst().time_elapsed_s),
+            std::int64_t{0},
+            comparison(0, "steady-state-water-age.time_elapsed_s"),
+            "steady-state water-age result must be the time-zero state");
+    }
 }
 
 void scenarioQualityExecutionSourceTrace(TestContext &context)

@@ -951,7 +951,6 @@ void scenarioQualityInputSourceTrace(TestContext &context)
     network.options_quality.analysis = WaterQualityAnalysisType::SourceTrace;
     network.options_quality.trace_node_uuid = trace_source.uuid;
     network.options_quality.source_trace_tolerance_percent = 0.2;
-    network.nodes_junctions.first().initial_source_trace_percent = 17.0;
 
     NativeSavedProject native(network);
     int quality_type = -1;
@@ -964,7 +963,7 @@ void scenarioQualityInputSourceTrace(TestContext &context)
     context.expectNear(value, 0.2, NumericTolerance{1.0e-12, 1.0e-9}, comparison("quality.source_trace_tolerance_percent"));
     const HydraulicNodeJunction &junction = network.nodes_junctions.first();
     checkEpanet(EN_getnodevalue(native.handle(), nodeIndex(native.handle(), junction.id), EN_INITQUAL, &value), "EN_getnodevalue(EN_INITQUAL trace)");
-    context.expectNear(value, 17.0, NumericTolerance{1.0e-12, 1.0e-9}, comparison("initial_source_trace_percent", "Junction", junction.id.toStdString()));
+    context.expectNear(value, 0.0, NumericTolerance{1.0e-12, 1.0e-9}, comparison("source_trace_initqual", "Junction", junction.id.toStdString()), "source-trace mode must not expose an arbitrary per-node initial trace input");
 }
 
 }

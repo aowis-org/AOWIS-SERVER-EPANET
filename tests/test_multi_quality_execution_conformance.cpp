@@ -1,9 +1,8 @@
-#include <aowis/epanet/epanet_batch_request.h>
-#include <aowis/epanet/epanet_result_batch.h>
 #include <aowis/epanet/epanet_runner.h>
+#include <aowis/epanet/epanet_run_request.h>
 
-#include "conformance/batch_execution_scenarios.h"
 #include "conformance/conformance_test_framework.h"
+#include "conformance/multi_quality_execution_scenarios.h"
 
 #include <cstdint>
 #include <functional>
@@ -36,10 +35,10 @@ ComparisonContext comparison(
     return value;
 }
 
-NetworkHydraulic batchFixtureNetwork()
+NetworkHydraulic multiQualityFixtureNetwork()
 {
     NetworkHydraulic network;
-    network.id = QStringLiteral("batch-reuse-conformance");
+    network.id = QStringLiteral("multi-quality-reuse-conformance");
     network.uuid = QUuid::createUuid();
     network.duration_s = 3600;
     network.timestep_hydraulic_s = 1800;
@@ -126,15 +125,16 @@ WaterQualitySolverOptions traceOptions(const QUuid &trace_node_uuid)
     return options;
 }
 
-EpanetBatchRequest batchRequest(
-    const NetworkHydraulic &network,
-    const QList<HydraulicHeadlossFormula> &formulas,
+EpanetRunRequest runRequest(
+    NetworkHydraulic network,
+    HydraulicHeadlossFormula formula,
     const QList<WaterQualitySolverOptions> &quality_runs)
 {
-    EpanetBatchRequest request;
+    network.options_hydraulic.headloss_formula = formula;
+
+    EpanetRunRequest request;
     request.network = network;
-    request.plan.headloss_formulas = formulas;
-    request.plan.quality_runs = quality_runs;
+    request.quality_runs = quality_runs;
     return request;
 }
 
@@ -148,23 +148,11 @@ EpanetResultRun isolatedRun(
     return EpanetRunner().run(network);
 }
 
-const EpanetBatchHydraulicResult *findHydraulicResult(
-    const EpanetResultBatch &result,
-    HydraulicHeadlossFormula formula)
-{
-    for (const EpanetBatchHydraulicResult &hydraulic_result : result.hydraulic_runs)
-    {
-        if (hydraulic_result.headloss_formula == formula)
-            return &hydraulic_result;
-    }
-    return nullptr;
-}
-
-const EpanetBatchQualityResult *findQualityResult(
-    const EpanetBatchHydraulicResult &hydraulic_result,
+const EpanetQualityResult *findQualityResult(
+    const EpanetResultRun &result,
     const WaterQualitySolverOptions &options)
 {
-    for (const EpanetBatchQualityResult &quality_result : hydraulic_result.quality_results)
+    for (const EpanetQualityResult &quality_result : result.quality_results)
     {
         if (quality_result.options.analysis != options.analysis)
             continue;
@@ -373,206 +361,158 @@ void compareQualityTimelines(
     }
 }
 
-void compareBatchBranchWithIsolated(
+void compareMultiQualityWithIsolated(
     TestContext &context,
     const NetworkHydraulic &network,
-    const EpanetBatchHydraulicResult &batch_hydraulic,
+    HydraulicHeadlossFormula formula,
+    const EpanetResultRun &multi_quality_result,
     const WaterQualitySolverOptions &quality_options,
     const std::string &prefix)
 {
-    const EpanetResultRun isolated = isolatedRun(network, batch_hydraulic.headloss_formula, quality_options);
-    compareHydraulicTimelines(context, batch_hydraulic.result_timeline, isolated.result_timeline, prefix + ".hydraulic");
+    const EpanetResultRun isolated = isolatedRun(network, formula, quality_options);
+    compareHydraulicTimelines(context, multi_quality_result.result_timeline, isolated.result_timeline, prefix + ".hydraulic");
 
-    const EpanetBatchQualityResult *batch_quality = findQualityResult(batch_hydraulic, quality_options);
-    context.expect(batch_quality != nullptr, prefix + ": batch branch must contain the requested quality child");
-    if (batch_quality != nullptr)
-        compareQualityTimelines(context, batch_quality->result_timeline, isolated.quality_result_timeline, prefix + ".quality");
+    const EpanetQualityResult *quality_result = findQualityResult(multi_quality_result, quality_options);
+    context.expect(quality_result != nullptr, prefix + ": multi-quality result must contain the requested quality child");
+    if (quality_result != nullptr)
+        compareQualityTimelines(context, quality_result->result_timeline, isolated.quality_result_timeline, prefix + ".quality");
 }
 
-void testBatchIsolatedEquivalence(TestContext &context)
+void testMultiQualityIsolatedEquivalence(TestContext &context)
 {
-    const NetworkHydraulic network = batchFixtureNetwork();
+    const NetworkHydraulic network = multiQualityFixtureNetwork();
     const WaterQualitySolverOptions chemical = chemicalOptions();
     const WaterQualitySolverOptions water_age = waterAgeOptions();
     const WaterQualitySolverOptions trace = traceOptions(network.nodes_reservoirs.first().uuid);
+    const QList<WaterQualitySolverOptions> quality_runs = {chemical, water_age, trace};
     const QList<HydraulicHeadlossFormula> formulas = {
         HydraulicHeadlossFormula::HazenWilliams,
         HydraulicHeadlossFormula::DarcyWeisbach,
         HydraulicHeadlossFormula::ChezyManning
     };
-    const QList<WaterQualitySolverOptions> quality_runs = {chemical, water_age, trace};
-
-    const EpanetResultBatch batch = EpanetRunner().runBatch(batchRequest(network, formulas, quality_runs));
-    context.expect(batch.state == EpanetBatchRunState::Success, "isolated-equivalence batch must succeed");
 
     for (const HydraulicHeadlossFormula formula : formulas)
     {
-        const EpanetBatchHydraulicResult *batch_hydraulic = findHydraulicResult(batch, formula);
-        context.expect(batch_hydraulic != nullptr, "batch must contain every requested hydraulic formula");
-        if (batch_hydraulic == nullptr)
-            continue;
+        const EpanetResultRun result = EpanetRunner().run(runRequest(network, formula, quality_runs));
+        context.expect(result.state == EpanetRunState::Success, "multi-quality run must succeed for each supported headloss formula");
+        context.expect(result.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "multi-quality run must retain one valid hydraulic timeline");
+        context.expectEqual(
+            static_cast<std::int64_t>(result.quality_results.size()),
+            static_cast<std::int64_t>(quality_runs.size()),
+            comparison("isolated-equivalence.quality_results.size"),
+            "multi-quality run must return every requested quality result");
 
-        context.expect(batch_hydraulic->state == EpanetBatchRunState::Success, "batch hydraulic branch must succeed");
         for (const WaterQualitySolverOptions &quality_options : quality_runs)
         {
-            compareBatchBranchWithIsolated(
+            compareMultiQualityWithIsolated(
                 context,
                 network,
-                *batch_hydraulic,
+                formula,
+                result,
                 quality_options,
-                std::string("formula-") + std::to_string(static_cast<int>(formula)) + "-quality-" + std::to_string(static_cast<int>(quality_options.analysis)));
+                std::string("formula-")
+                    + std::to_string(static_cast<int>(formula))
+                    + "-quality-"
+                    + std::to_string(static_cast<int>(quality_options.analysis)));
         }
     }
 }
 
-void testBatchOrderIndependence(TestContext &context)
+void testMultiQualityOrderIndependence(TestContext &context)
 {
-    const NetworkHydraulic network = batchFixtureNetwork();
+    const NetworkHydraulic network = multiQualityFixtureNetwork();
     const WaterQualitySolverOptions chemical = chemicalOptions();
     const WaterQualitySolverOptions water_age = waterAgeOptions();
     const WaterQualitySolverOptions trace = traceOptions(network.nodes_reservoirs.first().uuid);
-
-    const QList<HydraulicHeadlossFormula> forward_formulas = {
-        HydraulicHeadlossFormula::HazenWilliams,
-        HydraulicHeadlossFormula::DarcyWeisbach,
-        HydraulicHeadlossFormula::ChezyManning
-    };
-    const QList<HydraulicHeadlossFormula> reverse_formulas = {
-        HydraulicHeadlossFormula::ChezyManning,
-        HydraulicHeadlossFormula::DarcyWeisbach,
-        HydraulicHeadlossFormula::HazenWilliams
-    };
     const QList<WaterQualitySolverOptions> forward_quality = {chemical, water_age, trace};
     const QList<WaterQualitySolverOptions> reverse_quality = {trace, water_age, chemical};
+    const HydraulicHeadlossFormula formula = HydraulicHeadlossFormula::DarcyWeisbach;
 
-    const EpanetResultBatch forward = EpanetRunner().runBatch(batchRequest(network, forward_formulas, forward_quality));
-    const EpanetResultBatch reverse = EpanetRunner().runBatch(batchRequest(network, reverse_formulas, reverse_quality));
-    context.expect(forward.state == EpanetBatchRunState::Success, "forward-order batch must succeed");
-    context.expect(reverse.state == EpanetBatchRunState::Success, "reverse-order batch must succeed");
+    const EpanetResultRun forward = EpanetRunner().run(runRequest(network, formula, forward_quality));
+    const EpanetResultRun reverse = EpanetRunner().run(runRequest(network, formula, reverse_quality));
+    context.expect(forward.state == EpanetRunState::Success, "forward quality order must succeed");
+    context.expect(reverse.state == EpanetRunState::Success, "reverse quality order must succeed");
+    compareHydraulicTimelines(context, reverse.result_timeline, forward.result_timeline, "quality-order.hydraulic");
 
-    for (const HydraulicHeadlossFormula formula : forward_formulas)
+    for (const WaterQualitySolverOptions &quality_options : forward_quality)
     {
-        const EpanetBatchHydraulicResult *forward_hydraulic = findHydraulicResult(forward, formula);
-        const EpanetBatchHydraulicResult *reverse_hydraulic = findHydraulicResult(reverse, formula);
-        context.expect(forward_hydraulic != nullptr && reverse_hydraulic != nullptr, "both execution orders must contain every hydraulic branch");
-        if (forward_hydraulic == nullptr || reverse_hydraulic == nullptr)
-            continue;
-
-        const std::string prefix = std::string("order-formula-") + std::to_string(static_cast<int>(formula));
-        compareHydraulicTimelines(context, reverse_hydraulic->result_timeline, forward_hydraulic->result_timeline, prefix + ".hydraulic");
-        for (const WaterQualitySolverOptions &quality_options : forward_quality)
+        const EpanetQualityResult *forward_child = findQualityResult(forward, quality_options);
+        const EpanetQualityResult *reverse_child = findQualityResult(reverse, quality_options);
+        context.expect(forward_child != nullptr && reverse_child != nullptr, "both quality orders must contain every requested quality result");
+        if (forward_child != nullptr && reverse_child != nullptr)
         {
-            const EpanetBatchQualityResult *forward_child = findQualityResult(*forward_hydraulic, quality_options);
-            const EpanetBatchQualityResult *reverse_child = findQualityResult(*reverse_hydraulic, quality_options);
-            context.expect(forward_child != nullptr && reverse_child != nullptr, "both execution orders must contain every quality child");
-            if (forward_child != nullptr && reverse_child != nullptr)
-                compareQualityTimelines(context, reverse_child->result_timeline, forward_child->result_timeline, prefix + ".quality-" + std::to_string(static_cast<int>(quality_options.analysis)));
+            compareQualityTimelines(
+                context,
+                reverse_child->result_timeline,
+                forward_child->result_timeline,
+                std::string("quality-order-") + std::to_string(static_cast<int>(quality_options.analysis)));
         }
     }
 }
 
-void testBatchRepeatedSourceTrace(TestContext &context)
+void testMultiQualityRepeatedSourceTrace(TestContext &context)
 {
-    const NetworkHydraulic network = batchFixtureNetwork();
+    const NetworkHydraulic network = multiQualityFixtureNetwork();
     const WaterQualitySolverOptions trace_source = traceOptions(network.nodes_reservoirs.first().uuid);
     const WaterQualitySolverOptions trace_middle = traceOptions(network.nodes_junctions.first().uuid);
-    const QList<HydraulicHeadlossFormula> formulas = {HydraulicHeadlossFormula::DarcyWeisbach};
-    const QList<WaterQualitySolverOptions> quality_runs = {trace_source, trace_middle};
+    const HydraulicHeadlossFormula formula = HydraulicHeadlossFormula::DarcyWeisbach;
+    const EpanetResultRun result = EpanetRunner().run(runRequest(network, formula, {trace_source, trace_middle}));
 
-    const EpanetResultBatch batch = EpanetRunner().runBatch(batchRequest(network, formulas, quality_runs));
-    context.expect(batch.state == EpanetBatchRunState::Success, "repeated source-trace batch must succeed");
-    context.expectEqual(static_cast<std::int64_t>(batch.hydraulic_runs.size()), std::int64_t{1}, comparison("trace.hydraulic_runs.size"));
-    if (batch.hydraulic_runs.isEmpty())
-        return;
+    context.expect(result.state == EpanetRunState::Success, "repeated source-trace run must succeed");
+    context.expectEqual(
+        static_cast<std::int64_t>(result.quality_results.size()),
+        std::int64_t{2},
+        comparison("trace.quality_results.size"),
+        "both source-trace runs must be retained");
 
-    const EpanetBatchHydraulicResult &hydraulic = batch.hydraulic_runs.first();
-    context.expectEqual(static_cast<std::int64_t>(hydraulic.quality_results.size()), std::int64_t{2}, comparison("trace.quality_results.size"));
-    const EpanetBatchQualityResult *source_child = findQualityResult(hydraulic, trace_source);
-    const EpanetBatchQualityResult *middle_child = findQualityResult(hydraulic, trace_middle);
-    context.expect(source_child != nullptr, "first source-trace child must remain identifiable by trace node");
-    context.expect(middle_child != nullptr, "second source-trace child must remain identifiable by trace node");
+    const EpanetQualityResult *source_child = findQualityResult(result, trace_source);
+    const EpanetQualityResult *middle_child = findQualityResult(result, trace_middle);
+    context.expect(source_child != nullptr, "first source-trace result must remain identifiable by trace node");
+    context.expect(middle_child != nullptr, "second source-trace result must remain identifiable by trace node");
 
-    const EpanetResultRun isolated_source = isolatedRun(network, HydraulicHeadlossFormula::DarcyWeisbach, trace_source);
-    const EpanetResultRun isolated_middle = isolatedRun(network, HydraulicHeadlossFormula::DarcyWeisbach, trace_middle);
+    const EpanetResultRun isolated_source = isolatedRun(network, formula, trace_source);
+    const EpanetResultRun isolated_middle = isolatedRun(network, formula, trace_middle);
     if (source_child != nullptr)
         compareQualityTimelines(context, source_child->result_timeline, isolated_source.quality_result_timeline, "trace-source");
     if (middle_child != nullptr)
         compareQualityTimelines(context, middle_child->result_timeline, isolated_middle.quality_result_timeline, "trace-middle");
 }
 
-void testBatchQualityFailureIsolation(TestContext &context)
+void testMultiQualityFailureIsolation(TestContext &context)
 {
-    const NetworkHydraulic network = batchFixtureNetwork();
+    const NetworkHydraulic network = multiQualityFixtureNetwork();
     const WaterQualitySolverOptions water_age = waterAgeOptions();
     const WaterQualitySolverOptions invalid_trace = traceOptions(QUuid::createUuid());
     const WaterQualitySolverOptions chemical = chemicalOptions();
-    const QList<HydraulicHeadlossFormula> formulas = {HydraulicHeadlossFormula::HazenWilliams};
-    const QList<WaterQualitySolverOptions> quality_runs = {water_age, invalid_trace, chemical};
+    const HydraulicHeadlossFormula formula = HydraulicHeadlossFormula::HazenWilliams;
 
-    const EpanetResultBatch batch = EpanetRunner().runBatch(batchRequest(network, formulas, quality_runs));
-    context.expect(batch.state == EpanetBatchRunState::Error, "one failed quality child must make the aggregate batch erroneous");
-    context.expect(!batch.cancelled, "quality configuration failure must not cancel the batch");
-    context.expectEqual(static_cast<std::int64_t>(batch.hydraulic_runs.size()), std::int64_t{1}, comparison("quality-failure.hydraulic_runs.size"));
-    if (batch.hydraulic_runs.isEmpty())
-        return;
+    const EpanetResultRun result = EpanetRunner().run(runRequest(
+        network,
+        formula,
+        {water_age, invalid_trace, chemical}));
 
-    const EpanetBatchHydraulicResult &hydraulic = batch.hydraulic_runs.first();
-    context.expect(hydraulic.state == EpanetBatchRunState::Success, "quality-child failure must not downgrade completed hydraulics");
-    const EpanetBatchQualityResult *age_child = findQualityResult(hydraulic, water_age);
-    const EpanetBatchQualityResult *invalid_child = findQualityResult(hydraulic, invalid_trace);
-    const EpanetBatchQualityResult *chemical_child = findQualityResult(hydraulic, chemical);
-    context.expect(age_child != nullptr && age_child->state == EpanetBatchRunState::Success, "quality child before the failure must remain successful");
-    context.expect(invalid_child != nullptr && invalid_child->state == EpanetBatchRunState::Error, "invalid source trace must fail only its own child");
-    context.expect(chemical_child != nullptr && chemical_child->state == EpanetBatchRunState::Success, "quality child after the failure must still execute successfully");
+    context.expect(result.state == EpanetRunState::Error, "one failed quality run must make the aggregate run erroneous");
+    context.expect(!result.cancelled, "quality configuration failure must not cancel the run");
+    context.expect(result.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "quality failure must not downgrade completed hydraulics");
+
+    const EpanetQualityResult *age_child = findQualityResult(result, water_age);
+    const EpanetQualityResult *invalid_child = findQualityResult(result, invalid_trace);
+    const EpanetQualityResult *chemical_child = findQualityResult(result, chemical);
+    context.expect(age_child != nullptr && age_child->state == EpanetRunState::Success, "quality run before the failure must remain successful");
+    context.expect(invalid_child != nullptr && invalid_child->state == EpanetRunState::Error, "invalid source trace must fail only its own quality run");
+    context.expect(chemical_child != nullptr && chemical_child->state == EpanetRunState::Success, "quality run after the failure must still execute successfully");
 
     if (invalid_child != nullptr)
-        context.expect(!invalid_child->result_timeline.diagnostics.isEmpty(), "failed quality child must retain its diagnostics");
+        context.expect(!invalid_child->result_timeline.diagnostics.isEmpty(), "failed quality run must retain its diagnostics");
     if (chemical_child != nullptr)
     {
-        context.expect(chemical_child->result_timeline.diagnostics.isEmpty(), "later successful quality child must not inherit diagnostics from the failed child");
-        const EpanetResultRun isolated = isolatedRun(network, HydraulicHeadlossFormula::HazenWilliams, chemical);
-        compareQualityTimelines(context, chemical_child->result_timeline, isolated.quality_result_timeline, "quality-failure-later-child");
+        context.expect(chemical_child->result_timeline.diagnostics.isEmpty(), "later successful quality run must not inherit diagnostics from the failed run");
+        const EpanetResultRun isolated = isolatedRun(network, formula, chemical);
+        compareQualityTimelines(context, chemical_child->result_timeline, isolated.quality_result_timeline, "quality-failure-later-run");
     }
 }
 
-void testBatchHydraulicFailureIsolation(TestContext &context)
-{
-    const NetworkHydraulic network = batchFixtureNetwork();
-    const HydraulicHeadlossFormula invalid_formula = static_cast<HydraulicHeadlossFormula>(999);
-    const WaterQualitySolverOptions water_age = waterAgeOptions();
-    const QList<HydraulicHeadlossFormula> formulas = {
-        HydraulicHeadlossFormula::HazenWilliams,
-        invalid_formula,
-        HydraulicHeadlossFormula::DarcyWeisbach
-    };
-    const QList<WaterQualitySolverOptions> quality_runs = {water_age};
-
-    const EpanetResultBatch batch = EpanetRunner().runBatch(batchRequest(network, formulas, quality_runs));
-    context.expect(batch.state == EpanetBatchRunState::Error, "one failed hydraulic branch must make the aggregate batch erroneous");
-    context.expect(!batch.cancelled, "hydraulic configuration failure must not cancel the batch");
-    context.expectEqual(static_cast<std::int64_t>(batch.hydraulic_runs.size()), std::int64_t{3}, comparison("hydraulic-failure.hydraulic_runs.size"));
-    if (batch.hydraulic_runs.size() != 3)
-        return;
-
-    const EpanetBatchHydraulicResult &first = batch.hydraulic_runs.at(0);
-    const EpanetBatchHydraulicResult &failed = batch.hydraulic_runs.at(1);
-    const EpanetBatchHydraulicResult &later = batch.hydraulic_runs.at(2);
-    context.expect(first.state == EpanetBatchRunState::Success, "hydraulic branch before the failure must remain successful");
-    context.expect(failed.state == EpanetBatchRunState::Error, "unsupported headloss formula must fail only its own branch");
-    context.expect(!failed.result_timeline.diagnostics.isEmpty(), "failed hydraulic branch must retain its diagnostics");
-    context.expectEqual(static_cast<std::int64_t>(failed.quality_results.size()), std::int64_t{1}, comparison("hydraulic-failure.failed.quality_results.size"));
-    if (!failed.quality_results.isEmpty())
-        context.expect(failed.quality_results.first().state == EpanetBatchRunState::Skipped, "quality children of a failed hydraulic branch must be skipped");
-    context.expect(later.state == EpanetBatchRunState::Success, "hydraulic branch after the failure must still execute successfully");
-    context.expect(later.result_timeline.diagnostics.isEmpty(), "later successful hydraulic branch must not inherit diagnostics from the failed branch");
-
-    const EpanetResultRun isolated = isolatedRun(network, HydraulicHeadlossFormula::DarcyWeisbach, water_age);
-    compareHydraulicTimelines(context, later.result_timeline, isolated.result_timeline, "hydraulic-failure-later-branch");
-    if (!later.quality_results.isEmpty())
-        compareQualityTimelines(context, later.quality_results.first().result_timeline, isolated.quality_result_timeline, "hydraulic-failure-later-quality");
-}
-
-int countCancellationPolls(const EpanetBatchRequest &request)
+int countCancellationPolls(const EpanetRunRequest &request)
 {
     int poll_count = 0;
     const std::function<bool()> counter = [&poll_count]()
@@ -580,123 +520,74 @@ int countCancellationPolls(const EpanetBatchRequest &request)
         poll_count++;
         return false;
     };
-    EpanetRunner().runBatch(request, counter);
+    EpanetRunner().run(request, counter);
     return poll_count;
 }
 
-void testBatchCancellationBetweenHydraulicBranches(TestContext &context)
+void testMultiQualityCancellationBetweenRuns(TestContext &context)
 {
-    const NetworkHydraulic network = batchFixtureNetwork();
-    const EpanetBatchRequest one_branch = batchRequest(
-        network,
-        {HydraulicHeadlossFormula::HazenWilliams},
-        {});
-    const int completed_first_branch_poll_count = countCancellationPolls(one_branch);
-    context.expect(completed_first_branch_poll_count > 0, "poll-count fixture must observe cancellation checks");
-
-    const EpanetBatchRequest two_branches = batchRequest(
-        network,
-        {HydraulicHeadlossFormula::HazenWilliams, HydraulicHeadlossFormula::DarcyWeisbach},
-        {});
-    int poll_count = 0;
-    const std::function<bool()> cancel_after_first_branch = [&poll_count, completed_first_branch_poll_count]()
-    {
-        poll_count++;
-        return poll_count > completed_first_branch_poll_count;
-    };
-    const EpanetResultBatch batch = EpanetRunner().runBatch(two_branches, cancel_after_first_branch);
-
-    context.expect(batch.cancelled, "batch must report cancellation between hydraulic branches");
-    context.expect(batch.state == EpanetBatchRunState::Cancelled, "cancelled batch must expose Cancelled aggregate state");
-    context.expectEqual(static_cast<std::int64_t>(batch.hydraulic_runs.size()), std::int64_t{2}, comparison("cancel-hydraulic.hydraulic_runs.size"));
-    if (batch.hydraulic_runs.size() != 2)
-        return;
-
-    context.expect(batch.hydraulic_runs.at(0).state == EpanetBatchRunState::Success, "completed hydraulic branch must remain successful after later cancellation");
-    context.expect(batch.hydraulic_runs.at(0).result_timeline.validity == HydraulicSimulationResultValidity::Valid, "completed hydraulic results must remain valid after later cancellation");
-    context.expect(batch.hydraulic_runs.at(1).state == EpanetBatchRunState::Cancelled, "not-yet-started hydraulic branch must be marked cancelled");
-}
-
-void testBatchCancellationBetweenQualityRuns(TestContext &context)
-{
-    const NetworkHydraulic network = batchFixtureNetwork();
+    const NetworkHydraulic network = multiQualityFixtureNetwork();
     const WaterQualitySolverOptions water_age = waterAgeOptions();
     const WaterQualitySolverOptions chemical = chemicalOptions();
-    const EpanetBatchRequest one_quality = batchRequest(
-        network,
-        {HydraulicHeadlossFormula::HazenWilliams},
-        {water_age});
+    const HydraulicHeadlossFormula formula = HydraulicHeadlossFormula::HazenWilliams;
+    const EpanetRunRequest one_quality = runRequest(network, formula, {water_age});
     const int completed_first_quality_poll_count = countCancellationPolls(one_quality);
     context.expect(completed_first_quality_poll_count > 0, "quality poll-count fixture must observe cancellation checks");
 
-    const EpanetBatchRequest two_quality = batchRequest(
-        network,
-        {HydraulicHeadlossFormula::HazenWilliams},
-        {water_age, chemical});
+    const EpanetRunRequest two_quality = runRequest(network, formula, {water_age, chemical});
     int poll_count = 0;
     const std::function<bool()> cancel_after_first_quality = [&poll_count, completed_first_quality_poll_count]()
     {
         poll_count++;
         return poll_count > completed_first_quality_poll_count;
     };
-    const EpanetResultBatch batch = EpanetRunner().runBatch(two_quality, cancel_after_first_quality);
+    const EpanetResultRun result = EpanetRunner().run(two_quality, cancel_after_first_quality);
 
-    context.expect(batch.cancelled, "batch must report cancellation between quality children");
-    context.expect(batch.state == EpanetBatchRunState::Cancelled, "quality-child cancellation must expose Cancelled aggregate state");
-    context.expectEqual(static_cast<std::int64_t>(batch.hydraulic_runs.size()), std::int64_t{1}, comparison("cancel-quality.hydraulic_runs.size"));
-    if (batch.hydraulic_runs.isEmpty())
+    context.expect(result.cancelled, "run must report cancellation between quality runs");
+    context.expect(result.state == EpanetRunState::Cancelled, "cancelled run must expose Cancelled aggregate state");
+    context.expect(result.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "completed hydraulics must remain valid after quality-run cancellation");
+    context.expectEqual(
+        static_cast<std::int64_t>(result.quality_results.size()),
+        std::int64_t{2},
+        comparison("cancel-quality.quality_results.size"),
+        "cancelled run must preserve both requested quality result slots");
+    if (result.quality_results.size() != 2)
         return;
 
-    const EpanetBatchHydraulicResult &hydraulic = batch.hydraulic_runs.first();
-    context.expect(hydraulic.state == EpanetBatchRunState::Success, "completed hydraulics must remain successful after quality-child cancellation");
-    context.expectEqual(static_cast<std::int64_t>(hydraulic.quality_results.size()), std::int64_t{2}, comparison("cancel-quality.quality_results.size"));
-    if (hydraulic.quality_results.size() != 2)
-        return;
-
-    context.expect(hydraulic.quality_results.at(0).state == EpanetBatchRunState::Success, "completed quality child must remain successful after later cancellation");
-    context.expect(hydraulic.quality_results.at(0).result_timeline.validity == WaterQualitySimulationResultValidity::Valid, "completed quality results must remain valid after later cancellation");
-    context.expect(hydraulic.quality_results.at(1).state == EpanetBatchRunState::Cancelled, "not-yet-started quality child must be marked cancelled");
+    context.expect(result.quality_results.at(0).state == EpanetRunState::Success, "completed quality run must remain successful after later cancellation");
+    context.expect(result.quality_results.at(0).result_timeline.validity == WaterQualitySimulationResultValidity::Valid, "completed quality results must remain valid after later cancellation");
+    context.expect(result.quality_results.at(1).state == EpanetRunState::Cancelled, "not-yet-started quality run must be marked cancelled");
 }
 }
 
 namespace AowisEpanetTests
 {
-void registerBatchExecutionScenarios(ScenarioRegistry &registry)
+void registerMultiQualityExecutionScenarios(ScenarioRegistry &registry)
 {
     registry.add(ScenarioDefinition{
-        "conformance-batch-isolated-equivalence",
-        "Compares every reused-project hydraulic and quality batch branch with an independently constructed single-run reference.",
-        {"conformance", "hydraulic", "quality", "batch", "proof"},
-        &testBatchIsolatedEquivalence});
+        "conformance-multi-quality-isolated-equivalence",
+        "Compares each quality result from one hydraulic run with independently executed single-quality references across all supported headloss formulas.",
+        {"conformance", "hydraulic", "quality", "proof"},
+        &testMultiQualityIsolatedEquivalence});
     registry.add(ScenarioDefinition{
-        "conformance-batch-order-independence",
-        "Runs hydraulic formulas and quality analyses in forward and reverse order and verifies that reusable EPANET project state does not leak between runs.",
-        {"conformance", "hydraulic", "quality", "batch", "proof"},
-        &testBatchOrderIndependence});
+        "conformance-multi-quality-order-independence",
+        "Runs the same quality analyses in forward and reverse order and verifies that reusable quality state does not leak between runs.",
+        {"conformance", "hydraulic", "quality", "proof"},
+        &testMultiQualityOrderIndependence});
     registry.add(ScenarioDefinition{
-        "conformance-batch-repeated-source-trace",
-        "Checks multiple source-trace children with different trace nodes against isolated references.",
-        {"conformance", "quality", "batch"},
-        &testBatchRepeatedSourceTrace});
+        "conformance-multi-quality-repeated-source-trace",
+        "Checks multiple source-trace runs with different trace nodes against isolated references.",
+        {"conformance", "quality"},
+        &testMultiQualityRepeatedSourceTrace});
     registry.add(ScenarioDefinition{
-        "conformance-batch-quality-failure-isolation",
-        "Checks that a failed quality child retains diagnostics without poisoning later quality execution on the same hydraulic solution.",
-        {"conformance", "quality", "batch", "negative"},
-        &testBatchQualityFailureIsolation});
+        "conformance-multi-quality-failure-isolation",
+        "Checks that a failed quality run retains diagnostics without poisoning later quality execution on the same hydraulic solution.",
+        {"conformance", "quality", "negative"},
+        &testMultiQualityFailureIsolation});
     registry.add(ScenarioDefinition{
-        "conformance-batch-hydraulic-failure-isolation",
-        "Checks that one unsupported hydraulic branch is isolated and later valid branches still execute on the reusable project.",
-        {"conformance", "hydraulic", "quality", "batch", "negative"},
-        &testBatchHydraulicFailureIsolation});
-    registry.add(ScenarioDefinition{
-        "conformance-batch-cancellation-between-hydraulics",
-        "Checks cancellation between hydraulic branches while preserving already completed hydraulic results.",
-        {"conformance", "hydraulic", "batch"},
-        &testBatchCancellationBetweenHydraulicBranches});
-    registry.add(ScenarioDefinition{
-        "conformance-batch-cancellation-between-quality",
-        "Checks cancellation between quality children while preserving completed hydraulics and quality results.",
-        {"conformance", "hydraulic", "quality", "batch"},
-        &testBatchCancellationBetweenQualityRuns});
+        "conformance-multi-quality-cancellation-between-runs",
+        "Checks cancellation between quality runs while preserving completed hydraulics and already completed quality results.",
+        {"conformance", "hydraulic", "quality"},
+        &testMultiQualityCancellationBetweenRuns});
 }
 }

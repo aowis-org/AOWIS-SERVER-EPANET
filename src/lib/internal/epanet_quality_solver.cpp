@@ -153,6 +153,19 @@ HydraulicSimulationStatus EpanetQualitySolver::run(
             break;
         }
 
+        if (this->network.duration_s == 0)
+        {
+            long final_time_step_s = 0;
+            error = EN_nextQ(this->project.handle(), &final_time_step_s);
+            if (error != 0)
+            {
+                status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::RunQuality, HydraulicSimulationStatusOperation::StepQuality, QStringLiteral("EN_nextQ"), HydraulicSimulationStatusEntityType::QualitySolver, QString(), QStringLiteral("Failed to finalize steady-state EPANET water-quality analysis"));
+                if (!status.success)
+                    collectQualityFailure(timeline, status, first_failure, HydraulicSimulationDiagnosticSeverity::Fatal, current_time_s);
+            }
+            break;
+        }
+
         error = EN_stepQ(this->project.handle(), &time_left_s);
         if (error != 0)
         {

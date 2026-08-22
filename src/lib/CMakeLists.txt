@@ -6,7 +6,7 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/dummy/random_hydraulic_network_generator.cpp
     src/lib/utility/hydraulic_simulation_result_printer.cpp
     src/lib/utility/hydraulic_simulation_status_printer.cpp
-    src/lib/internal/epanet_batch_executor.cpp
+    src/lib/internal/epanet_multi_quality_run_executor.cpp
     src/lib/internal/epanet_diagnostic_helpers.cpp
     src/lib/internal/epanet_hydraulic_run_configurator.cpp
     src/lib/internal/epanet_hydraulic_solver.cpp
@@ -31,11 +31,10 @@ set(AOWIS_SERVER_EPANET_SOURCES
 set(AOWIS_SERVER_EPANET_PUBLIC_HEADERS
     include/aowis/epanet/epanet.h
     include/aowis/epanet/epanet_api.h
-    include/aowis/epanet/epanet_batch_request.h
     include/aowis/epanet/epanet_resolvers.h
-    include/aowis/epanet/epanet_result_batch.h
     include/aowis/epanet/epanet_result_inp.h
     include/aowis/epanet/epanet_result_run.h
+    include/aowis/epanet/epanet_run_request.h
     include/aowis/epanet/epanet_runner.h
     include/aowis/epanet/epanet_simulation_manager.h
     include/aowis/epanet/dummy/dummy_networks.h
@@ -46,7 +45,7 @@ set(AOWIS_SERVER_EPANET_PUBLIC_HEADERS
 )
 
 set(AOWIS_SERVER_EPANET_INTERNAL_HEADERS
-    src/lib/internal/epanet_batch_executor.h
+    src/lib/internal/epanet_multi_quality_run_executor.h
     src/lib/internal/epanet_diagnostic_helpers.h
     src/lib/internal/epanet_hydraulic_run_configurator.h
     src/lib/internal/epanet_hydraulic_solver.h

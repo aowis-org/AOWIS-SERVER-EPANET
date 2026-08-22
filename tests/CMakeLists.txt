@@ -5,7 +5,7 @@ set(AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS
     contract-reject-pump-power-rule
     contract-steady-state-pump-energy
     contract-quality-model-boundary
-    contract-batch-execution-envelope
+    contract-multi-quality-run-envelope
 )
 
 set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
@@ -160,14 +160,12 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-quality-stress-dual-source-reactions-hw
     conformance-quality-stress-grid-large-long-cm
     conformance-quality-stress-cancellation-positions
-    conformance-batch-sequential-basic
-    conformance-batch-isolated-equivalence
-    conformance-batch-order-independence
-    conformance-batch-repeated-source-trace
-    conformance-batch-quality-failure-isolation
-    conformance-batch-hydraulic-failure-isolation
-    conformance-batch-cancellation-between-hydraulics
-    conformance-batch-cancellation-between-quality
+    conformance-multi-quality-sequential-basic
+    conformance-multi-quality-isolated-equivalence
+    conformance-multi-quality-order-independence
+    conformance-multi-quality-repeated-source-trace
+    conformance-multi-quality-failure-isolation
+    conformance-multi-quality-cancellation-between-runs
     conformance-negative-duplicate-node-id
     conformance-negative-duplicate-link-id
     conformance-negative-duplicate-uuid
@@ -241,7 +239,7 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/negative_validation_scenarios.h
     conformance/deterministic_stress_scenarios.h
     conformance/deterministic_quality_stress_scenarios.h
-    conformance/batch_execution_scenarios.h
+    conformance/multi_quality_execution_scenarios.h
     test_net1_conformance.cpp
     test_result_contract.cpp
     test_hydraulic_behavior_conformance.cpp
@@ -254,7 +252,7 @@ add_executable(aowis-server-epanet-conformance-tests
     test_negative_validation_conformance.cpp
     test_deterministic_stress_conformance.cpp
     test_deterministic_quality_stress_conformance.cpp
-    test_batch_execution_conformance.cpp
+    test_multi_quality_execution_conformance.cpp
 )
 
 target_link_libraries(aowis-server-epanet-conformance-tests
@@ -282,7 +280,7 @@ endforeach()
 foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS)
     if(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-quality-model-boundary")
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;quality")
-    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-batch-execution-envelope")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-multi-quality-run-envelope")
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality")
     else()
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic")
@@ -296,7 +294,7 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONTRACT_
 endforeach()
 
 foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS)
-    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-batch-")
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-multi-quality-")
         set(AOWIS_SERVER_EPANET_TEST_LABELS "conformance;hydraulic;quality")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-quality-|^conformance-negative-invalid-quality-")
         set(AOWIS_SERVER_EPANET_TEST_LABELS "conformance;quality")
@@ -304,7 +302,7 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
         set(AOWIS_SERVER_EPANET_TEST_LABELS "conformance;hydraulic")
     endif()
 
-    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-negative-|^conformance-batch-.*failure-isolation$")
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-negative-|^conformance-multi-quality-failure-isolation$")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "negative")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-export-")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "export")
@@ -316,7 +314,7 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "coordinate")
     endif()
 
-    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-batch-(isolated-equivalence|order-independence)$")
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-multi-quality-(isolated-equivalence|order-independence)$")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "proof")
     endif()
 

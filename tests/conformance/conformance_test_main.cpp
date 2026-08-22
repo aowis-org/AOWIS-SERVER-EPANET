@@ -11,7 +11,7 @@
 #include "negative_validation_scenarios.h"
 #include "deterministic_stress_scenarios.h"
 #include "deterministic_quality_stress_scenarios.h"
-#include "batch_execution_scenarios.h"
+#include "multi_quality_execution_scenarios.h"
 
 #include <iostream>
 
@@ -30,6 +30,6 @@ int main(int argc, char *argv[])
     AowisEpanetTests::registerNegativeValidationScenarios(registry);
     AowisEpanetTests::registerDeterministicStressScenarios(registry);
     AowisEpanetTests::registerDeterministicQualityStressScenarios(registry);
-    AowisEpanetTests::registerBatchExecutionScenarios(registry);
+    AowisEpanetTests::registerMultiQualityExecutionScenarios(registry);
     return AowisEpanetTests::runTestProgram(argc, argv, registry, std::cout, std::cerr);
 }
