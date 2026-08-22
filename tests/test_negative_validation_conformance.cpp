@@ -127,6 +127,77 @@ void expectQualityRejected(
     context.expect(!quality_result.result_timeline.diagnostics.isEmpty(), "quality validation failure must be retained as a structured diagnostic");
 }
 
+void scenarioInvalidIdentifiers(TestContext &context)
+{
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.nodes_junctions.isEmpty(), "invalid-node-ID fixture requires a junction");
+        if (network.nodes_junctions.isEmpty())
+            return;
+        HydraulicNodeJunction &junction = network.nodes_junctions.first();
+        junction.id = QStringLiteral("N 3");
+        expectRejected(
+            context,
+            network,
+            HydraulicSimulationStatusEntityType::Junction,
+            junction.id,
+            junction.uuid,
+            QStringLiteral("Failed to add junction"),
+            HydraulicSimulationStatusStage::AddJunction);
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.links_pipes.isEmpty(), "invalid-link-ID fixture requires a pipe");
+        if (network.links_pipes.isEmpty())
+            return;
+        HydraulicLinkPipe &pipe = network.links_pipes.first();
+        pipe.id = QStringLiteral("L;2");
+        expectRejected(
+            context,
+            network,
+            HydraulicSimulationStatusEntityType::Pipe,
+            pipe.id,
+            pipe.uuid,
+            QStringLiteral("Failed to add pipe"),
+            HydraulicSimulationStatusStage::AddPipe);
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.patterns_time.isEmpty(), "invalid-pattern-ID fixture requires a time pattern");
+        if (network.patterns_time.isEmpty())
+            return;
+        HydraulicPatternTime &pattern = network.patterns_time.first();
+        pattern.id = QStringLiteral("P;2");
+        expectRejected(
+            context,
+            network,
+            HydraulicSimulationStatusEntityType::Pattern,
+            pattern.id,
+            pattern.uuid,
+            QStringLiteral("Failed to add time pattern"),
+            HydraulicSimulationStatusStage::AddPattern);
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
+        context.expect(!network.curves_pump_head.isEmpty(), "invalid-curve-ID fixture requires a pump curve");
+        if (network.curves_pump_head.isEmpty())
+            return;
+        HydraulicCurvePumpHead &curve = network.curves_pump_head.first();
+        curve.id = QStringLiteral("C;2");
+        expectRejected(
+            context,
+            network,
+            HydraulicSimulationStatusEntityType::Curve,
+            curve.id,
+            curve.uuid,
+            QStringLiteral("Failed to add pump head curve"),
+            HydraulicSimulationStatusStage::AddCurve);
+    }
+}
+
 void scenarioDuplicateNodeId(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
@@ -921,6 +992,11 @@ namespace AowisEpanetTests
 {
 void registerNegativeValidationScenarios(ScenarioRegistry &registry)
 {
+    registry.add(ScenarioDefinition{
+        "conformance-negative-invalid-identifiers",
+        "Rejects EPANET-invalid node, link, pattern, and curve identifiers with structured adapter diagnostics.",
+        {"conformance", "hydraulic", "negative", "upstream"},
+        &scenarioInvalidIdentifiers});
     registry.add(ScenarioDefinition{
         "conformance-negative-duplicate-node-id",
         "Reject duplicate EPANET node IDs before backend construction.",

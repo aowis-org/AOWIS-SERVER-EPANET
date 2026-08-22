@@ -143,7 +143,7 @@ Mismatch messages identify the scenario, timestep, entity type and stable ID, fi
 
 ## Upstream EPANET tests
 
-`tests/upstream_test_inventory.txt` records the disposition of every vendored upstream test. Adapter-relevant cases are represented by model-driven scenarios or native differential checks. Toolkit-only CRUD and binary-output operations remain classified as native-only.
+`tests/upstream_test_inventory.txt` records the disposition of every vendored upstream test. Every `wrapper-candidate` row names one or more registered AOWIS conformance scenarios as executable evidence; the inventory verifier fails if an evidence scenario is missing from the registered scenario manifest. Toolkit-only CRUD and binary-output operations remain classified as native-only.
 
 The original Boost suite can be exposed as an additional CTest entry:
 

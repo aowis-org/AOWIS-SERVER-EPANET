@@ -1,88 +1,88 @@
 # EPANET 2.3 upstream source-level test inventory.
-# Columns: source|test|kind|classification|coverage area|reason
+# Columns: source|test|kind|classification|coverage area|evidence scenario(s)|reason
 # Classifications: wrapper-candidate, native-only, not-applicable.
-external/epanet/tests/test_analysis.cpp|test_anlys_getoption|boost-case|wrapper-candidate|controls-options-operations|The hydraulic option values exercised by this upstream case map to typed AOWIS solver options.
-external/epanet/tests/test_analysis.cpp|test_anlys_gettimeparam|boost-case|wrapper-candidate|controls-options-operations|Duration, timesteps, event times, and period counts belong to the wrapper contract.
-external/epanet/tests/test_control.cpp|test_add_get_rule|boost-case|wrapper-candidate|controls-options-operations|Rule premises, THEN and ELSE actions, priority, and entity membership map to structured AOWIS rules.
-external/epanet/tests/test_curve.cpp|test_curve_comments|boost-case|wrapper-candidate|export-validation|Curve values and comments are relevant to Model-to-INP fidelity.
-external/epanet/tests/test_curve.cpp|test_curve_id_isvalid|boost-case|wrapper-candidate|export-validation|Invalid curve IDs must be rejected explicitly by the adapter.
-external/epanet/tests/test_demand.cpp|test_categories_save|boost-case|wrapper-candidate|export-validation|Demand category names and values are relevant to INP fidelity.
-external/epanet/tests/test_demand.cpp|test_categories_reopen|boost-case|wrapper-candidate|export-validation|Reopening exported demand categories verifies persisted wrapper input.
-external/epanet/tests/test_demand.cpp|test_adddemand|boost-case|wrapper-candidate|input-mapping|Multiple demand categories and pattern references are part of junction input mapping.
-external/epanet/tests/test_demand.cpp|test_cms_unit|boost-case|native-only|none|Changing a native project to arbitrary flow units is not exposed by the canonical-unit wrapper.
-external/epanet/tests/test_hydraulics.cpp|test_solveH|boost-case|wrapper-candidate|net1|The Net1 hydraulic solve is the primary native reference path.
-external/epanet/tests/test_hydraulics.cpp|test_hyd_step|boost-case|wrapper-candidate|net1|Hydraulic stepping supplies the native timeline compared with wrapper timesteps.
-external/epanet/tests/test_hydraulics.cpp|test_hydr_save|boost-case|native-only|none|Saving native hydraulic state and generating a report are Toolkit file APIs.
-external/epanet/tests/test_hydraulics.cpp|test_hydr_savefile|boost-case|native-only|none|The wrapper does not expose native hydraulic-state files.
-external/epanet/tests/test_hydraulics.cpp|test_hydr_usefile|boost-case|not-applicable|none|The high-level adapter does not accept native hydraulic-state files; quality analyses reuse hydraulics saved in the active EPANET project.
-external/epanet/tests/test_leakage.cpp|test_leakage_model|boost-case|wrapper-candidate|hydraulic-behavior|FAVAD parameters, pipe leakage, node leakage, and conservation map directly to AOWIS.
-external/epanet/tests/test_link.cpp|test_adddelete_link|boost-case|native-only|none|Mutable Toolkit link CRUD is not an EpanetRunner operation.
-external/epanet/tests/test_link.cpp|test_link_id_isvalid|boost-case|wrapper-candidate|export-validation|Invalid link IDs must be rejected by model-to-EPANET translation.
-external/epanet/tests/test_link.cpp|test_setlinktype|boost-case|wrapper-candidate|valve|The check-valve pipe path is covered by the pipe input-mapping scenarios and the PRV conversion/regulation path is covered by valve conformance.
-external/epanet/tests/test_link.cpp|test_link_setid_save|boost-case|native-only|none|Renaming a live Toolkit link is not exposed by EpanetRunner.
-external/epanet/tests/test_link.cpp|test_link_setid_reopen|boost-case|native-only|none|This verifies Toolkit rename persistence rather than wrapper translation.
-external/epanet/tests/test_link.cpp|test_link_comments|boost-case|wrapper-candidate|export-validation|Link comments are part of INP metadata fidelity.
-external/epanet/tests/test_net_builder.cpp|test_build_net1|boost-case|wrapper-candidate|net1|This is the canonical independently reconstructed Net1 scenario.
-external/epanet/tests/test_net_builder.cpp|test_open_net1|boost-case|wrapper-candidate|export-validation|Reopening the independently generated Net1 project is useful export-fidelity evidence.
-external/epanet/tests/test_net_builder.cpp|test_save_net2|boost-case|wrapper-candidate|input-mapping|The small node, tank, pipe, pump, and curve network is useful for input and result mapping.
-external/epanet/tests/test_net_builder.cpp|test_reopen_net2|boost-case|wrapper-candidate|export-validation|Reopening the generated small network verifies INP persistence and hydraulic equivalence.
-external/epanet/tests/test_node.cpp|test_adddelete_node|boost-case|native-only|none|Mutable Toolkit node CRUD is not an EpanetRunner operation.
-external/epanet/tests/test_node.cpp|test_node_validate_id|boost-case|wrapper-candidate|export-validation|Invalid node IDs must produce an explicit adapter diagnostic.
-external/epanet/tests/test_node.cpp|test_junc_props|boost-case|wrapper-candidate|input-mapping|Junction elevation, demand, pattern, emitter, and initial quality inputs map to AOWIS, and typed quality results are executed on the separate quality timeline.
-external/epanet/tests/test_node.cpp|test_tank_props|boost-case|wrapper-candidate|input-mapping|Tank elevation, levels, diameter, and volume map to AOWIS tank inputs.
-external/epanet/tests/test_node.cpp|test_junc_props|boost-case|wrapper-candidate|net1|The after-step demand, head, and pressure values are Net1 hydraulic upstream reference results. Quality is excluded.
-external/epanet/tests/test_node.cpp|test_tank_props|boost-case|wrapper-candidate|net1|The after-step tank demand, head, and pressure values are Net1 hydraulic upstream reference results. Quality is excluded.
-external/epanet/tests/test_node.cpp|test_setid_save|boost-case|native-only|none|Renaming a live Toolkit node is not exposed by EpanetRunner.
-external/epanet/tests/test_node.cpp|test_setid_reopen|boost-case|native-only|none|This verifies Toolkit rename persistence rather than wrapper translation.
-external/epanet/tests/test_node.cpp|test_node_comments|boost-case|wrapper-candidate|export-validation|Node comments and tags are wrapper export metadata.
-external/epanet/tests/test_node.cpp|test_replace_comment|boost-case|native-only|none|Replacing metadata on an already-open native project is Toolkit CRUD rather than wrapper behavior.
-external/epanet/tests/test_node.cpp|test_save_comment|boost-case|wrapper-candidate|export-validation|Saving AOWIS node comments and tags is relevant to INP fidelity.
-external/epanet/tests/test_node.cpp|test_reopen_comment|boost-case|wrapper-candidate|export-validation|Reopening exported comments and tags verifies persisted metadata.
-external/epanet/tests/test_overflow.cpp|test_tank_overflow|boost-case|wrapper-candidate|hydraulic-behavior|Tank overflow, spillage, level, and inlet-flow conservation map directly to AOWIS.
-external/epanet/tests/test_pattern.cpp|test_set_get_default_pattern|boost-case|wrapper-candidate|hydraulic-behavior|The AOWIS hydraulic options expose a default demand-pattern reference.
-external/epanet/tests/test_pattern.cpp|test_add_delete|boost-case|native-only|none|Deleting patterns from an open Toolkit project is not a wrapper operation.
-external/epanet/tests/test_pattern.cpp|test_add_set|boost-case|wrapper-candidate|hydraulic-behavior|Pattern values and pattern or curve assignment can be represented by an AOWIS fixture.
-external/epanet/tests/test_pattern.cpp|test_pattern_comments|boost-case|wrapper-candidate|export-validation|Pattern comments are wrapper export metadata.
-external/epanet/tests/test_pattern.cpp|test_pat_id_isvalid|boost-case|wrapper-candidate|export-validation|Invalid pattern IDs must produce explicit adapter diagnostics.
-external/epanet/tests/test_pda.cpp|test_pda_model|boost-case|wrapper-candidate|hydraulic-behavior|DDA and PDA behavior, deficits, deficient nodes, and demand reduction map directly to AOWIS.
-external/epanet/tests/test_project.cpp|test_create_delete|boost-case|native-only|none|Native project-handle lifecycle is internal to the adapter.
-external/epanet/tests/test_project.cpp|test_open_close|boost-case|native-only|none|Opening and closing arbitrary INP files is not the model-driven runner contract.
-external/epanet/tests/test_project.cpp|test_init_close|boost-case|native-only|none|Direct native project initialization is adapter implementation detail.
-external/epanet/tests/test_project.cpp|test_save|boost-case|native-only|none|Generic Toolkit save-file behavior is covered upstream and is not itself wrapper conformance.
-external/epanet/tests/test_project.cpp|test_reopen|boost-case|native-only|none|Generic Toolkit reopen behavior is covered upstream and is not itself wrapper conformance.
-external/epanet/tests/test_project.cpp|test_run|boost-case|native-only|none|EN_runproject is a convenience Toolkit API not used by EpanetRunner.
-external/epanet/tests/test_project.cpp|test_title|boost-case|wrapper-candidate|export-validation|Three project title lines are part of INP fidelity.
-external/epanet/tests/test_project.cpp|test_getcount|boost-case|wrapper-candidate|net1|Native entity counts verify complete entity-set alignment for Net1.
-external/epanet/tests/test_project.cpp|test_setdemandpattern|boost-case|wrapper-candidate|hydraulic-behavior|Demand-to-pattern assignments are typed AOWIS inputs.
-external/epanet/tests/test_project.cpp|test_addpattern|boost-case|native-only|none|Adding a pattern to an open Toolkit project is CRUD rather than model-driven translation.
-external/epanet/tests/test_project.cpp|test_add_control|boost-case|wrapper-candidate|hydraulic-behavior|Level controls and their hydraulic effect map directly to AOWIS simple controls.
-external/epanet/tests/test_quality.cpp|test_solveQ|boost-case|wrapper-candidate|quality-execution|AOWIS executes the equivalent saved-hydraulics quality analysis through the explicit Toolkit lifecycle and native differential scenarios.
-external/epanet/tests/test_quality.cpp|test_qual_step|boost-case|wrapper-candidate|quality-execution|The adapter mirrors EN_stepQ semantics and returns every configured quality timestep in a separate timeline.
-external/epanet/tests/test_quality.cpp|test_progressive_step|boost-case|native-only|none|Progressive interleaved hydraulic and quality stepping is not the high-level runner lifecycle, AOWIS completes and saves hydraulics before quality execution.
-external/epanet/tests/test_report.cpp|test_rprt_anlysstats|boost-case|wrapper-candidate|controls-options-operations|Hydraulic iterations and error statistics map to hydraulic results, quality mass balance is returned on the separate quality timeline.
-external/epanet/tests/test_units.cpp|test_pressure_units|boost-case|native-only|none|Changing native pressure display units is not exposed by the canonical metric AOWIS wrapper.
-external/epanet/tests/test_units.cpp|test_pda_unit_change|boost-case|native-only|none|Changing native project units and converting existing PDA pressure limits is not an AOWIS wrapper operation.
-external/epanet/tests/test_units.cpp|test_rule_unit_change|boost-case|native-only|none|Changing native project units and rewriting existing rule/control quantities is not exposed by the canonical metric wrapper.
-external/epanet/tests/test_units.cpp|test_decoupled_pressure_units|boost-case|native-only|none|Selecting native pressure units independently from flow units is not exposed by the canonical metric wrapper.
-external/epanet/tests/test_valve.cpp|test_PCV_valve|boost-case|wrapper-candidate|valve|The upstream PCV characteristic curve, 35-percent setting, minor loss, status, returned setting, and upstream reference head-loss result are native-compared.
-external/epanet/tests/outfile/test_output.cpp|OpenCloseTest|boost-case|native-only|none|The binary Output API handle lifecycle is outside the high-level wrapper contract.
-external/epanet/tests/outfile/test_output.cpp|test_getNetSize|boost-case|native-only|none|Binary Output API access is tested upstream and is not used by EpanetRunner.
-external/epanet/tests/outfile/test_output.cpp|test_getUnits|boost-case|not-applicable|none|The binary Output API is not part of the EpanetRunner contract; water-quality units are represented by typed AOWIS result fields.
-external/epanet/tests/outfile/test_output.cpp|test_getElementName|boost-case|native-only|none|Binary Output API element lookup is outside the high-level wrapper contract.
-external/epanet/tests/outfile/test_output.cpp|test_getNodeAttribute|boost-case|not-applicable|none|The binary Output API is not part of the EpanetRunner contract; water-quality node results are returned through the adapter timeline.
-external/epanet/tests/outfile/test_output.cpp|test_getLinkAttribute|boost-case|native-only|none|Binary Output API bulk link access is outside the high-level wrapper contract.
-external/epanet/tests/outfile/test_output.cpp|test_getNodeResult|boost-case|native-only|none|Binary Output API result records are outside the high-level wrapper contract.
-external/epanet/tests/outfile/test_output.cpp|test_getLinkResult|boost-case|native-only|none|Binary Output API result records are outside the high-level wrapper contract.
-external/epanet/tests/outfile/test_output.cpp|test_getNodeSeries|boost-case|native-only|none|Binary Output API series access is outside the high-level wrapper contract.
-external/epanet/tests/outfile/test_output.cpp|test_getLinkSeries|boost-case|native-only|none|Binary Output API series access is outside the high-level wrapper contract.
-external/epanet/tests/outfile/test_output.cpp|test_getNetReacts|boost-case|not-applicable|none|This case reads reaction totals through the binary Output API, which is not part of the EpanetRunner contract.
-external/epanet/tests/outfile/test_output.cpp|test_getEnergyUsage|boost-case|native-only|none|The binary Output API is out of scope although its upstream reference energy values can inform pump scenarios.
-external/epanet/tests/util/test_cstrhelper.cpp|test_duplicate|boost-case|native-only|none|EPANET internal C-string allocation is unrelated to wrapper conformance.
-external/epanet/tests/util/test_cstrhelper.cpp|test_isvalid|boost-case|native-only|none|EPANET internal string validation remains upstream-only while wrapper ID failures get separate scenarios.
-external/epanet/tests/util/test_errormanager.cpp|test_create_destroy|boost-case|native-only|none|EPANET internal error-manager lifecycle is unrelated to wrapper conformance.
-external/epanet/tests/util/test_errormanager.cpp|test_set_clear|boost-case|native-only|none|EPANET internal error-manager state is unrelated to wrapper conformance.
-external/epanet/tests/util/test_errormanager.cpp|test_set_check|boost-case|native-only|none|EPANET internal error-manager state is unrelated to wrapper conformance.
-external/epanet/tests/util/test_filemanager.cpp|test_create_destroy|boost-case|native-only|none|EPANET internal file-manager lifecycle is unrelated to wrapper conformance.
-external/epanet/tests/util/test_filemanager.cpp|test_open_close|boost-case|native-only|none|EPANET internal file-manager operations are unrelated to wrapper conformance.
-external/epanet/tests/util/test_filemanager.cpp|test_temp_file|boost-case|native-only|none|EPANET internal temporary-file handling is unrelated to wrapper conformance.
-external/epanet/tests/test_reent.cpp|standalone_reentrancy|standalone|wrapper-candidate|export-validation|Concurrent independent native runs should be mirrored by concurrent EpanetRunner scenarios.
+external/epanet/tests/test_analysis.cpp|test_anlys_getoption|boost-case|wrapper-candidate|controls-options-operations|conformance-options-hydraulic-maximum-trials,conformance-options-hydraulic-accuracy,conformance-options-hydraulic-demand-multiplier|The hydraulic option values exercised by this upstream case map to typed AOWIS solver options.
+external/epanet/tests/test_analysis.cpp|test_anlys_gettimeparam|boost-case|wrapper-candidate|controls-options-operations|conformance-options-time-duration,conformance-options-time-hydraulic-step,conformance-options-time-quality-step,conformance-controls-next-hydraulic-event|Duration, timesteps, event times, and period counts belong to the wrapper contract.
+external/epanet/tests/test_control.cpp|test_add_get_rule|boost-case|wrapper-candidate|controls-options-operations|conformance-controls-rule-structured-serialization|Rule premises, THEN and ELSE actions, priority, and entity membership map to structured AOWIS rules.
+external/epanet/tests/test_curve.cpp|test_curve_comments|boost-case|wrapper-candidate|export-validation|conformance-export-patterns-curves|Curve values and comments are relevant to Model-to-INP fidelity.
+external/epanet/tests/test_curve.cpp|test_curve_id_isvalid|boost-case|wrapper-candidate|validation|conformance-negative-invalid-identifiers|Invalid curve IDs must be rejected explicitly by the adapter.
+external/epanet/tests/test_demand.cpp|test_categories_save|boost-case|wrapper-candidate|export-validation|conformance-upstream-demand-categories,conformance-export-native-reopen|Demand category names and values are relevant to INP fidelity.
+external/epanet/tests/test_demand.cpp|test_categories_reopen|boost-case|wrapper-candidate|export-validation|conformance-upstream-demand-categories,conformance-export-native-reopen|Reopening exported demand categories verifies persisted wrapper input.
+external/epanet/tests/test_demand.cpp|test_adddemand|boost-case|wrapper-candidate|input-mapping|conformance-upstream-demand-categories|Multiple demand categories and pattern references are part of junction input mapping.
+external/epanet/tests/test_demand.cpp|test_cms_unit|boost-case|native-only|none|none|Changing a native project to arbitrary flow units is not exposed by the canonical-unit wrapper.
+external/epanet/tests/test_hydraulics.cpp|test_solveH|boost-case|wrapper-candidate|net1|conformance-net1|The Net1 hydraulic solve is the primary native reference path.
+external/epanet/tests/test_hydraulics.cpp|test_hyd_step|boost-case|wrapper-candidate|net1|conformance-upstream-hydraulic-stepping|Hydraulic stepping supplies the native timeline compared with wrapper timesteps.
+external/epanet/tests/test_hydraulics.cpp|test_hydr_save|boost-case|native-only|none|none|Saving native hydraulic state and generating a report are Toolkit file APIs.
+external/epanet/tests/test_hydraulics.cpp|test_hydr_savefile|boost-case|native-only|none|none|The wrapper does not expose native hydraulic-state files.
+external/epanet/tests/test_hydraulics.cpp|test_hydr_usefile|boost-case|not-applicable|none|none|The high-level adapter does not accept native hydraulic-state files; quality analyses reuse hydraulics saved in the active EPANET project.
+external/epanet/tests/test_leakage.cpp|test_leakage_model|boost-case|wrapper-candidate|hydraulic-behavior|conformance-upstream-leakage|FAVAD parameters, pipe leakage, node leakage, and conservation map directly to AOWIS.
+external/epanet/tests/test_link.cpp|test_adddelete_link|boost-case|native-only|none|none|Mutable Toolkit link CRUD is not an EpanetRunner operation.
+external/epanet/tests/test_link.cpp|test_link_id_isvalid|boost-case|wrapper-candidate|validation|conformance-negative-invalid-identifiers|Invalid link IDs must be rejected by model-to-EPANET translation.
+external/epanet/tests/test_link.cpp|test_setlinktype|boost-case|wrapper-candidate|valve|conformance-upstream-pipe-inputs,conformance-upstream-pcv|The check-valve pipe path is covered by the pipe input-mapping scenarios and the PRV conversion/regulation path is covered by valve conformance.
+external/epanet/tests/test_link.cpp|test_link_setid_save|boost-case|native-only|none|none|Renaming a live Toolkit link is not exposed by EpanetRunner.
+external/epanet/tests/test_link.cpp|test_link_setid_reopen|boost-case|native-only|none|none|This verifies Toolkit rename persistence rather than wrapper translation.
+external/epanet/tests/test_link.cpp|test_link_comments|boost-case|wrapper-candidate|export-validation|conformance-export-titles-comments-tags|Link comments are part of INP metadata fidelity.
+external/epanet/tests/test_net_builder.cpp|test_build_net1|boost-case|wrapper-candidate|net1|conformance-net1|This is the canonical independently reconstructed Net1 scenario.
+external/epanet/tests/test_net_builder.cpp|test_open_net1|boost-case|wrapper-candidate|export-validation|conformance-export-native-reopen|Reopening the independently generated Net1 project is useful export-fidelity evidence.
+external/epanet/tests/test_net_builder.cpp|test_save_net2|boost-case|wrapper-candidate|input-mapping|conformance-upstream-junction-reservoir-inputs,conformance-upstream-tank-uniform-area,conformance-upstream-pipe-inputs,conformance-upstream-pump-three-point|The small node, tank, pipe, pump, and curve network is useful for input and result mapping.
+external/epanet/tests/test_net_builder.cpp|test_reopen_net2|boost-case|wrapper-candidate|export-validation|conformance-export-native-reopen|Reopening the generated small network verifies INP persistence and hydraulic equivalence.
+external/epanet/tests/test_node.cpp|test_adddelete_node|boost-case|native-only|none|none|Mutable Toolkit node CRUD is not an EpanetRunner operation.
+external/epanet/tests/test_node.cpp|test_node_validate_id|boost-case|wrapper-candidate|validation|conformance-negative-invalid-identifiers|Invalid node IDs must produce an explicit adapter diagnostic.
+external/epanet/tests/test_node.cpp|test_junc_props|boost-case|wrapper-candidate|input-mapping|conformance-upstream-junction-reservoir-inputs|Junction elevation, demand, pattern, emitter, and initial quality inputs map to AOWIS, and typed quality results are executed on the separate quality timeline.
+external/epanet/tests/test_node.cpp|test_tank_props|boost-case|wrapper-candidate|input-mapping|conformance-upstream-tank-uniform-area|Tank elevation, levels, diameter, and volume map to AOWIS tank inputs.
+external/epanet/tests/test_node.cpp|test_junc_props|boost-case|wrapper-candidate|net1|conformance-net1|The after-step demand, head, and pressure values are Net1 hydraulic upstream reference results. Quality is excluded.
+external/epanet/tests/test_node.cpp|test_tank_props|boost-case|wrapper-candidate|net1|conformance-net1|The after-step tank demand, head, and pressure values are Net1 hydraulic upstream reference results. Quality is excluded.
+external/epanet/tests/test_node.cpp|test_setid_save|boost-case|native-only|none|none|Renaming a live Toolkit node is not exposed by EpanetRunner.
+external/epanet/tests/test_node.cpp|test_setid_reopen|boost-case|native-only|none|none|This verifies Toolkit rename persistence rather than wrapper translation.
+external/epanet/tests/test_node.cpp|test_node_comments|boost-case|wrapper-candidate|export-validation|conformance-export-titles-comments-tags|Node comments and tags are wrapper export metadata.
+external/epanet/tests/test_node.cpp|test_replace_comment|boost-case|native-only|none|none|Replacing metadata on an already-open native project is Toolkit CRUD rather than wrapper behavior.
+external/epanet/tests/test_node.cpp|test_save_comment|boost-case|wrapper-candidate|export-validation|conformance-export-titles-comments-tags|Saving AOWIS node comments and tags is relevant to INP fidelity.
+external/epanet/tests/test_node.cpp|test_reopen_comment|boost-case|wrapper-candidate|export-validation|conformance-export-titles-comments-tags|Reopening exported comments and tags verifies persisted metadata.
+external/epanet/tests/test_overflow.cpp|test_tank_overflow|boost-case|wrapper-candidate|hydraulic-behavior|conformance-upstream-tank-overflow|Tank overflow, spillage, level, and inlet-flow conservation map directly to AOWIS.
+external/epanet/tests/test_pattern.cpp|test_set_get_default_pattern|boost-case|wrapper-candidate|hydraulic-behavior|conformance-options-hydraulic-default-demand-pattern|The AOWIS hydraulic options expose a default demand-pattern reference.
+external/epanet/tests/test_pattern.cpp|test_add_delete|boost-case|native-only|none|none|Deleting patterns from an open Toolkit project is not a wrapper operation.
+external/epanet/tests/test_pattern.cpp|test_add_set|boost-case|wrapper-candidate|hydraulic-behavior|conformance-upstream-demand-pattern|Pattern values and pattern or curve assignment can be represented by an AOWIS fixture.
+external/epanet/tests/test_pattern.cpp|test_pattern_comments|boost-case|wrapper-candidate|export-validation|conformance-export-patterns-curves|Pattern comments are wrapper export metadata.
+external/epanet/tests/test_pattern.cpp|test_pat_id_isvalid|boost-case|wrapper-candidate|validation|conformance-negative-invalid-identifiers|Invalid pattern IDs must produce explicit adapter diagnostics.
+external/epanet/tests/test_pda.cpp|test_pda_model|boost-case|wrapper-candidate|hydraulic-behavior|conformance-upstream-dda-pda|DDA and PDA behavior, deficits, deficient nodes, and demand reduction map directly to AOWIS.
+external/epanet/tests/test_project.cpp|test_create_delete|boost-case|native-only|none|none|Native project-handle lifecycle is internal to the adapter.
+external/epanet/tests/test_project.cpp|test_open_close|boost-case|native-only|none|none|Opening and closing arbitrary INP files is not the model-driven runner contract.
+external/epanet/tests/test_project.cpp|test_init_close|boost-case|native-only|none|none|Direct native project initialization is adapter implementation detail.
+external/epanet/tests/test_project.cpp|test_save|boost-case|native-only|none|none|Generic Toolkit save-file behavior is covered upstream and is not itself wrapper conformance.
+external/epanet/tests/test_project.cpp|test_reopen|boost-case|native-only|none|none|Generic Toolkit reopen behavior is covered upstream and is not itself wrapper conformance.
+external/epanet/tests/test_project.cpp|test_run|boost-case|native-only|none|none|EN_runproject is a convenience Toolkit API not used by EpanetRunner.
+external/epanet/tests/test_project.cpp|test_title|boost-case|wrapper-candidate|export-validation|conformance-export-titles-comments-tags|Three project title lines are part of INP fidelity.
+external/epanet/tests/test_project.cpp|test_getcount|boost-case|wrapper-candidate|net1|conformance-net1|Native entity counts verify complete entity-set alignment for Net1.
+external/epanet/tests/test_project.cpp|test_setdemandpattern|boost-case|wrapper-candidate|hydraulic-behavior|conformance-upstream-demand-pattern|Demand-to-pattern assignments are typed AOWIS inputs.
+external/epanet/tests/test_project.cpp|test_addpattern|boost-case|native-only|none|none|Adding a pattern to an open Toolkit project is CRUD rather than model-driven translation.
+external/epanet/tests/test_project.cpp|test_add_control|boost-case|wrapper-candidate|hydraulic-behavior|conformance-upstream-simple-control|Level controls and their hydraulic effect map directly to AOWIS simple controls.
+external/epanet/tests/test_quality.cpp|test_solveQ|boost-case|wrapper-candidate|quality-execution|conformance-quality-execution-chemical|AOWIS executes the equivalent saved-hydraulics quality analysis through the explicit Toolkit lifecycle and native differential scenarios.
+external/epanet/tests/test_quality.cpp|test_qual_step|boost-case|wrapper-candidate|quality-execution|conformance-quality-execution-independent-timeline|The adapter mirrors EN_stepQ semantics and returns every configured quality timestep in a separate timeline.
+external/epanet/tests/test_quality.cpp|test_progressive_step|boost-case|native-only|none|none|Progressive interleaved hydraulic and quality stepping is not the high-level runner lifecycle, AOWIS completes and saves hydraulics before quality execution.
+external/epanet/tests/test_report.cpp|test_rprt_anlysstats|boost-case|wrapper-candidate|controls-options-operations|conformance-operational-statistics|Hydraulic iterations and error statistics map to hydraulic results, quality mass balance is returned on the separate quality timeline.
+external/epanet/tests/test_units.cpp|test_pressure_units|boost-case|native-only|none|none|Changing native pressure display units is not exposed by the canonical metric AOWIS wrapper.
+external/epanet/tests/test_units.cpp|test_pda_unit_change|boost-case|native-only|none|none|Changing native project units and converting existing PDA pressure limits is not an AOWIS wrapper operation.
+external/epanet/tests/test_units.cpp|test_rule_unit_change|boost-case|native-only|none|none|Changing native project units and rewriting existing rule/control quantities is not exposed by the canonical metric wrapper.
+external/epanet/tests/test_units.cpp|test_decoupled_pressure_units|boost-case|native-only|none|none|Selecting native pressure units independently from flow units is not exposed by the canonical metric wrapper.
+external/epanet/tests/test_valve.cpp|test_PCV_valve|boost-case|wrapper-candidate|valve|conformance-upstream-pcv|The upstream PCV characteristic curve, 35-percent setting, minor loss, status, returned setting, and upstream reference head-loss result are native-compared.
+external/epanet/tests/outfile/test_output.cpp|OpenCloseTest|boost-case|native-only|none|none|The binary Output API handle lifecycle is outside the high-level wrapper contract.
+external/epanet/tests/outfile/test_output.cpp|test_getNetSize|boost-case|native-only|none|none|Binary Output API access is tested upstream and is not used by EpanetRunner.
+external/epanet/tests/outfile/test_output.cpp|test_getUnits|boost-case|not-applicable|none|none|The binary Output API is not part of the EpanetRunner contract; water-quality units are represented by typed AOWIS result fields.
+external/epanet/tests/outfile/test_output.cpp|test_getElementName|boost-case|native-only|none|none|Binary Output API element lookup is outside the high-level wrapper contract.
+external/epanet/tests/outfile/test_output.cpp|test_getNodeAttribute|boost-case|not-applicable|none|none|The binary Output API is not part of the EpanetRunner contract; water-quality node results are returned through the adapter timeline.
+external/epanet/tests/outfile/test_output.cpp|test_getLinkAttribute|boost-case|native-only|none|none|Binary Output API bulk link access is outside the high-level wrapper contract.
+external/epanet/tests/outfile/test_output.cpp|test_getNodeResult|boost-case|native-only|none|none|Binary Output API result records are outside the high-level wrapper contract.
+external/epanet/tests/outfile/test_output.cpp|test_getLinkResult|boost-case|native-only|none|none|Binary Output API result records are outside the high-level wrapper contract.
+external/epanet/tests/outfile/test_output.cpp|test_getNodeSeries|boost-case|native-only|none|none|Binary Output API series access is outside the high-level wrapper contract.
+external/epanet/tests/outfile/test_output.cpp|test_getLinkSeries|boost-case|native-only|none|none|Binary Output API series access is outside the high-level wrapper contract.
+external/epanet/tests/outfile/test_output.cpp|test_getNetReacts|boost-case|not-applicable|none|none|This case reads reaction totals through the binary Output API, which is not part of the EpanetRunner contract.
+external/epanet/tests/outfile/test_output.cpp|test_getEnergyUsage|boost-case|native-only|none|none|The binary Output API is out of scope although its upstream reference energy values can inform pump scenarios.
+external/epanet/tests/util/test_cstrhelper.cpp|test_duplicate|boost-case|native-only|none|none|EPANET internal C-string allocation is unrelated to wrapper conformance.
+external/epanet/tests/util/test_cstrhelper.cpp|test_isvalid|boost-case|native-only|none|none|EPANET internal string validation remains upstream-only while wrapper ID failures get separate scenarios.
+external/epanet/tests/util/test_errormanager.cpp|test_create_destroy|boost-case|native-only|none|none|EPANET internal error-manager lifecycle is unrelated to wrapper conformance.
+external/epanet/tests/util/test_errormanager.cpp|test_set_clear|boost-case|native-only|none|none|EPANET internal error-manager state is unrelated to wrapper conformance.
+external/epanet/tests/util/test_errormanager.cpp|test_set_check|boost-case|native-only|none|none|EPANET internal error-manager state is unrelated to wrapper conformance.
+external/epanet/tests/util/test_filemanager.cpp|test_create_destroy|boost-case|native-only|none|none|EPANET internal file-manager lifecycle is unrelated to wrapper conformance.
+external/epanet/tests/util/test_filemanager.cpp|test_open_close|boost-case|native-only|none|none|EPANET internal file-manager operations are unrelated to wrapper conformance.
+external/epanet/tests/util/test_filemanager.cpp|test_temp_file|boost-case|native-only|none|none|EPANET internal temporary-file handling is unrelated to wrapper conformance.
+external/epanet/tests/test_reent.cpp|standalone_reentrancy|standalone|wrapper-candidate|reentrancy|conformance-reentrancy-independent-runners|Concurrent independent native runs should be mirrored by concurrent EpanetRunner scenarios.

@@ -68,7 +68,7 @@ ctest --test-dir build-linux-tests -L upstream --output-on-failure
 ctest --test-dir build-linux-tests -L proof --output-on-failure
 ```
 
-`conformance` contains native-backed hydraulic and water-quality scenarios. `contract` contains public wrapper contract and regression scenarios. `hydraulic` and `quality` select their respective solver domains. `negative` covers invalid-input and reference hardening. `export` covers INP fidelity. `stress` covers deterministic generated-network differentials. `proof` contains scenario-manifest, upstream-inventory, and field-audit checks. `upstream` always contains the source inventory and can also include the original upstream Boost suite when enabled.
+`conformance` contains native-backed hydraulic and water-quality scenarios. `contract` contains public wrapper contract and regression scenarios. `hydraulic` and `quality` select their respective solver domains. `negative` covers invalid-input and reference hardening. `export` covers INP fidelity. `stress` covers deterministic generated-network differentials. `proof` contains the scenario-manifest, upstream-inventory, field-audit, multi-quality isolation/order checks, and independent-run reentrancy proof. `upstream` always contains the source inventory and can also include the original upstream Boost suite when enabled.
 
 ### Optional original upstream Boost suite
 
@@ -209,13 +209,15 @@ Each case uses a fixed seed, two alternating junction-demand patterns, a six-hou
 | `aowis-server-epanet-conformance-upstream-valve-fcv` | Differential conformance | FCV exact controlled-flow behavior, non-default geometry/loss inputs, Active status, and returned setting |
 | `aowis-server-epanet-conformance-upstream-valve-tcv` | Differential conformance | TCV throttling setting, minor loss, non-default diameter, Active status, and complete valve-result mapping |
 | `aowis-server-epanet-conformance-upstream-valve-gpv` | Differential conformance | GPV non-linear head-loss curve interpolation, explicit Open initial status, non-default diameter/minor loss, and returned curve setting |
+| `aowis-server-epanet-conformance-reentrancy-independent-runners` | Reentrancy proof | Eight simultaneous independent `EpanetRunner` executions alternate between distinct hydraulic/quality requests and must match their sequential baselines without cross-project contamination |
+| `aowis-server-epanet-conformance-negative-invalid-identifiers` | Upstream validation evidence | EPANET-invalid node, link, pattern, and curve identifiers are rejected through the adapter with structured entity diagnostics |
 | `aowis-server-epanet-test-scenario-manifest` | Framework | Every C++ scenario is individually registered in CTest and vice versa |
-| `aowis-server-epanet-upstream-test-inventory` | Framework | Every active vendored upstream source-level test has an explicit classification |
+| `aowis-server-epanet-upstream-test-inventory` | Framework | Every active vendored upstream source-level test has an explicit classification, and every wrapper candidate points to registered AOWIS conformance evidence |
 | `aowis-server-epanet-model-field-conformance-audit` | Framework / audit | Every field in every audited hydraulic and water-quality Model struct is explicitly classified and every completed field points to registered evidence |
 
 ## Upstream EPANET inventory
 
-`tests/upstream_test_inventory.txt` is the machine-readable classification. Its CTest verifier scans the vendored EPANET test sources and fails when a test is added, removed, duplicated, or left unclassified.
+`tests/upstream_test_inventory.txt` is the machine-readable classification and evidence map. Its CTest verifier scans the vendored EPANET test sources and fails when a test is added, removed, duplicated, or left unclassified. For every `wrapper-candidate`, it also verifies that every named evidence scenario exists in the registered AOWIS scenario manifest.
 
 Each active upstream source-level test is assigned one of these classifications:
 

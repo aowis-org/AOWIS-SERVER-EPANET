@@ -9,9 +9,18 @@ endif()
 if(NOT EXISTS "${AOWIS_INVENTORY_FILE}")
     message(FATAL_ERROR "Upstream test inventory does not exist: ${AOWIS_INVENTORY_FILE}")
 endif()
+if(NOT DEFINED AOWIS_REGISTERED_SCENARIOS_FILE)
+    message(FATAL_ERROR "AOWIS_REGISTERED_SCENARIOS_FILE is required")
+endif()
+if(NOT EXISTS "${AOWIS_REGISTERED_SCENARIOS_FILE}")
+    message(FATAL_ERROR "Registered scenario manifest does not exist: ${AOWIS_REGISTERED_SCENARIOS_FILE}")
+endif()
 
+file(STRINGS "${AOWIS_REGISTERED_SCENARIOS_FILE}" AOWIS_REGISTERED_SCENARIOS)
 file(STRINGS "${AOWIS_INVENTORY_FILE}" AOWIS_INVENTORY_LINES)
 set(AOWIS_INVENTORY_KEYS)
+set(AOWIS_WRAPPER_CANDIDATE_COUNT 0)
+set(AOWIS_EVIDENCE_LINK_COUNT 0)
 
 foreach(AOWIS_INVENTORY_LINE IN LISTS AOWIS_INVENTORY_LINES)
     if(AOWIS_INVENTORY_LINE STREQUAL "" OR AOWIS_INVENTORY_LINE MATCHES "^#")
@@ -23,20 +32,60 @@ foreach(AOWIS_INVENTORY_LINE IN LISTS AOWIS_INVENTORY_LINES)
     string(REPLACE ";" "\\;" AOWIS_ESCAPED_INVENTORY_LINE "${AOWIS_INVENTORY_LINE}")
     string(REPLACE "|" ";" AOWIS_INVENTORY_COLUMNS "${AOWIS_ESCAPED_INVENTORY_LINE}")
     list(LENGTH AOWIS_INVENTORY_COLUMNS AOWIS_COLUMN_COUNT)
-    if(NOT AOWIS_COLUMN_COUNT EQUAL 6)
-        message(FATAL_ERROR "Inventory row must contain exactly six pipe-separated columns: ${AOWIS_INVENTORY_LINE}")
+    if(NOT AOWIS_COLUMN_COUNT EQUAL 7)
+        message(FATAL_ERROR "Inventory row must contain exactly seven pipe-separated columns: ${AOWIS_INVENTORY_LINE}")
     endif()
 
     list(GET AOWIS_INVENTORY_COLUMNS 0 AOWIS_TEST_SOURCE)
     list(GET AOWIS_INVENTORY_COLUMNS 1 AOWIS_TEST_NAME)
     list(GET AOWIS_INVENTORY_COLUMNS 2 AOWIS_TEST_KIND)
     list(GET AOWIS_INVENTORY_COLUMNS 3 AOWIS_TEST_CLASSIFICATION)
+    list(GET AOWIS_INVENTORY_COLUMNS 4 AOWIS_COVERAGE_AREA)
+    list(GET AOWIS_INVENTORY_COLUMNS 5 AOWIS_EVIDENCE_TEXT)
 
     if(NOT AOWIS_TEST_KIND MATCHES "^(boost-case|standalone)$")
         message(FATAL_ERROR "Invalid inventory kind for ${AOWIS_TEST_SOURCE}::${AOWIS_TEST_NAME}: ${AOWIS_TEST_KIND}")
     endif()
     if(NOT AOWIS_TEST_CLASSIFICATION MATCHES "^(wrapper-candidate|native-only|not-applicable)$")
         message(FATAL_ERROR "Invalid inventory classification for ${AOWIS_TEST_SOURCE}::${AOWIS_TEST_NAME}: ${AOWIS_TEST_CLASSIFICATION}")
+    endif()
+
+    if(AOWIS_TEST_CLASSIFICATION STREQUAL "wrapper-candidate")
+        math(EXPR AOWIS_WRAPPER_CANDIDATE_COUNT "${AOWIS_WRAPPER_CANDIDATE_COUNT} + 1")
+        if(AOWIS_COVERAGE_AREA STREQUAL "none")
+            message(FATAL_ERROR "Wrapper candidate has no coverage area: ${AOWIS_TEST_SOURCE}::${AOWIS_TEST_NAME}")
+        endif()
+        if(AOWIS_EVIDENCE_TEXT STREQUAL "" OR AOWIS_EVIDENCE_TEXT STREQUAL "none")
+            message(FATAL_ERROR "Wrapper candidate has no conformance evidence: ${AOWIS_TEST_SOURCE}::${AOWIS_TEST_NAME}")
+        endif()
+
+        string(REPLACE "," ";" AOWIS_EVIDENCE_SCENARIOS "${AOWIS_EVIDENCE_TEXT}")
+        foreach(AOWIS_EVIDENCE_SCENARIO IN LISTS AOWIS_EVIDENCE_SCENARIOS)
+            string(STRIP "${AOWIS_EVIDENCE_SCENARIO}" AOWIS_EVIDENCE_SCENARIO)
+            if(AOWIS_EVIDENCE_SCENARIO STREQUAL "")
+                message(FATAL_ERROR "Wrapper candidate contains an empty evidence scenario: ${AOWIS_TEST_SOURCE}::${AOWIS_TEST_NAME}")
+            endif()
+            if(NOT AOWIS_EVIDENCE_SCENARIO MATCHES "^conformance-")
+                message(FATAL_ERROR
+                    "Wrapper candidate evidence must name a conformance scenario: "
+                    "${AOWIS_TEST_SOURCE}::${AOWIS_TEST_NAME} -> ${AOWIS_EVIDENCE_SCENARIO}"
+                )
+            endif()
+            if(NOT AOWIS_EVIDENCE_SCENARIO IN_LIST AOWIS_REGISTERED_SCENARIOS)
+                message(FATAL_ERROR
+                    "Wrapper candidate evidence scenario is not registered: "
+                    "${AOWIS_TEST_SOURCE}::${AOWIS_TEST_NAME} -> ${AOWIS_EVIDENCE_SCENARIO}"
+                )
+            endif()
+            math(EXPR AOWIS_EVIDENCE_LINK_COUNT "${AOWIS_EVIDENCE_LINK_COUNT} + 1")
+        endforeach()
+    else()
+        if(NOT AOWIS_EVIDENCE_TEXT STREQUAL "none")
+            message(FATAL_ERROR
+                "Only wrapper-candidate rows may claim AOWIS conformance evidence: "
+                "${AOWIS_TEST_SOURCE}::${AOWIS_TEST_NAME}"
+            )
+        endif()
     endif()
 
     list(APPEND AOWIS_INVENTORY_KEYS "${AOWIS_TEST_SOURCE}::${AOWIS_TEST_NAME}")
@@ -110,4 +159,7 @@ if(NOT "${AOWIS_SORTED_INVENTORY_KEYS}" STREQUAL "${AOWIS_SORTED_DISCOVERED_KEYS
 endif()
 
 list(LENGTH AOWIS_DISCOVERED_KEYS AOWIS_DISCOVERED_COUNT)
-message(STATUS "Verified classifications for ${AOWIS_DISCOVERED_COUNT} active upstream test cases")
+message(STATUS
+    "Verified classifications for ${AOWIS_DISCOVERED_COUNT} active upstream test cases; "
+    "${AOWIS_WRAPPER_CANDIDATE_COUNT} wrapper candidates have ${AOWIS_EVIDENCE_LINK_COUNT} registered conformance evidence links"
+)

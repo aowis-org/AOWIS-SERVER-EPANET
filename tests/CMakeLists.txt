@@ -128,6 +128,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-operational-error-diagnostics
     conformance-operational-cancellation-before-results
     conformance-operational-cancellation-partial-results
+    conformance-reentrancy-independent-runners
     conformance-export-native-reopen
     conformance-export-titles-comments-tags
     conformance-export-patterns-curves
@@ -167,6 +168,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-multi-quality-repeated-source-trace
     conformance-multi-quality-failure-isolation
     conformance-multi-quality-cancellation-between-runs
+    conformance-negative-invalid-identifiers
     conformance-negative-duplicate-node-id
     conformance-negative-duplicate-link-id
     conformance-negative-duplicate-uuid
@@ -241,6 +243,7 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/deterministic_stress_scenarios.h
     conformance/deterministic_quality_stress_scenarios.h
     conformance/multi_quality_execution_scenarios.h
+    conformance/reentrancy_scenarios.h
     test_net1_conformance.cpp
     test_result_contract.cpp
     test_hydraulic_behavior_conformance.cpp
@@ -254,11 +257,15 @@ add_executable(aowis-server-epanet-conformance-tests
     test_deterministic_stress_conformance.cpp
     test_deterministic_quality_stress_conformance.cpp
     test_multi_quality_execution_conformance.cpp
+    test_reentrancy_conformance.cpp
 )
+
+find_package(Threads REQUIRED)
 
 target_link_libraries(aowis-server-epanet-conformance-tests
     PRIVATE
         AOWIS::ServerEpanet
+        Threads::Threads
 )
 
 target_compile_features(aowis-server-epanet-conformance-tests PRIVATE cxx_std_20)
@@ -317,6 +324,8 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
 
     if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-multi-quality-(isolated-equivalence|order-independence)$")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "proof")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-reentrancy-independent-runners")
+        list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "quality" "proof")
     endif()
 
     set_tests_properties(
@@ -339,12 +348,22 @@ set_tests_properties(
         LABELS "framework;proof"
 )
 
+string(REPLACE ";" "\n" AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS "${AOWIS_SERVER_EPANET_TEST_SCENARIOS}")
+set(AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS_FILE
+    "${CMAKE_CURRENT_BINARY_DIR}/registered_scenarios.txt"
+)
+file(WRITE
+    "${AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS_FILE}"
+    "${AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS}\n"
+)
+
 add_test(
     NAME aowis-server-epanet-upstream-test-inventory
     COMMAND
         ${CMAKE_COMMAND}
         -DAOWIS_SOURCE_ROOT=${PROJECT_SOURCE_DIR}
         -DAOWIS_INVENTORY_FILE=${CMAKE_CURRENT_SOURCE_DIR}/upstream_test_inventory.txt
+        -DAOWIS_REGISTERED_SCENARIOS_FILE=${AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS_FILE}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/conformance/verify_upstream_test_inventory.cmake
 )
 set_tests_properties(
@@ -396,15 +415,6 @@ if(NOT AOWIS_SERVER_MODEL_SOURCE_ROOT
         "The model-field conformance audit requires readable AOWIS-SERVER-MODEL hydraulic and water-quality headers."
     )
 endif()
-
-string(REPLACE ";" "\n" AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS "${AOWIS_SERVER_EPANET_TEST_SCENARIOS}")
-set(AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS_FILE
-    "${CMAKE_CURRENT_BINARY_DIR}/registered_scenarios.txt"
-)
-file(WRITE
-    "${AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS_FILE}"
-    "${AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS}\n"
-)
 
 add_test(
     NAME aowis-server-epanet-model-field-conformance-audit

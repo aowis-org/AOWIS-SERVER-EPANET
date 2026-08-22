@@ -12,8 +12,17 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/internal/epanet_hydraulic_solver.cpp
     src/lib/internal/epanet_inp_exporter.cpp
     src/lib/internal/epanet_network_builder.cpp
+    src/lib/internal/epanet_network_builder_controls.cpp
+    src/lib/internal/epanet_network_builder_links.cpp
+    src/lib/internal/epanet_network_builder_nodes.cpp
+    src/lib/internal/epanet_network_builder_patterns_curves.cpp
+    src/lib/internal/epanet_network_builder_support.cpp
     src/lib/internal/epanet_network_preparer.cpp
     src/lib/internal/epanet_network_validator.cpp
+    src/lib/internal/epanet_network_validator_identity.cpp
+    src/lib/internal/epanet_network_validator_numerics.cpp
+    src/lib/internal/epanet_network_validator_references.cpp
+    src/lib/internal/epanet_network_validator_support.cpp
     src/lib/internal/epanet_prepared_project.cpp
     src/lib/internal/epanet_project.cpp
     src/lib/internal/epanet_project_initializer.cpp
@@ -51,8 +60,11 @@ set(AOWIS_SERVER_EPANET_INTERNAL_HEADERS
     src/lib/internal/epanet_inp_exporter.h
     src/lib/internal/epanet_index_registry.h
     src/lib/internal/epanet_network_builder.h
+    src/lib/internal/epanet_network_builder_support.h
     src/lib/internal/epanet_network_preparer.h
     src/lib/internal/epanet_network_validator.h
+    src/lib/internal/epanet_network_validator_parts.h
+    src/lib/internal/epanet_network_validator_support.h
     src/lib/internal/epanet_prepared_project.h
     src/lib/internal/epanet_project.h
     src/lib/internal/epanet_project_initializer.h
