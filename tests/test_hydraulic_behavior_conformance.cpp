@@ -251,11 +251,11 @@ void testLeakage(TestContext &context)
         const double orifice_coefficient = 0.6 * std::sqrt(2.0 * 32.2);
         const double head_21_ft = metresToFeet(junction_21->pressure_head_m);
         const double head_22_ft = metresToFeet(junction_22->pressure_head_m);
-        const double q1_cfs = orifice_coefficient * (pipe_sections / 2.0)
+        const double junction_21_leakage_cfs = orifice_coefficient * (pipe_sections / 2.0)
             * (area_ft2 + expansion_ft2_per_ft * head_21_ft) * std::sqrt(head_21_ft);
-        const double q2_cfs = orifice_coefficient * (pipe_sections / 2.0)
+        const double junction_22_leakage_cfs = orifice_coefficient * (pipe_sections / 2.0)
             * (area_ft2 + expansion_ft2_per_ft * head_22_ft) * std::sqrt(head_22_ft);
-        const double calculated_leakage_m3_per_h = (q1_cfs + q2_cfs)
+        const double calculated_leakage_m3_per_h = (junction_21_leakage_cfs + junction_22_leakage_cfs)
             * kCubicMetresPerHourPerCubicFootPerSecond;
 
         context.expectNear(
@@ -446,7 +446,7 @@ void testPcv(TestContext &context)
         context.expectNear(valve->head_loss_m, feetToMetres(0.0255),
             NumericTolerance{feetToMetres(0.001), 0.0},
             comparison("upstream_golden.head_loss_m", result.time_elapsed_s, "Valve", "22"),
-            "upstream PCV head loss must retain the 35-percent-open golden result");
+            "upstream PCV head loss must retain the 35-percent-open upstream reference result");
     }
 
     const EpanetResultRun wrapper_run = EpanetRunner().run(fixture.network);
@@ -599,7 +599,7 @@ void registerHydraulicBehaviorScenarios(ScenarioRegistry &registry)
 {
     registry.add(ScenarioDefinition{
         "conformance-upstream-dda-pda",
-        "Ports upstream DDA/PDA stress behavior, golden deficient-node and demand-reduction checks, and full native-versus-wrapper results.",
+        "Ports upstream DDA/PDA stress behavior, upstream reference deficient-node and demand-reduction checks, and full native-versus-wrapper results.",
         {"conformance", "hydraulic", "upstream", "pda"},
         &testDdaPda});
     registry.add(ScenarioDefinition{
@@ -614,7 +614,7 @@ void registerHydraulicBehaviorScenarios(ScenarioRegistry &registry)
         &testTankOverflow});
     registry.add(ScenarioDefinition{
         "conformance-upstream-pcv",
-        "Ports the upstream 35-percent-open PCV characteristic-curve case and golden head-loss assertion with full differential comparison.",
+        "Ports the upstream 35-percent-open PCV characteristic-curve case and upstream reference head-loss assertion with full differential comparison.",
         {"conformance", "hydraulic", "upstream", "valve", "curve"},
         &testPcv});
     registry.add(ScenarioDefinition{

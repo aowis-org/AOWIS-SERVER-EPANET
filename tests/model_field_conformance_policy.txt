@@ -1,9 +1,9 @@
-# Hydraulic field conformance audit policy.
+# AOWIS hydraulic and water-quality model-field conformance policy.
 # Format: header|struct|fields_csv|state|evidence_scenarios_csv|note
-# States: complete, excluded-quality, excluded-non-epanet, excluded-runtime-metadata
+# States: complete, excluded-non-epanet, excluded-runtime-metadata
 @headers|hydraulic_types.h,hydraulic_nodes.h,hydraulic_links.h,hydraulic_curves.h,hydraulic_controls.h,hydraulic_simulation_options.h,hydraulic_simulation_results.h,water_quality_simulation_results.h,hydraulic_simulation_status.h,hydraulic_simulation_diagnostics.h,hydraulic_map.h,network_hydraulic.h
 hydraulic_types.h|HydraulicEntityMetadata|enabled|complete|conformance-negative-disabled-entity-pruning|
-hydraulic_types.h|HydraulicEntityMetadata|model_role,date_added,date_installed|excluded-non-epanet||AOWIS lifecycle/presentation metadata is not an EPANET hydraulic input.
+hydraulic_types.h|HydraulicEntityMetadata|model_role,date_added,date_installed|excluded-non-epanet||AOWIS lifecycle/presentation metadata is not an EPANET simulation input.
 hydraulic_types.h|HydraulicEntityMetadata|comment,tag|complete|conformance-export-titles-comments-tags|
 hydraulic_types.h|HydraulicLinkVertex|coordinate_wgs84|complete|conformance-export-coordinates-vertices|
 hydraulic_types.h|HydraulicNodeQualitySource|type,chemical_concentration_mg_per_l,chemical_mass_flow_mg_per_min,pattern_uuid|complete|conformance-quality-input-chemical|Typed water-quality source configuration maps to EPANET source type, strength, and optional pattern.
@@ -135,7 +135,7 @@ hydraulic_map.h|HydraulicMapLabel|id,uuid|excluded-non-epanet||AOWIS map-label i
 hydraulic_map.h|HydraulicMapLabel|coordinate_wgs84,text,anchor_node_uuid|complete|conformance-export-coordinates-vertices,conformance-negative-invalid-map-numeric,conformance-negative-missing-map-label-anchor|
 hydraulic_map.h|HydraulicMapBackdrop|enabled,lower_left_wgs84,upper_right_wgs84,file,offset_longitude_deg,offset_latitude_deg|complete|conformance-export-coordinates-vertices|
 network_hydraulic.h|NetworkHydraulicCustomerPoint|id,uuid|excluded-non-epanet||Customer-point identity is application metadata, hydraulic demands are represented on junctions.
-network_hydraulic.h|NetworkHydraulic|id,uuid|excluded-non-epanet||Network application identity is not an EPANET hydraulic field.
+network_hydraulic.h|NetworkHydraulic|id,uuid|excluded-non-epanet||Network application identity is not an EPANET simulation input.
 network_hydraulic.h|NetworkHydraulic|title_line_1,title_line_2,title_line_3|complete|conformance-export-titles-comments-tags|
 network_hydraulic.h|NetworkHydraulic|duration_s|complete|conformance-options-time-duration|
 network_hydraulic.h|NetworkHydraulic|timestep_hydraulic_s|complete|conformance-options-time-hydraulic-step|

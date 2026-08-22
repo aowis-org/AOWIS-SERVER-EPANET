@@ -392,7 +392,7 @@ endif()
 if(NOT AOWIS_SERVER_MODEL_SOURCE_ROOT
    OR NOT EXISTS "${AOWIS_SERVER_MODEL_SOURCE_ROOT}/include/aowis/model/hydraulic/network_hydraulic.h")
     message(FATAL_ERROR
-        "The hydraulic field-conformance audit requires readable AOWIS-SERVER-MODEL hydraulic headers."
+        "The model-field conformance audit requires readable AOWIS-SERVER-MODEL hydraulic and water-quality headers."
     )
 endif()
 
@@ -406,17 +406,17 @@ file(WRITE
 )
 
 add_test(
-    NAME aowis-server-epanet-hydraulic-field-conformance-audit
+    NAME aowis-server-epanet-model-field-conformance-audit
     COMMAND
         ${CMAKE_COMMAND}
         -DAOWIS_MODEL_SOURCE_ROOT=${AOWIS_SERVER_MODEL_SOURCE_ROOT}
-        -DAOWIS_FIELD_AUDIT_POLICY=${CMAKE_CURRENT_SOURCE_DIR}/hydraulic_field_conformance_policy.txt
+        -DAOWIS_FIELD_AUDIT_POLICY=${CMAKE_CURRENT_SOURCE_DIR}/model_field_conformance_policy.txt
         -DAOWIS_REGISTERED_SCENARIOS_FILE=${AOWIS_SERVER_EPANET_REGISTERED_SCENARIOS_FILE}
-        -DAOWIS_FIELD_AUDIT_REPORT=${CMAKE_CURRENT_BINARY_DIR}/hydraulic_field_conformance_audit.tsv
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/conformance/verify_hydraulic_field_conformance.cmake
+        -DAOWIS_FIELD_AUDIT_REPORT=${CMAKE_CURRENT_BINARY_DIR}/model_field_conformance_audit.tsv
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/conformance/verify_model_field_conformance.cmake
 )
 set_tests_properties(
-    aowis-server-epanet-hydraulic-field-conformance-audit
+    aowis-server-epanet-model-field-conformance-audit
     PROPERTIES
         LABELS "framework;proof"
 )

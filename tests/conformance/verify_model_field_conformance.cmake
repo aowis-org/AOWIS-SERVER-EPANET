@@ -12,7 +12,7 @@ foreach(AOWIS_REQUIRED_VARIABLE IN ITEMS
 endforeach()
 
 if(NOT EXISTS "${AOWIS_FIELD_AUDIT_POLICY}")
-    message(FATAL_ERROR "Hydraulic field audit policy not found: ${AOWIS_FIELD_AUDIT_POLICY}")
+    message(FATAL_ERROR "Model-field audit policy not found: ${AOWIS_FIELD_AUDIT_POLICY}")
 endif()
 if(NOT EXISTS "${AOWIS_REGISTERED_SCENARIOS_FILE}")
     message(FATAL_ERROR "Registered scenario manifest not found: ${AOWIS_REGISTERED_SCENARIOS_FILE}")
@@ -31,7 +31,6 @@ set(AOWIS_POLICY_FIELDS "")
 set(AOWIS_POLICY_STRUCTS "")
 set(AOWIS_REPORT_ROWS "")
 set(AOWIS_COMPLETE_FIELD_COUNT 0)
-set(AOWIS_EXCLUDED_QUALITY_FIELD_COUNT 0)
 set(AOWIS_EXCLUDED_NON_EPANET_FIELD_COUNT 0)
 set(AOWIS_EXCLUDED_RUNTIME_FIELD_COUNT 0)
 
@@ -50,7 +49,7 @@ foreach(AOWIS_POLICY_LINE IN LISTS AOWIS_POLICY_LINES)
     string(REPLACE "|" ";" AOWIS_POLICY_COLUMNS "${AOWIS_POLICY_LINE}")
     list(LENGTH AOWIS_POLICY_COLUMNS AOWIS_POLICY_COLUMN_COUNT)
     if(NOT AOWIS_POLICY_COLUMN_COUNT EQUAL 6)
-        message(FATAL_ERROR "Invalid hydraulic field audit policy row: ${AOWIS_POLICY_LINE}")
+        message(FATAL_ERROR "Invalid model-field audit policy row: ${AOWIS_POLICY_LINE}")
     endif()
 
     list(GET AOWIS_POLICY_COLUMNS 0 AOWIS_HEADER)
@@ -60,7 +59,7 @@ foreach(AOWIS_POLICY_LINE IN LISTS AOWIS_POLICY_LINES)
     list(GET AOWIS_POLICY_COLUMNS 4 AOWIS_EVIDENCE_CSV)
     list(GET AOWIS_POLICY_COLUMNS 5 AOWIS_NOTE)
 
-    if(NOT AOWIS_STATE MATCHES "^(complete|excluded-quality|excluded-non-epanet|excluded-runtime-metadata)$")
+    if(NOT AOWIS_STATE MATCHES "^(complete|excluded-non-epanet|excluded-runtime-metadata)$")
         message(FATAL_ERROR "Unsupported audit state '${AOWIS_STATE}' in row: ${AOWIS_POLICY_LINE}")
     endif()
 
@@ -72,7 +71,7 @@ foreach(AOWIS_POLICY_LINE IN LISTS AOWIS_POLICY_LINES)
         foreach(AOWIS_EVIDENCE_SCENARIO IN LISTS AOWIS_EVIDENCE_SCENARIOS)
             if(NOT AOWIS_EVIDENCE_SCENARIO IN_LIST AOWIS_REGISTERED_SCENARIOS)
                 message(FATAL_ERROR
-                    "Hydraulic field audit references unknown scenario '${AOWIS_EVIDENCE_SCENARIO}' "
+                    "Model-field audit references unknown scenario '${AOWIS_EVIDENCE_SCENARIO}' "
                     "for ${AOWIS_STRUCT}: ${AOWIS_FIELDS_CSV}"
                 )
             endif()
@@ -97,14 +96,12 @@ foreach(AOWIS_POLICY_LINE IN LISTS AOWIS_POLICY_LINES)
 
         set(AOWIS_FIELD_KEY "${AOWIS_HEADER}|${AOWIS_STRUCT}|${AOWIS_FIELD}")
         if(AOWIS_FIELD_KEY IN_LIST AOWIS_POLICY_FIELDS)
-            message(FATAL_ERROR "Duplicate hydraulic field audit entry: ${AOWIS_FIELD_KEY}")
+            message(FATAL_ERROR "Duplicate model-field audit entry: ${AOWIS_FIELD_KEY}")
         endif()
         list(APPEND AOWIS_POLICY_FIELDS "${AOWIS_FIELD_KEY}")
 
         if(AOWIS_STATE STREQUAL "complete")
             math(EXPR AOWIS_COMPLETE_FIELD_COUNT "${AOWIS_COMPLETE_FIELD_COUNT} + 1")
-        elseif(AOWIS_STATE STREQUAL "excluded-quality")
-            math(EXPR AOWIS_EXCLUDED_QUALITY_FIELD_COUNT "${AOWIS_EXCLUDED_QUALITY_FIELD_COUNT} + 1")
         elseif(AOWIS_STATE STREQUAL "excluded-non-epanet")
             math(EXPR AOWIS_EXCLUDED_NON_EPANET_FIELD_COUNT "${AOWIS_EXCLUDED_NON_EPANET_FIELD_COUNT} + 1")
         elseif(AOWIS_STATE STREQUAL "excluded-runtime-metadata")
@@ -118,7 +115,7 @@ foreach(AOWIS_POLICY_LINE IN LISTS AOWIS_POLICY_LINES)
 endforeach()
 
 if(AOWIS_AUDITED_HEADERS STREQUAL "")
-    message(FATAL_ERROR "Hydraulic field audit policy does not declare @headers")
+    message(FATAL_ERROR "Model-field audit policy does not declare @headers")
 endif()
 list(REMOVE_DUPLICATES AOWIS_POLICY_STRUCTS)
 
@@ -204,23 +201,23 @@ list(REMOVE_DUPLICATES AOWIS_MODEL_STRUCTS)
 
 foreach(AOWIS_MODEL_STRUCT IN LISTS AOWIS_MODEL_STRUCTS)
     if(NOT AOWIS_MODEL_STRUCT IN_LIST AOWIS_POLICY_STRUCTS)
-        message(FATAL_ERROR "Model struct is missing from hydraulic field audit policy: ${AOWIS_MODEL_STRUCT}")
+        message(FATAL_ERROR "Model struct is missing from model-field audit policy: ${AOWIS_MODEL_STRUCT}")
     endif()
 endforeach()
 foreach(AOWIS_POLICY_STRUCT IN LISTS AOWIS_POLICY_STRUCTS)
     if(NOT AOWIS_POLICY_STRUCT IN_LIST AOWIS_MODEL_STRUCTS)
-        message(FATAL_ERROR "Hydraulic field audit policy references missing Model struct: ${AOWIS_POLICY_STRUCT}")
+        message(FATAL_ERROR "Model-field audit policy references missing Model struct: ${AOWIS_POLICY_STRUCT}")
     endif()
 endforeach()
 
 foreach(AOWIS_MODEL_FIELD IN LISTS AOWIS_MODEL_FIELDS)
     if(NOT AOWIS_MODEL_FIELD IN_LIST AOWIS_POLICY_FIELDS)
-        message(FATAL_ERROR "Model field is missing from hydraulic field audit policy: ${AOWIS_MODEL_FIELD}")
+        message(FATAL_ERROR "Model field is missing from model-field audit policy: ${AOWIS_MODEL_FIELD}")
     endif()
 endforeach()
 foreach(AOWIS_POLICY_FIELD IN LISTS AOWIS_POLICY_FIELDS)
     if(NOT AOWIS_POLICY_FIELD IN_LIST AOWIS_MODEL_FIELDS)
-        message(FATAL_ERROR "Hydraulic field audit policy references missing Model field: ${AOWIS_POLICY_FIELD}")
+        message(FATAL_ERROR "Model-field audit policy references missing Model field: ${AOWIS_POLICY_FIELD}")
     endif()
 endforeach()
 
@@ -235,8 +232,8 @@ file(WRITE "${AOWIS_FIELD_AUDIT_REPORT}"
 )
 
 message(STATUS
-    "Hydraulic field audit passed: ${AOWIS_MODEL_FIELD_COUNT} fields across ${AOWIS_MODEL_STRUCT_COUNT} structs; "
-    "${AOWIS_COMPLETE_FIELD_COUNT} complete, ${AOWIS_EXCLUDED_QUALITY_FIELD_COUNT} quality-excluded, "
-    "${AOWIS_EXCLUDED_NON_EPANET_FIELD_COUNT} non-EPANET, ${AOWIS_EXCLUDED_RUNTIME_FIELD_COUNT} runtime-metadata."
+    "Model-field audit passed: ${AOWIS_MODEL_FIELD_COUNT} fields across ${AOWIS_MODEL_STRUCT_COUNT} structs; "
+    "${AOWIS_COMPLETE_FIELD_COUNT} complete, ${AOWIS_EXCLUDED_NON_EPANET_FIELD_COUNT} non-EPANET, "
+    "${AOWIS_EXCLUDED_RUNTIME_FIELD_COUNT} runtime-metadata."
 )
-message(STATUS "Hydraulic field audit report: ${AOWIS_FIELD_AUDIT_REPORT}")
+message(STATUS "Model-field audit report: ${AOWIS_FIELD_AUDIT_REPORT}")

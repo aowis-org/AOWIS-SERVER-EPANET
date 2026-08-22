@@ -1,22 +1,26 @@
-# AOWIS-SERVER-EPANET
+# AOWIS EPANET Backend
 
-EPANET simulation backend and REST server for AOWIS.
+EPANET 2.3 simulation backend for the solver-neutral AOWIS hydraulic model.
 
-The shared AOWIS hydraulic model is solver-neutral. This repository is the EPANET adapter, so EPANET names remain only where they identify the backend implementation, its native API, or backend-specific output.
+The adapter translates `NetworkHydraulic` into a native EPANET project, executes one hydraulic analysis, optionally executes one or more water-quality analyses against the saved hydraulic solution, and maps native results and diagnostics back into AOWIS result types.
 
-## Architecture
+## Public API
 
-- `EpanetRunner`: synchronous EPANET adapter entry point. `run(const EpanetRunRequest &)` executes one hydraulic configuration from `NetworkHydraulic`, followed by zero or more requested quality analyses that reuse the saved hydraulic solution.
-- `EpanetSimulationManager`: asynchronous Qt queue for `EpanetRunRequest` jobs. Each job owns independent cooperative-cancellation state and completes with one `EpanetResultRun`.
-- `EpanetProject`: RAII ownership of the native `EN_Project` handle.
-- `EpanetNetworkBuilder`: converts generic hydraulic model entities into the static EPANET network topology and entity data.
-- `EpanetHydraulicRunConfigurator`: applies the selected headloss formula and its formula-specific pipe roughness values.
-- `EpanetQualityRunConfigurator`: applies the selected water-quality mode, initial values, sources, mixing, and reactions.
-- `EpanetIndexRegistry`: stores native EPANET indices while the network is built.
-- `EpanetHydraulicSolver`: owns the native hydraulic-session lifecycle and report configuration.
-- `EpanetResultReader`: converts native EPANET result values into generic hydraulic result structures.
-- `EpanetReportCollector`: owns the EPANET report callback state.
-- `HydraulicSimulationResultPrinter` and `HydraulicSimulationStatusPrinter`: print the solver-neutral model result and status types.
+- `EpanetRunner`: synchronous entry point for one complete EPANET run request.
+- `EpanetSimulationManager`: asynchronous Qt queue with independent cooperative cancellation for each job.
+- `EpanetRunRequest`: one hydraulic network plus an ordered list of requested water-quality analyses.
+- `EpanetResultRun`: one hydraulic result timeline plus the results of the requested quality analyses.
+- `EpanetResolvers`: conversion helpers for supported AOWIS input forms.
+
+The implementation keeps native EPANET state behind adapter-internal builders, configurators, solvers, result readers, project wrappers, and index registries.
+
+## Execution model
+
+Each request contains exactly one hydraulic configuration. The selected headloss formula comes from `NetworkHydraulic::options_hydraulic.headloss_formula`.
+
+Hydraulics are solved and saved once. The adapter then executes the ordered `quality_runs` list against that saved hydraulic solution. Chemical concentration, water age, and source trace use independent quality timelines because their timesteps do not have to coincide with hydraulic events.
+
+Multiple headloss formulas are separate requests; they are not branches inside one `EpanetRunRequest`.
 
 ```cpp
 EpanetRunRequest request;
@@ -35,37 +39,56 @@ else
     HydraulicSimulationResultPrinter::print(result.result_timeline);
 ```
 
+## Diagnostics
 
-### Multi-quality execution contract
-
-`EpanetRunRequest` contains one `NetworkHydraulic` and an ordered list of `WaterQualitySolverOptions`. The network's `options_hydraulic.headloss_formula` is the single hydraulic formula for that run. `EpanetResultRun` contains one hydraulic result timeline plus zero or more `EpanetQualityResult` children. Multiple source-trace runs remain independently identifiable through their quality options.
-
-The execution contract has exactly one hydraulic run. Multiple headloss formulas are not represented as branches of one request; callers choose one formula through `NetworkHydraulic::options_hydraulic.headloss_formula`. The executor saves that hydraulic solution once and reuses it for each requested quality analysis.
-
-The standalone HTTP executable currently exposes only the `/status` liveness route. Solver execution is intentionally kept out of `server.cpp`; a future transport route should submit `EpanetRunRequest` jobs through `EpanetSimulationManager` and consume `EpanetResultRun` results.
-
-## Backend diagnostics
-
-The adapter maps native errors into `HydraulicSimulationStatus`:
+Native EPANET failures are represented through `HydraulicSimulationStatus` without leaking backend-specific concepts into the shared hydraulic model:
 
 - `backend_name` is `EPANET`.
 - `backend_error_code` contains the native numeric error code.
-- `backend_operation` contains the exact native call, such as `EN_runH`.
-- `message_backend` contains the native EPANET error message.
-- `operation`, `stage`, `property`, and `entity` remain generic AOWIS concepts.
+- `backend_operation` contains the native call, such as `EN_runH`.
+- `message_backend` contains the EPANET error message.
+- `operation`, `stage`, `property`, and `entity` remain solver-neutral AOWIS concepts.
 
-See `EPANET_SPECIFIC_BOUNDARY.md` for the names deliberately retained as EPANET-specific.
+See `EPANET_BACKEND_SEMANTICS.md` for backend-specific units, translation rules, constraints, and result semantics.
 
-## Hydraulic tests
+## HTTP server
 
-Configure, build, and run the adapter tests with:
+The standalone server executable exposes the `/status` liveness route. Simulation execution is provided by the adapter API and `EpanetSimulationManager`; `server.cpp` does not expose a solver transport endpoint.
+
+## Build
+
+```bash
+./compile_linux.sh
+```
+
+The EPANET dependency is the Git submodule at `external/epanet`:
+
+```bash
+git submodule update --init --recursive
+```
+
+## Tests and conformance
+
+Configure, build, and run the default test suite with:
 
 ```bash
 ./compile_linux_tests.sh
 ```
 
-The adapter test executable uses a named scenario registry, and CTest registers each scenario separately. Run `ctest --test-dir build-linux-tests -N` to list them or use `ctest --test-dir build-linux-tests -R <name> --verbose` to run one scenario.
+CTest registers each scenario separately:
 
-The `conformance-net1` scenario opens the vendored upstream Net1 INP directly with native EPANET, independently constructs the same hydraulic network as `NetworkHydraulic`, runs it through `EpanetRunner`, and compares every hydraulic event and applicable result field.
+```bash
+ctest --test-dir build-linux-tests -N
+ctest --test-dir build-linux-tests -R <scenario-name> --verbose
+```
 
-See `EPANET_HYDRAULIC_CONFORMANCE.md` for the coverage matrix, upstream-test classification, scope, tolerances, and the evidence required before claiming complete hydraulic conformance.
+Useful label groups include `contract`, `conformance`, `hydraulic`, `quality`, `negative`, `export`, `stress`, `proof`, and `upstream`.
+
+`EPANET_CONFORMANCE.md` defines the conformance target, evidence model, test groups, acceptance rule, and supported hydraulic and water-quality coverage. `EPANET_CONFORMANCE_MATRIX.md` contains the detailed scenario and field-level evidence matrix.
+
+## Reference documents
+
+- `EPANET_ADAPTER_CONTRACT.md` — public adapter contract and model-to-EPANET translation rules.
+- `EPANET_BACKEND_SEMANTICS.md` — backend-specific units, native constraints, result semantics, and enabled-state behavior.
+- `EPANET_CONFORMANCE.md` — conformance scope and verification method.
+- `EPANET_CONFORMANCE_MATRIX.md` — detailed coverage and evidence matrix.

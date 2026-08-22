@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT DEFINED AOWIS_SOURCE_ROOT)
     message(FATAL_ERROR "AOWIS_SOURCE_ROOT is required")
 endif()
@@ -16,7 +18,10 @@ foreach(AOWIS_INVENTORY_LINE IN LISTS AOWIS_INVENTORY_LINES)
         continue()
     endif()
 
-    string(REPLACE "|" ";" AOWIS_INVENTORY_COLUMNS "${AOWIS_INVENTORY_LINE}")
+    # CMake uses semicolons as list separators. Preserve semicolons that are
+    # part of free-text inventory fields before converting pipe delimiters.
+    string(REPLACE ";" "\\;" AOWIS_ESCAPED_INVENTORY_LINE "${AOWIS_INVENTORY_LINE}")
+    string(REPLACE "|" ";" AOWIS_INVENTORY_COLUMNS "${AOWIS_ESCAPED_INVENTORY_LINE}")
     list(LENGTH AOWIS_INVENTORY_COLUMNS AOWIS_COLUMN_COUNT)
     if(NOT AOWIS_COLUMN_COUNT EQUAL 6)
         message(FATAL_ERROR "Inventory row must contain exactly six pipe-separated columns: ${AOWIS_INVENTORY_LINE}")

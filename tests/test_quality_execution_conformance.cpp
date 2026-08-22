@@ -309,7 +309,7 @@ class NativeQualityRun
 public:
     explicit NativeQualityRun(const NetworkHydraulic &network)
     {
-        // Q1 separately proves Model-to-EPANET input mapping. Build the runtime
+        // Input-mapping scenarios cover Model-to-EPANET configuration. Build the runtime
         // reference in memory so EN_saveinpfile rounding cannot contaminate
         // the native-vs-AOWIS quality execution comparison.
         NetworkHydraulic prepared_network;
