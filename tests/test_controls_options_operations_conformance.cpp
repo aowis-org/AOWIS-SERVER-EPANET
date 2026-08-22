@@ -843,23 +843,27 @@ void testRuleActiveAction(TestContext &context)
     context.expectEqual(static_cast<std::int64_t>(status), static_cast<std::int64_t>(EN_R_IS_ACTIVE), comparison("then.status"));
 }
 
-void testRuleSourceText(TestContext &context)
+void testRuleStructuredSerialization(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
-    HydraulicControlRule rule;
-    rule.id = QStringLiteral("SOURCE_TEXT_RULE");
-    rule.uuid = QUuid::createUuid();
-    rule.source_text = QStringLiteral(
-        "RULE SOURCE_TEXT_RULE\n"
-        "IF SYSTEM TIME >= 0.5\n"
-        "THEN PUMP 9 STATUS = CLOSED\n"
-        "PRIORITY 3.5\n");
+
+    QList<HydraulicControlRulePremise> premises;
+    premises.append(numericPremise(
+        HydraulicControlRuleLogicalOperator::If,
+        HydraulicControlRuleObject::System,
+        QUuid(),
+        HydraulicControlRuleVariable::Time,
+        HydraulicControlRuleOperator::GreaterOrEqual,
+        1800.0));
+
+    HydraulicControlRule rule = makeRule(network, premises, false, 3.5);
+    rule.id = QStringLiteral("STRUCTURED_SERIALIZATION_RULE");
     network.controls_rules.append(rule);
 
     const NativeSavedProject native_project(network);
     char rule_id[EN_MAXID + 1] = {};
     checkEpanet(EN_getruleID(native_project.handle(), 1, rule_id), "EN_getruleID");
-    context.expectEqual(std::string_view(rule_id), std::string_view("SOURCE_TEXT_RULE"), comparison("rule.id"));
+    context.expectEqual(std::string_view(rule_id), std::string_view("STRUCTURED_SERIALIZATION_RULE"), comparison("rule.id"));
 
     int premise_count = 0;
     int then_count = 0;
@@ -881,7 +885,7 @@ void testRuleSourceText(TestContext &context)
     int status = 0;
     double setting = 0.0;
     checkEpanet(EN_getthenaction(native_project.handle(), 1, 1, &link_index, &status, &setting), "EN_getthenaction");
-    context.expect(link_index > 0, "preserved source rule must retain its pump action");
+    context.expect(link_index > 0, "structured rule serialization must retain its pump action");
     context.expectEqual(static_cast<std::int64_t>(status), static_cast<std::int64_t>(EN_R_IS_CLOSED), comparison("then.status"));
 }
 
@@ -1551,7 +1555,7 @@ void registerControlsOptionsOperationsScenarios(ScenarioRegistry &registry)
     registry.add(ScenarioDefinition{"conformance-controls-rule-else", "Checks ELSE action mapping.", {"conformance", "hydraulic", "rule"}, &testRuleElseAction});
     registry.add(ScenarioDefinition{"conformance-controls-rule-setting-action", "Checks numeric rule SETTING action mapping.", {"conformance", "hydraulic", "rule"}, &testRuleSettingAction});
     registry.add(ScenarioDefinition{"conformance-controls-rule-active-action", "Checks ACTIVE valve rule-action mapping.", {"conformance", "hydraulic", "rule"}, &testRuleActiveAction});
-    registry.add(ScenarioDefinition{"conformance-controls-rule-source-text", "Checks preserved backend rule source-text parsing and identity.", {"conformance", "hydraulic", "rule"}, &testRuleSourceText});
+    registry.add(ScenarioDefinition{"conformance-controls-rule-structured-serialization", "Checks structured rule serialization and native readback.", {"conformance", "hydraulic", "rule"}, &testRuleStructuredSerialization});
     registry.add(ScenarioDefinition{"conformance-controls-rule-priority", "Checks native priority mapping and conflicting-rule resolution.", {"conformance", "hydraulic", "rule"}, &testRulePriority});
     registry.add(ScenarioDefinition{"conformance-controls-rule-disabled", "Checks disabled rules do not execute.", {"conformance", "hydraulic", "rule"}, &testDisabledRule});
 

@@ -72,7 +72,7 @@ The repository does not hard-code test totals in this document. CTest is the aut
 | Pumps | Constant power; one-point, three-point, and multipoint curves; speed, patterns, status, efficiency, pricing, energy summaries, operating states, flow, velocity, head gain, power, and control membership. |
 | Valves | PRV, PSV, PBV, FCV, TCV, GPV, and PCV configuration, curves, statuses, settings, flow, velocity, headloss, regulation state, and control membership. |
 | Controls | Low/high level, timer, time of day, open/close/setting actions, disabled controls, and next-event identity. |
-| Rules | IF/AND/OR premises, THEN/ELSE actions, priorities, source text, enabled state, supported objects, variables, and comparison operators. |
+| Rules | IF/AND/OR premises, THEN/ELSE actions, priorities, structured serialization, enabled state, supported objects, variables, and comparison operators. |
 | Run summaries | Solver statistics, demand deficiency, leakage loss, flow balance, pump energy, system energy, demand charge, and cost. |
 | Lifecycle | Hydraulic stepping, steady state, warnings, errors, cancellation before results, and cancellation with partial results. |
 

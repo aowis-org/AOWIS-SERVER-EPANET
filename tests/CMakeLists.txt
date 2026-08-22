@@ -58,7 +58,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-controls-rule-else
     conformance-controls-rule-setting-action
     conformance-controls-rule-active-action
-    conformance-controls-rule-source-text
+    conformance-controls-rule-structured-serialization
     conformance-controls-rule-priority
     conformance-controls-rule-disabled
     conformance-controls-premise-node-demand

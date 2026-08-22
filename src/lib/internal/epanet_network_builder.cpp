@@ -1933,15 +1933,10 @@ HydraulicSimulationStatus EpanetNetworkBuilder::buildControlRuleText(const Hydra
 
 HydraulicSimulationStatus EpanetNetworkBuilder::addControlRule(const HydraulicControlRule &rule)
 {
-    QString rule_text = rule.source_text;
-    if (rule_text.isEmpty())
-    {
-        const HydraulicSimulationStatus status = buildControlRuleText(rule, rule_text);
-        if (!status.success)
-            return status;
-    }
-    if (!rule_text.endsWith(QLatin1Char('\n')))
-        rule_text.append(QLatin1Char('\n'));
+    QString rule_text;
+    const HydraulicSimulationStatus build_status = buildControlRuleText(rule, rule_text);
+    if (!build_status.success)
+        return build_status;
 
     int rule_count_before = 0;
     int error = EN_getcount(this->project.handle(), EN_RULECOUNT, &rule_count_before);
@@ -1989,7 +1984,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addControlRule(const HydraulicCo
     if (QString::fromUtf8(backend_rule_id) != rule.id)
     {
         EN_deleterule(this->project.handle(), rule_index);
-        return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::AddRule, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("Preserved control-rule source text uses an ID different from the model rule ID"));
+        return makeEpanetStatus(HydraulicSimulationStatusStage::AddRule, HydraulicSimulationStatusOperation::AddRule, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("EPANET returned a control-rule ID different from the model rule ID"));
     }
 
     error = EN_setruleenabled(this->project.handle(), rule_index, rule.enabled ? EN_TRUE : EN_FALSE);

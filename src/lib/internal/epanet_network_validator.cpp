@@ -613,9 +613,6 @@ QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulic &netw
 
     for (const HydraulicControlRule &rule : network.controls_rules)
     {
-        if (!rule.source_text.isEmpty())
-            continue;
-
         for (const HydraulicControlRulePremise &premise : rule.premises)
         {
             if (premise.object == HydraulicControlRuleObject::Node)
@@ -1160,9 +1157,6 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
     {
         status = validateFinite(rule.priority, HydraulicSimulationStatusEntityType::Rule, rule.id, rule.uuid, QStringLiteral("priority"));
         appendValidationFailure(failures, status);
-
-        if (!rule.source_text.isEmpty())
-            continue;
 
         for (int index = 0; index < rule.premises.size(); index++)
         {
