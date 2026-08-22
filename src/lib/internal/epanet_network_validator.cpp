@@ -468,12 +468,6 @@ QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulic &netw
 
     HydraulicSimulationStatus status;
 
-    if (network.options_quality.analysis == WaterQualityAnalysisType::SourceTrace)
-    {
-        status = validateReference(all_nodes, enabled_nodes, network.options_quality.trace_node_uuid, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("source-trace node"));
-        appendValidationFailure(failures, status);
-    }
-
     const std::function<void(const HydraulicNodeQualitySource &, HydraulicSimulationStatusEntityType, const QString &, const QUuid &)> validate_quality_source_pattern = [&failures, &patterns](const HydraulicNodeQualitySource &source, HydraulicSimulationStatusEntityType entity_type, const QString &id, const QUuid &uuid)
     {
         if (source.type == HydraulicNodeQualitySourceType::None || source.pattern_uuid.isNull())
@@ -674,16 +668,7 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
     HydraulicSimulationStatus status;
 
 
-    const WaterQualitySolverOptions &quality = network.options_quality;
     const WaterQualityReactionOptions &reactions = network.options_reaction;
-    status = validateFiniteNonNegative(quality.chemical_tolerance_mg_per_l, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_quality.chemical_tolerance_mg_per_l"));
-    appendValidationFailure(failures, status);
-    status = validateFiniteNonNegative(quality.water_age_tolerance_h, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_quality.water_age_tolerance_h"));
-    appendValidationFailure(failures, status);
-    status = validateFiniteNonNegative(quality.source_trace_tolerance_percent, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_quality.source_trace_tolerance_percent"));
-    appendValidationFailure(failures, status);
-    status = validateFiniteNonNegative(quality.relative_diffusivity, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_quality.relative_diffusivity"));
-    appendValidationFailure(failures, status);
     status = validateFiniteNonNegative(reactions.global_pipe_bulk_reaction.order, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_pipe_bulk_reaction.order"));
     appendValidationFailure(failures, status);
     status = validateFiniteNonNegative(reactions.global_tank_bulk_reaction.order, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_tank_bulk_reaction.order"));
@@ -702,11 +687,6 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
     appendValidationFailure(failures, status);
     status = validateFinite(reactions.roughness_reaction_factor, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.roughness_reaction_factor"));
     appendValidationFailure(failures, status);
-
-    if (quality.analysis == WaterQualityAnalysisType::Chemical && quality.chemical_name.trimmed().isEmpty())
-    {
-        failures.append(validationStatus(HydraulicSimulationStatusOperation::ConfigureQuality, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("Chemical water-quality analysis requires a chemical name")));
-    }
 
     const std::function<void(const HydraulicNodeQualitySource &, HydraulicSimulationStatusEntityType, const QString &, const QUuid &)> validate_quality_source = [&failures](const HydraulicNodeQualitySource &source, HydraulicSimulationStatusEntityType entity_type, const QString &id, const QUuid &uuid)
     {
@@ -1216,6 +1196,100 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
     return failures;
 }
 
+HydraulicSimulationStatus qualityRunValidationStatus(HydraulicSimulationStatus status)
+{
+    if (!status.success)
+        status.stage = HydraulicSimulationStatusStage::ConfigureOptions;
+    return status;
+}
+
+QList<HydraulicSimulationStatus> validateQualityRunReferences(
+    const NetworkHydraulic &network,
+    const WaterQualitySolverOptions &options)
+{
+    QList<HydraulicSimulationStatus> failures;
+    if (options.analysis != WaterQualityAnalysisType::SourceTrace)
+        return failures;
+
+    NetworkHydraulic enabled_network = network;
+    enabled_network.nodes_junctions = enabledEntities(network.nodes_junctions);
+    enabled_network.nodes_reservoirs = enabledEntities(network.nodes_reservoirs);
+    enabled_network.nodes_tanks = enabledEntities(network.nodes_tanks);
+
+    const HydraulicSimulationStatus status = qualityRunValidationStatus(validateReference(
+        nodeUuids(network),
+        nodeUuids(enabled_network),
+        options.trace_node_uuid,
+        HydraulicSimulationStatusEntityType::QualitySolver,
+        network.id,
+        network.uuid,
+        QStringLiteral("source-trace node")));
+    appendValidationFailure(failures, status);
+    return failures;
+}
+
+QList<HydraulicSimulationStatus> validateQualityRunNumerics(
+    const NetworkHydraulic &network,
+    const WaterQualitySolverOptions &options)
+{
+    QList<HydraulicSimulationStatus> failures;
+    HydraulicSimulationStatus status = qualityRunValidationStatus(validateFiniteNonNegative(
+        options.chemical_tolerance_mg_per_l,
+        HydraulicSimulationStatusEntityType::QualitySolver,
+        network.id,
+        network.uuid,
+        QStringLiteral("quality_run.chemical_tolerance_mg_per_l")));
+    appendValidationFailure(failures, status);
+    status = qualityRunValidationStatus(validateFiniteNonNegative(
+        options.water_age_tolerance_h,
+        HydraulicSimulationStatusEntityType::QualitySolver,
+        network.id,
+        network.uuid,
+        QStringLiteral("quality_run.water_age_tolerance_h")));
+    appendValidationFailure(failures, status);
+    status = qualityRunValidationStatus(validateFiniteNonNegative(
+        options.source_trace_tolerance_percent,
+        HydraulicSimulationStatusEntityType::QualitySolver,
+        network.id,
+        network.uuid,
+        QStringLiteral("quality_run.source_trace_tolerance_percent")));
+    appendValidationFailure(failures, status);
+    status = qualityRunValidationStatus(validateFiniteNonNegative(
+        options.relative_diffusivity,
+        HydraulicSimulationStatusEntityType::QualitySolver,
+        network.id,
+        network.uuid,
+        QStringLiteral("quality_run.relative_diffusivity")));
+    appendValidationFailure(failures, status);
+
+    if (options.analysis == WaterQualityAnalysisType::Chemical && options.chemical_name.trimmed().isEmpty())
+    {
+        failures.append(makeEpanetStatus(
+            HydraulicSimulationStatusStage::ConfigureOptions,
+            HydraulicSimulationStatusOperation::ConfigureQuality,
+            HydraulicSimulationStatusEntityType::QualitySolver,
+            network.id,
+            network.uuid,
+            QStringLiteral("Chemical water-quality analysis requires a chemical name")));
+    }
+
+    return failures;
+}
+
+HydraulicSimulationStatus validateQualityRun(
+    const NetworkHydraulic &network,
+    const WaterQualitySolverOptions &options,
+    QList<HydraulicSimulationStatus> *validation_failures)
+{
+    QList<HydraulicSimulationStatus> failures = validateQualityRunReferences(network, options);
+    appendValidationFailures(failures, validateQualityRunNumerics(network, options));
+
+    if (validation_failures != nullptr)
+        *validation_failures = failures;
+
+    return failures.isEmpty() ? makeEpanetSuccess() : failures.first();
+}
+
 HydraulicSimulationStatus validateNetwork(
     const NetworkHydraulic &network,
     QList<HydraulicSimulationStatus> *validation_failures)
@@ -1236,4 +1310,12 @@ HydraulicSimulationStatus validateEpanetNetwork(
     QList<HydraulicSimulationStatus> *validation_failures)
 {
     return validateNetwork(network, validation_failures);
+}
+
+HydraulicSimulationStatus validateEpanetQualityRun(
+    const NetworkHydraulic &network,
+    const WaterQualitySolverOptions &options,
+    QList<HydraulicSimulationStatus> *validation_failures)
+{
+    return validateQualityRun(network, options, validation_failures);
 }

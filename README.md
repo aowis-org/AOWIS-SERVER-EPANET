@@ -8,8 +8,8 @@ The adapter translates `NetworkHydraulic` into a native EPANET project, executes
 
 - `EpanetRunner`: synchronous entry point for one complete EPANET run request.
 - `EpanetSimulationManager`: asynchronous Qt queue with independent cooperative cancellation for each job.
-- `EpanetRunRequest`: one hydraulic network plus an ordered list of requested water-quality analyses.
-- `EpanetResultRun`: one hydraulic result timeline plus the results of the requested quality analyses.
+- `EpanetRunRequest`: the complete execution request: one hydraulic network plus an ordered list of requested water-quality analyses.
+- `EpanetResultRun`: one hydraulic result timeline plus one child result for every requested quality analysis.
 - `EpanetResolvers`: conversion helpers for supported AOWIS input forms.
 
 The implementation keeps native EPANET state behind adapter-internal builders, configurators, solvers, result readers, project wrappers, and index registries.
@@ -20,7 +20,9 @@ Each request contains exactly one hydraulic configuration. The selected headloss
 
 Hydraulics are solved and saved once. The adapter then executes the ordered `quality_runs` list against that saved hydraulic solution. Chemical concentration, water age, and source trace use independent quality timelines because their timesteps do not have to coincide with hydraulic events.
 
-Multiple headloss formulas are separate requests; they are not branches inside one `EpanetRunRequest`.
+`NetworkHydraulic` contains the network and its persistent hydraulic/quality input data. The active water-quality analysis, trace origin, chemical name, tolerances, and diffusivity are execution settings carried only by `EpanetRunRequest::quality_runs`; they are not mutable network state.
+
+Multiple headloss formulas are separate requests; they are not branches inside one `EpanetRunRequest`. `retrieveInp()` accepts the same request type because quality-analysis configuration is part of execution state, but an INP file can represent at most one active quality analysis, so INP export rejects requests containing more than one quality child.
 
 ```cpp
 EpanetRunRequest request;

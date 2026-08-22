@@ -1,6 +1,7 @@
 #include <aowis/epanet/epanet_runner.h>
 
 #include "conformance/conformance_test_framework.h"
+#include "conformance/epanet_test_requests.h"
 #include "conformance/deterministic_quality_stress_scenarios.h"
 #include "conformance/generated_quality_stress_fixture.h"
 #include "conformance/native_quality_reference_runner.h"
@@ -143,8 +144,14 @@ void compareGeneratedQualityCase(const GeneratedQualityStressCase &definition, T
     if (!native.success)
         return;
 
-    const EpanetResultRun actual_run = EpanetRunner().run(fixture.network);
-    const WaterQualitySimulationResultTimeline &actual = actual_run.quality_result_timeline;
+    const EpanetResultRun actual_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network, fixture.quality_options));
+    context.expectEqual(
+        static_cast<std::int64_t>(actual_run.quality_results.size()),
+        std::int64_t{1},
+        comparison(-1, "quality_results.size"));
+    if (actual_run.quality_results.size() != 1)
+        return;
+    const WaterQualitySimulationResultTimeline &actual = actual_run.quality_results.constFirst().result_timeline;
     context.expect(actual_run.result_timeline.validity == HydraulicSimulationResultValidity::Valid,
         "generated quality stress run must preserve a valid hydraulic timeline");
     context.expect(actual.status.success, "generated quality stress run must finish quality successfully");
@@ -246,7 +253,7 @@ void qualityStressCancellationPositions(TestContext &context)
     for (int threshold = 1; threshold <= 80 && partial_result_counts.size() < 3; threshold++)
     {
         int checks = 0;
-        const EpanetResultRun run = EpanetRunner().run(fixture.network, [&checks, threshold]()
+        const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network, fixture.quality_options), [&checks, threshold]()
         {
             checks++;
             return checks >= threshold;
@@ -254,13 +261,14 @@ void qualityStressCancellationPositions(TestContext &context)
 
         if (!run.cancelled
             || run.result_timeline.validity != HydraulicSimulationResultValidity::Valid
-            || run.quality_result_timeline.validity != WaterQualitySimulationResultValidity::Partial
-            || run.quality_result_timeline.results.isEmpty())
+            || run.quality_results.size() != 1
+            || run.quality_results.constFirst().result_timeline.validity != WaterQualitySimulationResultValidity::Partial
+            || run.quality_results.constFirst().result_timeline.results.isEmpty())
         {
             continue;
         }
 
-        const int result_count = run.quality_result_timeline.results.size();
+        const int result_count = run.quality_results.constFirst().result_timeline.results.size();
         if (!partial_result_counts.empty() && result_count <= partial_result_counts.back())
             continue;
 

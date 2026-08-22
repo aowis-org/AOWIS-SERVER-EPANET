@@ -133,6 +133,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-export-patterns-curves
     conformance-export-coordinates-vertices
     conformance-export-report-options
+    conformance-export-multiple-quality-rejected
     conformance-quality-input-none
     conformance-quality-input-chemical
     conformance-quality-input-water-age

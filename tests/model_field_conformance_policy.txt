@@ -148,7 +148,7 @@ network_hydraulic.h|NetworkHydraulic|timestep_rule_s|complete|conformance-option
 network_hydraulic.h|NetworkHydraulic|start_time_of_day_s|complete|conformance-options-time-start-clock|
 network_hydraulic.h|NetworkHydraulic|report_statistic|complete|conformance-options-report-statistic-series,conformance-options-report-statistic-average,conformance-options-report-statistic-minimum,conformance-options-report-statistic-maximum,conformance-options-report-statistic-range|
 network_hydraulic.h|NetworkHydraulic|options_hydraulic|complete|conformance-options-hydraulic-demand-model-dda,conformance-options-hydraulic-accuracy|
-network_hydraulic.h|NetworkHydraulic|options_quality,options_reaction|complete|conformance-quality-input-none,conformance-quality-input-chemical,conformance-quality-input-water-age,conformance-quality-input-source-trace,conformance-quality-input-tank-mixing-models,conformance-quality-input-reactions|Water-quality and reaction configuration is fully mapped into the prepared EPANET project.
+network_hydraulic.h|NetworkHydraulic|options_reaction|complete|conformance-quality-input-chemical,conformance-quality-input-tank-mixing-models,conformance-quality-input-reactions|Water-quality reaction configuration is fully mapped into the prepared EPANET project.
 network_hydraulic.h|NetworkHydraulic|options_energy|complete|conformance-upstream-pump-global-energy|
 network_hydraulic.h|NetworkHydraulic|options_report|complete|conformance-export-report-options|
 network_hydraulic.h|NetworkHydraulic|patterns_time|complete|conformance-export-patterns-curves,conformance-upstream-demand-pattern|

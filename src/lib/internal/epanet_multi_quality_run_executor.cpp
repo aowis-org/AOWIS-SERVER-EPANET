@@ -3,6 +3,7 @@
 #include "epanet_diagnostic_helpers.h"
 #include "epanet_hydraulic_run_configurator.h"
 #include "epanet_hydraulic_solver.h"
+#include "epanet_network_validator.h"
 #include "epanet_prepared_project.h"
 #include "epanet_quality_result_reader.h"
 #include "epanet_quality_run_configurator.h"
@@ -82,23 +83,8 @@ void markPendingQualityRuns(EpanetResultRun &result, EpanetRunState state)
     }
 }
 
-void updateCompatibilityQualityTimeline(EpanetResultRun &result)
-{
-    if (!result.quality_results.isEmpty())
-    {
-        result.quality_result_timeline = result.quality_results.constFirst().result_timeline;
-        return;
-    }
-
-    result.quality_result_timeline.analysis = WaterQualityAnalysisType::None;
-    result.quality_result_timeline.status = makeEpanetSuccess();
-    result.quality_result_timeline.validity = WaterQualitySimulationResultValidity::NotRun;
-}
-
 void finalizeRunState(EpanetResultRun &result)
 {
-    updateCompatibilityQualityTimeline(result);
-
     if (result.cancelled)
     {
         result.state = EpanetRunState::Cancelled;
@@ -191,13 +177,6 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
     const std::function<bool()> &cancellation_requested)
 {
     result.state = EpanetRunState::Running;
-
-    if (cancellationRequested(cancellation_requested))
-    {
-        result.cancelled = true;
-        finalizeRunState(result);
-        return result;
-    }
 
     const EpanetDiagnosticCheckpoint hydraulic_diagnostics(this->prepared_project_.project().diagnostics());
     HydraulicSimulationStatus status = configureEpanetHydraulicRun(
@@ -317,13 +296,33 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
         }
 
         quality_result.state = EpanetRunState::Running;
-        this->prepared_project_.network().options_quality = quality_result.options;
-        const EpanetDiagnosticCheckpoint quality_diagnostics(this->prepared_project_.project().diagnostics());
+        QList<HydraulicSimulationStatus> quality_validation_failures;
+        status = validateEpanetQualityRun(
+            this->prepared_project_.network(),
+            quality_result.options,
+            &quality_validation_failures);
+        if (!status.success)
+        {
+            for (const HydraulicSimulationStatus &validation_failure : quality_validation_failures)
+            {
+                appendEpanetDiagnosticIfUnique(
+                    quality_result.result_timeline.diagnostics,
+                    epanetDiagnosticFromStatus(validation_failure));
+            }
+            quality_result.result_timeline.status = status;
+            finalizeEpanetQualityResultValidity(quality_result.result_timeline);
+            quality_result.state = EpanetRunState::Error;
+            appendEpanetDiagnostics(result.diagnostics, quality_result.result_timeline.diagnostics);
+            recordFailureStatus(result, status);
+            continue;
+        }
 
+        const EpanetDiagnosticCheckpoint quality_diagnostics(this->prepared_project_.project().diagnostics());
         status = configureEpanetQualityRun(
             this->prepared_project_.project(),
             this->prepared_project_.network(),
-            this->prepared_project_.indices());
+            this->prepared_project_.indices(),
+            quality_result.options);
         quality_diagnostics.appendSince(
             quality_result.result_timeline.diagnostics,
             this->prepared_project_.project().diagnostics());
@@ -342,7 +341,8 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
         EpanetQualityResultReader quality_result_reader(
             this->prepared_project_.project(),
             this->prepared_project_.network(),
-            this->prepared_project_.indices());
+            this->prepared_project_.indices(),
+            quality_result.options.analysis);
         EpanetQualitySolver quality_solver(
             this->prepared_project_.project(),
             this->prepared_project_.network(),

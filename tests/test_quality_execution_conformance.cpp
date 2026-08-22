@@ -2,6 +2,7 @@
 #include <aowis/epanet/epanet_runner.h>
 
 #include "conformance/conformance_test_framework.h"
+#include "conformance/epanet_test_requests.h"
 #include "conformance/net1_fixture.h"
 #include "conformance/quality_execution_scenarios.h"
 
@@ -97,12 +98,10 @@ NetworkHydraulic qualityNetwork(WaterQualityAnalysisType analysis)
     network.timestep_hydraulic_s = 1800;
     network.timestep_quality_s = 300;
     network.timestep_report_s = 1800;
-    network.options_quality.analysis = analysis;
     replacePipeWithValve(network, QStringLiteral("111"));
 
     if (analysis == WaterQualityAnalysisType::Chemical)
     {
-        network.options_quality.chemical_name = QStringLiteral("Chlorine");
         network.nodes_reservoirs.first().initial_chemical_concentration_mg_per_l = 1.0;
         network.nodes_reservoirs.first().quality_source.type = HydraulicNodeQualitySourceType::Concentration;
         network.nodes_reservoirs.first().quality_source.chemical_concentration_mg_per_l = 1.0;
@@ -113,12 +112,20 @@ NetworkHydraulic qualityNetwork(WaterQualityAnalysisType analysis)
         network.nodes_tanks.first().quality_source.type = HydraulicNodeQualitySourceType::SetpointBooster;
         network.nodes_tanks.first().quality_source.chemical_concentration_mg_per_l = 0.5;
     }
-    else if (analysis == WaterQualityAnalysisType::SourceTrace)
-    {
-        network.options_quality.trace_node_uuid = network.nodes_reservoirs.first().uuid;
-    }
-
     return network;
+}
+
+WaterQualitySolverOptions qualityOptions(
+    WaterQualityAnalysisType analysis,
+    const NetworkHydraulic &network)
+{
+    WaterQualitySolverOptions options;
+    options.analysis = analysis;
+    if (analysis == WaterQualityAnalysisType::Chemical)
+        options.chemical_name = QStringLiteral("Chlorine");
+    else if (analysis == WaterQualityAnalysisType::SourceTrace)
+        options.trace_node_uuid = network.nodes_reservoirs.first().uuid;
+    return options;
 }
 
 void clearChemicalInputs(NetworkHydraulic &network)
@@ -240,8 +247,6 @@ NetworkHydraulic qualityCancellationNetwork()
     network.timestep_hydraulic_s = 1800;
     network.timestep_quality_s = 300;
     network.timestep_report_s = 1800;
-    network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
-    network.options_quality.chemical_name = QStringLiteral("Chlorine");
 
     HydraulicNodeReservoir reservoir;
     reservoir.id = QStringLiteral("R1");
@@ -307,7 +312,7 @@ struct NativeQualityStep
 class NativeQualityRun
 {
 public:
-    explicit NativeQualityRun(const NetworkHydraulic &network)
+    NativeQualityRun(const NetworkHydraulic &network, const WaterQualitySolverOptions &quality_options)
     {
         // Input-mapping scenarios cover Model-to-EPANET configuration. Build the runtime
         // reference in memory so EN_saveinpfile rounding cannot contaminate
@@ -329,7 +334,7 @@ public:
 
         status = configureEpanetHydraulicRun(this->project_, prepared_network, indices);
         checkStatus(status, "configureEpanetHydraulicRun(native quality)");
-        status = configureEpanetQualityRun(this->project_, prepared_network, indices);
+        status = configureEpanetQualityRun(this->project_, prepared_network, indices, quality_options);
         checkStatus(status, "configureEpanetQualityRun(native quality)");
 
         checkEpanet(EN_solveH(this->project_.handle()), "EN_solveH(native quality)");
@@ -504,11 +509,23 @@ void compareLinkResults(TestContext &context, const QList<ResultType> &actual, c
     }
 }
 
-void compareQualityTimeline(TestContext &context, const NetworkHydraulic &network, const EpanetResultRun &actual_run)
+void compareQualityTimeline(
+    TestContext &context,
+    const NetworkHydraulic &network,
+    const WaterQualitySolverOptions &quality_options,
+    const EpanetResultRun &actual_run)
 {
-    NativeQualityRun native(network);
+    context.expectEqual(
+        static_cast<std::int64_t>(actual_run.quality_results.size()),
+        std::int64_t{1},
+        comparison(-1, "quality_results.size"),
+        "single-quality execution must return exactly one quality child");
+    if (actual_run.quality_results.size() != 1)
+        return;
+
+    NativeQualityRun native(network, quality_options);
     const QList<NativeQualityStep> &expected_steps = native.steps();
-    const WaterQualitySimulationResultTimeline &actual = actual_run.quality_result_timeline;
+    const WaterQualitySimulationResultTimeline &actual = actual_run.quality_results.constFirst().result_timeline;
 
     context.expect(actual.status.success, "AOWIS quality execution should finish successfully");
     context.expect(actual.validity == WaterQualitySimulationResultValidity::Valid, "successful quality execution should produce a valid quality timeline");
@@ -534,37 +551,34 @@ void compareQualityTimeline(TestContext &context, const NetworkHydraulic &networ
 
 void scenarioQualityExecutionNone(TestContext &context)
 {
-    NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::None);
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::None);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
 
     context.expect(run.result_timeline.status.success, "quality-disabled run must retain successful hydraulics");
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "quality-disabled run must retain valid hydraulics");
-    context.expect(run.quality_result_timeline.status.success, "quality-disabled timeline should have successful not-run status");
-    context.expect(run.quality_result_timeline.validity == WaterQualitySimulationResultValidity::NotRun, "quality-disabled timeline must remain NotRun");
-    context.expect(run.quality_result_timeline.results.isEmpty(), "quality-disabled timeline must contain no quality results");
+    context.expect(run.quality_results.isEmpty(), "hydraulics-only request must not manufacture a quality result");
 }
 
 void scenarioQualityExecutionChemical(TestContext &context)
 {
     const NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::Chemical);
-    const EpanetResultRun run = EpanetRunner().run(network);
-    compareQualityTimeline(context, network, run);
+    const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
+    compareQualityTimeline(context, network, options, run);
 }
 
 void scenarioQualityExecutionWaterAge(TestContext &context)
 {
     const NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::WaterAge);
-    const EpanetResultRun run = EpanetRunner().run(network);
-    compareQualityTimeline(context, network, run);
+    const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::WaterAge, network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
+    compareQualityTimeline(context, network, options, run);
 
     NetworkHydraulic steady_state_network = qualityNetwork(WaterQualityAnalysisType::WaterAge);
     steady_state_network.duration_s = 0;
-
-    EpanetRunRequest steady_state_request;
-    steady_state_request.network = steady_state_network;
-    steady_state_request.quality_runs.append(steady_state_network.options_quality);
-
-    const EpanetResultRun steady_state_run = EpanetRunner().run(steady_state_request);
+    const WaterQualitySolverOptions steady_state_options = qualityOptions(WaterQualityAnalysisType::WaterAge, steady_state_network);
+    const EpanetResultRun steady_state_run = EpanetRunner().run(
+        AowisEpanetTests::makeRunRequest(steady_state_network, steady_state_options));
     context.expect(steady_state_run.state == EpanetRunState::Success, "steady-state water-age run must complete successfully");
     context.expect(steady_state_run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "steady-state water-age run must retain valid hydraulics");
     context.expectEqual(
@@ -598,24 +612,34 @@ void scenarioQualityExecutionWaterAge(TestContext &context)
 void scenarioQualityExecutionSourceTrace(TestContext &context)
 {
     const NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::SourceTrace);
-    const EpanetResultRun run = EpanetRunner().run(network);
-    compareQualityTimeline(context, network, run);
+    const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::SourceTrace, network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
+    compareQualityTimeline(context, network, options, run);
 }
 
 void scenarioQualityExecutionIndependentTimeline(TestContext &context)
 {
     const NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::Chemical);
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
 
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "independent-timeline fixture requires valid hydraulics");
-    context.expect(run.quality_result_timeline.validity == WaterQualitySimulationResultValidity::Valid, "independent-timeline fixture requires valid quality results");
-    context.expect(run.quality_result_timeline.results.size() > run.result_timeline.results.size(), "quality timestep must produce more samples than the coarser hydraulic timestep");
+    context.expectEqual(
+        static_cast<std::int64_t>(run.quality_results.size()),
+        std::int64_t{1},
+        comparison(-1, "independent-timeline.quality_results.size"));
+    if (run.quality_results.size() != 1)
+        return;
 
-    for (int index = 0; index < run.quality_result_timeline.results.size(); index++)
+    const WaterQualitySimulationResultTimeline &quality_timeline = run.quality_results.constFirst().result_timeline;
+    context.expect(quality_timeline.validity == WaterQualitySimulationResultValidity::Valid, "independent-timeline fixture requires valid quality results");
+    context.expect(quality_timeline.results.size() > run.result_timeline.results.size(), "quality timestep must produce more samples than the coarser hydraulic timestep");
+
+    for (int index = 0; index < quality_timeline.results.size(); index++)
     {
         const std::int64_t expected_time_s = static_cast<std::int64_t>(index) * static_cast<std::int64_t>(network.timestep_quality_s);
         context.expectEqual(
-            static_cast<std::int64_t>(run.quality_result_timeline.results.at(index).time_elapsed_s),
+            static_cast<std::int64_t>(quality_timeline.results.at(index).time_elapsed_s),
             expected_time_s,
             comparison(expected_time_s, "quality_timestep"));
     }
@@ -624,37 +648,43 @@ void scenarioQualityExecutionIndependentTimeline(TestContext &context)
 void scenarioQualityRuntimeSourceConcentration(TestContext &context)
 {
     const NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
-    const EpanetResultRun run = EpanetRunner().run(network);
-    compareQualityTimeline(context, network, run);
+    const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
+    compareQualityTimeline(context, network, options, run);
 }
 
 void scenarioQualityRuntimeSourceMassBooster(TestContext &context)
 {
     const NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::MassBooster);
-    const EpanetResultRun run = EpanetRunner().run(network);
-    compareQualityTimeline(context, network, run);
+    const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
+    compareQualityTimeline(context, network, options, run);
 }
 
 void scenarioQualityRuntimeSourceFlowPaced(TestContext &context)
 {
     const NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::FlowPacedBooster);
-    const EpanetResultRun run = EpanetRunner().run(network);
-    compareQualityTimeline(context, network, run);
+    const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
+    compareQualityTimeline(context, network, options, run);
 }
 
 void scenarioQualityRuntimeSourceSetpoint(TestContext &context)
 {
     const NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::SetpointBooster);
-    const EpanetResultRun run = EpanetRunner().run(network);
-    compareQualityTimeline(context, network, run);
+    const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
+    compareQualityTimeline(context, network, options, run);
 }
 
 void scenarioQualityRuntimeSourcePattern(TestContext &context)
 {
     const NetworkHydraulic network = patternedSourceNetwork();
-    const EpanetResultRun run = EpanetRunner().run(network);
-    compareQualityTimeline(context, network, run);
-    context.expect(run.quality_result_timeline.results.size() == 8, "2400-second patterned source run at 300-second quality steps must return eight EN_runQ samples from time zero through 2100 seconds");
+    const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
+    compareQualityTimeline(context, network, options, run);
+    if (run.quality_results.size() == 1)
+        context.expect(run.quality_results.constFirst().result_timeline.results.size() == 8, "2400-second patterned source run at 300-second quality steps must return eight EN_runQ samples from time zero through 2100 seconds");
 }
 
 void scenarioQualityRuntimeTankMixingModels(TestContext &context)
@@ -669,8 +699,9 @@ void scenarioQualityRuntimeTankMixingModels(TestContext &context)
     for (const HydraulicNodeTankMixingModel model : models)
     {
         const NetworkHydraulic network = tankMixingNetwork(model);
-        const EpanetResultRun run = EpanetRunner().run(network);
-        compareQualityTimeline(context, network, run);
+        const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
+        const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
+        compareQualityTimeline(context, network, options, run);
     }
 }
 
@@ -685,8 +716,9 @@ void scenarioQualityRuntimeReactions(TestContext &context)
     for (const HydraulicHeadlossFormula formula : formulas)
     {
         const NetworkHydraulic network = reactionNetwork(formula);
-        const EpanetResultRun run = EpanetRunner().run(network);
-        compareQualityTimeline(context, network, run);
+        const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
+        const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
+        compareQualityTimeline(context, network, options, run);
     }
 }
 
@@ -696,15 +728,20 @@ void scenarioQualityRuntimeLongMultistepContract(TestContext &context)
     network.duration_s = 12 * 3600;
     network.timestep_hydraulic_s = 3600;
     network.timestep_quality_s = 300;
-    const EpanetResultRun run = EpanetRunner().run(network);
-    compareQualityTimeline(context, network, run);
+    const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
+    compareQualityTimeline(context, network, options, run);
 
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "long quality run must preserve valid hydraulic results");
-    context.expect(run.quality_result_timeline.validity == WaterQualitySimulationResultValidity::Valid, "long quality run must produce a valid quality timeline");
-    context.expect(run.quality_result_timeline.results.size() == 144, "12-hour run at 300-second quality steps must return 144 EN_runQ samples from time zero through 42900 seconds");
-    for (int index = 0; index < run.quality_result_timeline.results.size(); index++)
+    if (run.quality_results.size() != 1)
+        return;
+
+    const WaterQualitySimulationResultTimeline &quality_timeline = run.quality_results.constFirst().result_timeline;
+    context.expect(quality_timeline.validity == WaterQualitySimulationResultValidity::Valid, "long quality run must produce a valid quality timeline");
+    context.expect(quality_timeline.results.size() == 144, "12-hour run at 300-second quality steps must return 144 EN_runQ samples from time zero through 42900 seconds");
+    for (int index = 0; index < quality_timeline.results.size(); index++)
     {
-        const WaterQualitySimulationResult &step = run.quality_result_timeline.results.at(index);
+        const WaterQualitySimulationResult &step = quality_timeline.results.at(index);
         context.expect(step.status.success, "every successfully returned quality timestep must carry a successful per-step status");
         context.expect(std::isfinite(step.statistics.mass_balance_ratio), "quality mass-balance ratio must be finite at every returned timestep");
         if (index == 0)
@@ -721,18 +758,29 @@ void scenarioQualityRuntimeLongMultistepContract(TestContext &context)
 void scenarioQualityExecutionCancellationPartial(TestContext &context)
 {
     const NetworkHydraulic network = qualityCancellationNetwork();
+    const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
     int cancellation_checks = 0;
-    const EpanetResultRun run = EpanetRunner().run(network, [&cancellation_checks]()
-    {
-        cancellation_checks++;
-        return cancellation_checks >= 20;
-    });
+    const EpanetResultRun run = EpanetRunner().run(
+        AowisEpanetTests::makeRunRequest(network, options),
+        [&cancellation_checks]()
+        {
+            cancellation_checks++;
+            return cancellation_checks >= 20;
+        });
 
     context.expect(run.cancelled, "quality-step cancellation must be reported");
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "quality cancellation must not downgrade completed hydraulic results");
-    context.expect(!run.quality_result_timeline.results.isEmpty(), "quality cancellation must preserve already produced quality results");
-    context.expect(run.quality_result_timeline.results.size() < 7, "quality cancellation fixture must stop before the full seven-step quality timeline is produced");
-    context.expect(run.quality_result_timeline.validity == WaterQualitySimulationResultValidity::Partial, "quality cancellation after numerical results must classify quality as partial");
+    context.expectEqual(
+        static_cast<std::int64_t>(run.quality_results.size()),
+        std::int64_t{1},
+        comparison(-1, "quality-cancellation.quality_results.size"));
+    if (run.quality_results.size() != 1)
+        return;
+
+    const WaterQualitySimulationResultTimeline &quality_timeline = run.quality_results.constFirst().result_timeline;
+    context.expect(!quality_timeline.results.isEmpty(), "quality cancellation must preserve already produced quality results");
+    context.expect(quality_timeline.results.size() < 7, "quality cancellation fixture must stop before the full seven-step quality timeline is produced");
+    context.expect(quality_timeline.validity == WaterQualitySimulationResultValidity::Partial, "quality cancellation after numerical results must classify quality as partial");
 }
 }
 

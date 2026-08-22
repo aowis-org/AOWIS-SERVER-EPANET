@@ -3,11 +3,17 @@
 
 #include <QList>
 
+#include <aowis/model/hydraulic/hydraulic_simulation_options.h>
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
 #include <aowis/model/hydraulic/network_hydraulic.h>
 
 HydraulicSimulationStatus validateEpanetNetwork(
     const NetworkHydraulic &network,
+    QList<HydraulicSimulationStatus> *validation_failures = nullptr);
+
+HydraulicSimulationStatus validateEpanetQualityRun(
+    const NetworkHydraulic &network,
+    const WaterQualitySolverOptions &options,
     QList<HydraulicSimulationStatus> *validation_failures = nullptr);
 
 #endif // AOWIS_EPANET_NETWORK_VALIDATOR_H

@@ -258,17 +258,17 @@ void applyNodeSpecification(HydraulicNodeReservoir &node, const QualityNodeSpeci
     node.quality_source.pattern_uuid = patternUuid(network, quality.source_pattern_id);
 }
 
-void applyQualityToModel(NetworkHydraulic &network, const QualityStressSpecification &quality)
+void applyQualityToModel(NetworkHydraulic &network, WaterQualitySolverOptions &options, const QualityStressSpecification &quality)
 {
-    network.options_quality.analysis = quality.analysis;
-    network.options_quality.chemical_name = quality.chemical_name;
-    network.options_quality.relative_diffusivity = quality.relative_diffusivity;
+    options.analysis = quality.analysis;
+    options.chemical_name = quality.chemical_name;
+    options.relative_diffusivity = quality.relative_diffusivity;
     if (quality.analysis == WaterQualityAnalysisType::Chemical)
-        network.options_quality.chemical_tolerance_mg_per_l = quality.tolerance;
+        options.chemical_tolerance_mg_per_l = quality.tolerance;
     else if (quality.analysis == WaterQualityAnalysisType::WaterAge)
-        network.options_quality.water_age_tolerance_h = quality.tolerance;
+        options.water_age_tolerance_h = quality.tolerance;
     else if (quality.analysis == WaterQualityAnalysisType::SourceTrace)
-        network.options_quality.source_trace_tolerance_percent = quality.tolerance;
+        options.source_trace_tolerance_percent = quality.tolerance;
 
     if (quality.analysis == WaterQualityAnalysisType::SourceTrace)
     {
@@ -277,7 +277,7 @@ void applyQualityToModel(NetworkHydraulic &network, const QualityStressSpecifica
         {
             if (node.id == quality.trace_node_id)
             {
-                network.options_quality.trace_node_uuid = node.uuid;
+                options.trace_node_uuid = node.uuid;
                 trace_node_found = true;
                 break;
             }
@@ -426,7 +426,7 @@ GeneratedQualityStressFixture makeGeneratedQualityStressFixture(const GeneratedQ
     fixture.network.duration_s = definition.duration_s;
     fixture.network.timestep_hydraulic_s = definition.hydraulic_timestep_s;
     fixture.network.timestep_quality_s = definition.quality_timestep_s;
-    applyQualityToModel(fixture.network, quality);
+    applyQualityToModel(fixture.network, fixture.quality_options, quality);
     fixture.native_inp_text = buildNativeQualityInp(hydraulic_fixture.native_inp_text, definition, quality);
     fixture.expected_quality_sample_count = definition.duration_s / definition.quality_timestep_s;
     return fixture;

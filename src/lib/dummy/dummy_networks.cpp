@@ -503,9 +503,7 @@ NetworkHydraulic DummyNetworks::networkFull()
 {
     NetworkHydraulic network;
     network.uuid = QUuid::createUuid();
-    network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
-    network.options_quality.chemical_name = QStringLiteral("Chemical");
-    
+
     // Curves
     HydraulicCurvePumpHead pump_head_curve;
     pump_head_curve.uuid = QUuid::createUuid();

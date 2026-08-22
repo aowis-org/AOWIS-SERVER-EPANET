@@ -55,8 +55,12 @@ void assignQualityValue(WaterQualityAnalysisType analysis, double backend_value,
 }
 }
 
-EpanetQualityResultReader::EpanetQualityResultReader(const EpanetProject &project, const NetworkHydraulic &network, const EpanetIndexRegistry &indices)
-    : project(project), network(network), indices(indices)
+EpanetQualityResultReader::EpanetQualityResultReader(
+    const EpanetProject &project,
+    const NetworkHydraulic &network,
+    const EpanetIndexRegistry &indices,
+    WaterQualityAnalysisType analysis)
+    : project(project), network(network), indices(indices), analysis(analysis)
 {
 }
 
@@ -125,7 +129,7 @@ HydraulicSimulationStatus EpanetQualityResultReader::readNodesJunctions(WaterQua
         HydraulicSimulationStatus status = readNodeValue(this->project, index, EN_QUALITY, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, HydraulicSimulationStatusProperty::Quality, QStringLiteral("Failed to get junction quality"), backend_quality);
         if (!status.success)
             return status;
-        assignQualityValue(this->network.options_quality.analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
+        assignQualityValue(this->analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
 
         if (junction.quality_source.type != HydraulicNodeQualitySourceType::None)
         {
@@ -155,7 +159,7 @@ HydraulicSimulationStatus EpanetQualityResultReader::readNodesReservoirs(WaterQu
         HydraulicSimulationStatus status = readNodeValue(this->project, index, EN_QUALITY, HydraulicSimulationStatusEntityType::Reservoir, reservoir.id, reservoir.uuid, HydraulicSimulationStatusProperty::Quality, QStringLiteral("Failed to get reservoir quality"), backend_quality);
         if (!status.success)
             return status;
-        assignQualityValue(this->network.options_quality.analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
+        assignQualityValue(this->analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
 
         if (reservoir.quality_source.type != HydraulicNodeQualitySourceType::None)
         {
@@ -185,7 +189,7 @@ HydraulicSimulationStatus EpanetQualityResultReader::readNodesTanks(WaterQuality
         HydraulicSimulationStatus status = readNodeValue(this->project, index, EN_QUALITY, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, HydraulicSimulationStatusProperty::Quality, QStringLiteral("Failed to get tank quality"), backend_quality);
         if (!status.success)
             return status;
-        assignQualityValue(this->network.options_quality.analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
+        assignQualityValue(this->analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
 
         if (tank.quality_source.type != HydraulicNodeQualitySourceType::None)
         {
@@ -214,7 +218,7 @@ HydraulicSimulationStatus EpanetQualityResultReader::readLinksPipes(WaterQuality
         const HydraulicSimulationStatus status = readLinkValue(this->project, index, EN_LINKQUAL, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to get pipe quality"), backend_quality);
         if (!status.success)
             return status;
-        assignQualityValue(this->network.options_quality.analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
+        assignQualityValue(this->analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
         result.links_pipes.append(value);
     }
     return makeEpanetSuccess();
@@ -235,7 +239,7 @@ HydraulicSimulationStatus EpanetQualityResultReader::readLinksPumps(WaterQuality
         const HydraulicSimulationStatus status = readLinkValue(this->project, index, EN_LINKQUAL, HydraulicSimulationStatusEntityType::Pump, pump.id, pump.uuid, QStringLiteral("Failed to get pump quality"), backend_quality);
         if (!status.success)
             return status;
-        assignQualityValue(this->network.options_quality.analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
+        assignQualityValue(this->analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
         result.links_pumps.append(value);
     }
     return makeEpanetSuccess();
@@ -256,7 +260,7 @@ HydraulicSimulationStatus EpanetQualityResultReader::readLinksValves(WaterQualit
         const HydraulicSimulationStatus status = readLinkValue(this->project, index, EN_LINKQUAL, HydraulicSimulationStatusEntityType::Valve, valve.id, valve.uuid, QStringLiteral("Failed to get valve quality"), backend_quality);
         if (!status.success)
             return status;
-        assignQualityValue(this->network.options_quality.analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
+        assignQualityValue(this->analysis, backend_quality, value.chemical_concentration_mg_per_l, value.water_age_h, value.source_trace_percent);
         result.links_valves.append(value);
     }
     return makeEpanetSuccess();

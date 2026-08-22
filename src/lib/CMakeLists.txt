@@ -24,7 +24,6 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/internal/epanet_report_configurator.cpp
     src/lib/internal/epanet_result_finalizer.cpp
     src/lib/internal/epanet_result_reader.cpp
-    src/lib/internal/epanet_single_run_executor.cpp
     src/lib/internal/epanet_status_helpers.cpp
 )
 
@@ -64,7 +63,6 @@ set(AOWIS_SERVER_EPANET_INTERNAL_HEADERS
     src/lib/internal/epanet_report_configurator.h
     src/lib/internal/epanet_result_finalizer.h
     src/lib/internal/epanet_result_reader.h
-    src/lib/internal/epanet_single_run_executor.h
     src/lib/internal/epanet_status_helpers.h
 )
 

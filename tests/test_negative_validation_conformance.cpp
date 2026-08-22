@@ -1,6 +1,7 @@
 #include <aowis/epanet/epanet_runner.h>
 
 #include "conformance/conformance_test_framework.h"
+#include "conformance/epanet_test_requests.h"
 #include "conformance/net1_fixture.h"
 #include "conformance/negative_validation_scenarios.h"
 
@@ -73,7 +74,7 @@ void expectRejected(
     const QString &message_fragment,
     HydraulicSimulationStatusStage expected_stage = HydraulicSimulationStatusStage::BuildNetwork)
 {
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
 
     context.expect(!run.result_timeline.status.success, "invalid network must return a failing structured status");
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Invalid, "pre-simulation validation failure must produce invalid results");
@@ -96,6 +97,34 @@ void expectRejected(
     context.expect(diagnostic.entity.id == expected_entity_id, "diagnostic must retain entity ID");
     context.expect(diagnostic.entity.uuid == expected_entity_uuid, "diagnostic must retain entity UUID");
     context.expect(diagnostic.message == run.result_timeline.status.message, "diagnostic must retain the actionable status message");
+}
+
+void expectQualityRejected(
+    TestContext &context,
+    const NetworkHydraulic &network,
+    const WaterQualitySolverOptions &options,
+    const QString &message_fragment)
+{
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
+    context.expect(run.result_timeline.status.success, "invalid quality-run configuration must not invalidate completed hydraulics");
+    context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "invalid quality-run configuration must preserve valid hydraulics");
+    context.expectEqual(
+        static_cast<std::int64_t>(run.quality_results.size()),
+        std::int64_t{1},
+        AowisEpanetTests::ComparisonContext{},
+        "quality validation fixture must return exactly one quality child");
+    if (run.quality_results.size() != 1)
+        return;
+
+    const EpanetQualityResult &quality_result = run.quality_results.constFirst();
+    context.expect(quality_result.state == EpanetRunState::Error, "invalid quality-run configuration must fail its quality child");
+    context.expect(!quality_result.result_timeline.status.success, "invalid quality-run configuration must return a failing quality status");
+    context.expect(quality_result.result_timeline.validity == WaterQualitySimulationResultValidity::Invalid, "quality validation failure must produce invalid quality results");
+    context.expect(quality_result.result_timeline.results.isEmpty(), "quality validation failure must not return quality timesteps");
+    context.expect(quality_result.result_timeline.status.stage == HydraulicSimulationStatusStage::ConfigureOptions, "quality validation status must identify request configuration rather than network construction");
+    context.expect(quality_result.result_timeline.status.entity.type == HydraulicSimulationStatusEntityType::QualitySolver, "quality validation status must identify the quality solver");
+    context.expect(quality_result.result_timeline.status.message.contains(message_fragment, Qt::CaseInsensitive), "quality validation status must contain an actionable reason");
+    context.expect(!quality_result.result_timeline.diagnostics.isEmpty(), "quality validation failure must be retained as a structured diagnostic");
 }
 
 void scenarioDuplicateNodeId(TestContext &context)
@@ -264,14 +293,14 @@ void scenarioDisabledEntityPruning(TestContext &context)
         disabled_valve.id
     };
 
-    const EpanetResultInp inp = EpanetRunner().retrieveInp(network);
+    const EpanetResultInp inp = EpanetRunner().retrieveInp(AowisEpanetTests::makeRunRequest(network));
     context.expect(inp.status.success, "disabled nodes/links and their selected report references must be pruned before INP construction");
     context.expect(!inpSectionContainsId(inp.inp_text, QStringLiteral("[PIPES]"), disabled_pipe_id), "disabled existing pipe must not appear in the generated [PIPES] section");
     context.expect(!inp.inp_text.contains(QStringLiteral("LINKS %1").arg(disabled_pipe_id), Qt::CaseInsensitive), "disabled selected link must be pruned from generated report selection");
     for (const QString &disabled_id : unique_disabled_ids)
         context.expect(!inp.inp_text.contains(disabled_id), "disabled hydraulic entity must not appear in generated EPANET input");
 
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(run.result_timeline.status.success, "network must remain runnable after disabled hydraulic entities are omitted");
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "disabled-entity pruning must preserve valid hydraulic results");
 }
@@ -343,7 +372,7 @@ void scenarioMissingDemandPattern(TestContext &context)
 
     junction.demands.first().pattern_mode = HydraulicTimePatternMode::TimePattern;
     junction.demands.first().pattern_uuid = QUuid();
-    const EpanetResultInp inherited_default = EpanetRunner().retrieveInp(network);
+    const EpanetResultInp inherited_default = EpanetRunner().retrieveInp(AowisEpanetTests::makeRunRequest(network));
     context.expect(inherited_default.status.success,
         "null per-demand pattern UUID must inherit the configured default demand pattern");
 
@@ -629,17 +658,28 @@ void scenarioInvalidEmitterConfiguration(TestContext &context)
 void scenarioInvalidQualityConfiguration(TestContext &context)
 {
     {
-        NetworkHydraulic network = cleanNet1();
-        network.options_quality.analysis = WaterQualityAnalysisType::SourceTrace;
-        network.options_quality.trace_node_uuid = QUuid::createUuid();
-        expectRejected(context, network, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("source-trace node"));
+        const NetworkHydraulic network = cleanNet1();
+        WaterQualitySolverOptions options;
+        options.analysis = WaterQualityAnalysisType::SourceTrace;
+        options.trace_node_uuid = QUuid::createUuid();
+        expectQualityRejected(context, network, options, QStringLiteral("source-trace node"));
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
-        network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
-        network.options_quality.chemical_name.clear();
-        expectRejected(context, network, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("chemical name"));
+        const NetworkHydraulic network = cleanNet1();
+        WaterQualitySolverOptions options;
+        options.analysis = WaterQualityAnalysisType::Chemical;
+        options.chemical_name.clear();
+        expectQualityRejected(context, network, options, QStringLiteral("chemical name"));
+    }
+
+    {
+        const NetworkHydraulic network = cleanNet1();
+        WaterQualitySolverOptions options;
+        options.analysis = WaterQualityAnalysisType::Chemical;
+        options.chemical_name = QStringLiteral("Chlorine");
+        options.chemical_tolerance_mg_per_l = std::numeric_limits<double>::quiet_NaN();
+        expectQualityRejected(context, network, options, QStringLiteral("invalid numeric"));
     }
 
     {
@@ -647,8 +687,6 @@ void scenarioInvalidQualityConfiguration(TestContext &context)
         context.expect(!network.nodes_junctions.isEmpty(), "quality-source pattern fixture requires a junction");
         if (network.nodes_junctions.isEmpty())
             return;
-        network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
-        network.options_quality.chemical_name = QStringLiteral("Chlorine");
         HydraulicNodeJunction &junction = network.nodes_junctions.first();
         junction.quality_source.type = HydraulicNodeQualitySourceType::Concentration;
         junction.quality_source.chemical_concentration_mg_per_l = 0.5;
@@ -671,8 +709,6 @@ void scenarioInvalidQualityConfiguration(TestContext &context)
         context.expect(!network.links_pipes.isEmpty(), "reaction-order fixture requires a pipe");
         if (network.links_pipes.isEmpty())
             return;
-        network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
-        network.options_quality.chemical_name = QStringLiteral("Chlorine");
         HydraulicLinkPipe &pipe = network.links_pipes.first();
         pipe.override_reactions = true;
         pipe.bulk_reaction.order = network.options_reaction.global_pipe_bulk_reaction.order + 0.5;
@@ -798,7 +834,7 @@ void scenarioUnsupportedConfiguration(TestContext &context)
     NetworkHydraulic network = cleanNet1();
     network.options_hydraulic.headloss_formula = static_cast<HydraulicHeadlossFormula>(999);
 
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(!run.result_timeline.status.success, "unsupported headloss formula must be rejected");
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Invalid, "unsupported configuration must not produce valid results");
     context.expect(run.result_timeline.status.stage == HydraulicSimulationStatusStage::ConfigureOptions, "unsupported headloss formula must identify option configuration stage");
@@ -844,7 +880,7 @@ void scenarioMultipleValidationDiagnostics(TestContext &context)
     junction.coordinate_wgs84.longitude_deg = std::numeric_limits<double>::quiet_NaN();
     pump.initial_speed_ratio = std::numeric_limits<double>::quiet_NaN();
 
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
 
     context.expect(!run.result_timeline.status.success, "network with multiple invalid entities must fail validation");
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Invalid, "preflight validation failure must keep result validity invalid");
@@ -867,7 +903,7 @@ void scenarioStructuredDiagnosticDetails(TestContext &context)
     const QUuid missing_uuid = QUuid::createUuid();
     pipe.node_uuid_to = missing_uuid;
 
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(!run.result_timeline.status.success, "broken reference must fail");
     context.expect(run.result_timeline.status.operation == HydraulicSimulationStatusOperation::ResolveEntity, "broken reference must identify ResolveEntity operation");
     context.expect(!run.result_timeline.status.details.isEmpty(), "broken reference status must include structured details");

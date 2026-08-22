@@ -2,6 +2,7 @@
 #include <aowis/epanet/epanet_runner.h>
 
 #include "conformance/conformance_test_framework.h"
+#include "conformance/epanet_test_requests.h"
 #include "conformance/net1_fixture.h"
 #include "conformance/export_fidelity_scenarios.h"
 
@@ -89,7 +90,40 @@ class NativeSavedProject
 public:
     explicit NativeSavedProject(const NetworkHydraulic &network)
     {
-        const EpanetResultInp result = EpanetRunner().retrieveInp(network);
+        initialize(AowisEpanetTests::makeRunRequest(network));
+    }
+
+    NativeSavedProject(const NetworkHydraulic &network, const WaterQualitySolverOptions &quality_options)
+    {
+        initialize(AowisEpanetTests::makeRunRequest(network, quality_options));
+    }
+
+    ~NativeSavedProject()
+    {
+        if (this->project_ == nullptr)
+            return;
+        if (this->opened_)
+            EN_close(this->project_);
+        EN_deleteproject(this->project_);
+    }
+
+    NativeSavedProject(const NativeSavedProject &) = delete;
+    NativeSavedProject &operator=(const NativeSavedProject &) = delete;
+
+    EN_Project handle() const
+    {
+        return this->project_;
+    }
+
+    const QString &inpText() const
+    {
+        return this->inp_text_;
+    }
+
+private:
+    void initialize(const EpanetRunRequest &request)
+    {
+        const EpanetResultInp result = EpanetRunner().retrieveInp(request);
         if (!result.status.success)
             throw std::runtime_error((QStringLiteral("retrieveInp failed: ") + result.status.message).toStdString());
         if (!this->directory_.isValid())
@@ -118,29 +152,6 @@ public:
         this->opened_ = true;
     }
 
-    ~NativeSavedProject()
-    {
-        if (this->project_ == nullptr)
-            return;
-        if (this->opened_)
-            EN_close(this->project_);
-        EN_deleteproject(this->project_);
-    }
-
-    NativeSavedProject(const NativeSavedProject &) = delete;
-    NativeSavedProject &operator=(const NativeSavedProject &) = delete;
-
-    EN_Project handle() const
-    {
-        return this->project_;
-    }
-
-    const QString &inpText() const
-    {
-        return this->inp_text_;
-    }
-
-private:
     QTemporaryDir directory_;
     EN_Project project_ = nullptr;
     bool opened_ = false;
@@ -244,7 +255,7 @@ void scenarioGeneratedInpNativeReopen(TestContext &context)
     NativeSavedProject native(network);
     checkEpanet(EN_solveH(native.handle()), "EN_solveH(generated INP)");
 
-    const EpanetResultRun wrapper = EpanetRunner().run(network);
+    const EpanetResultRun wrapper = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(wrapper.result_timeline.validity == HydraulicSimulationResultValidity::Valid,
         "AOWIS run must succeed for the generated-INP native reopen fixture");
     context.expect(!wrapper.result_timeline.results.isEmpty(), "AOWIS run must return a hydraulic result");
@@ -675,7 +686,6 @@ void scenarioReportOptions(TestContext &context)
 void scenarioQualityInputNone(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
-    network.options_quality.analysis = WaterQualityAnalysisType::None;
 
     NativeSavedProject native(network);
     int quality_type = -1;
@@ -683,6 +693,27 @@ void scenarioQualityInputNone(TestContext &context)
     checkEpanet(EN_getqualtype(native.handle(), &quality_type, &trace_node), "EN_getqualtype(none)");
     context.expectEqual(static_cast<std::int64_t>(quality_type), static_cast<std::int64_t>(EN_NONE), comparison("quality.analysis"));
     context.expectEqual(static_cast<std::int64_t>(trace_node), std::int64_t{0}, comparison("quality.trace_node"));
+}
+
+void scenarioInpRejectsMultipleQualityAnalyses(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+
+    WaterQualitySolverOptions chemical;
+    chemical.analysis = WaterQualityAnalysisType::Chemical;
+    chemical.chemical_name = QStringLiteral("Chlorine");
+
+    WaterQualitySolverOptions water_age;
+    water_age.analysis = WaterQualityAnalysisType::WaterAge;
+
+    EpanetRunRequest request = AowisEpanetTests::makeRunRequest(network);
+    request.quality_runs = {chemical, water_age};
+    const EpanetResultInp result = EpanetRunner().retrieveInp(request);
+
+    context.expect(!result.status.success, "INP export must reject requests containing multiple quality analyses");
+    context.expect(result.inp_text.isEmpty(), "rejected multi-quality INP export must not return partial INP text");
+    context.expect(result.status.stage == HydraulicSimulationStatusStage::ConfigureOptions, "multi-quality INP rejection must identify the configuration stage");
+    context.expect(result.status.operation == HydraulicSimulationStatusOperation::ConfigureQuality, "multi-quality INP rejection must identify quality configuration");
 }
 
 void scenarioQualityTankMixingModels(TestContext &context)
@@ -708,13 +739,14 @@ void scenarioQualityTankMixingModels(TestContext &context)
         if (network.nodes_tanks.isEmpty())
             return;
 
-        network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
-        network.options_quality.chemical_name = QStringLiteral("Chlorine");
+        WaterQualitySolverOptions quality_options;
+        quality_options.analysis = WaterQualityAnalysisType::Chemical;
+        quality_options.chemical_name = QStringLiteral("Chlorine");
         HydraulicNodeTank &tank = network.nodes_tanks.first();
         tank.mixing_model = mixing_case.model;
         tank.mixing_fraction = mixing_case.fraction;
 
-        NativeSavedProject native(network);
+        NativeSavedProject native(network, quality_options);
         double value = 0.0;
         const int tank_index = nodeIndex(native.handle(), tank.id);
         checkEpanet(EN_getnodevalue(native.handle(), tank_index, EN_MIXMODEL, &value), "EN_getnodevalue(EN_MIXMODEL mapping)");
@@ -758,8 +790,9 @@ void scenarioQualityReactionMapping(TestContext &context)
         if (network.links_pipes.isEmpty() || network.nodes_tanks.isEmpty())
             return;
 
-        network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
-        network.options_quality.chemical_name = QStringLiteral("Chlorine");
+        WaterQualitySolverOptions quality_options;
+        quality_options.analysis = WaterQualityAnalysisType::Chemical;
+        quality_options.chemical_name = QStringLiteral("Chlorine");
         network.options_hydraulic.headloss_formula = roughness_case.formula;
         network.options_reaction.roughness_reaction_factor = roughness_case.roughness_factor;
         network.options_reaction.global_pipe_wall_reaction.coefficient = roughness_case.global_wall_coefficient;
@@ -775,7 +808,7 @@ void scenarioQualityReactionMapping(TestContext &context)
         HydraulicNodeTank &tank = network.nodes_tanks.first();
         tank.override_bulk_reaction = false;
 
-        NativeSavedProject native(network);
+        NativeSavedProject native(network, quality_options);
         double value = 0.0;
         checkEpanet(EN_getlinkvalue(native.handle(), linkIndex(native.handle(), pipe.id), EN_KWALL, &value), "EN_getlinkvalue(EN_KWALL reaction mapping)");
         // EN_saveinpfile serializes reaction coefficients to six decimal places, so
@@ -789,10 +822,11 @@ void scenarioQualityReactionMapping(TestContext &context)
 void scenarioQualityInputChemical(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
-    network.options_quality.analysis = WaterQualityAnalysisType::Chemical;
-    network.options_quality.chemical_name = QStringLiteral("Chlorine");
-    network.options_quality.chemical_tolerance_mg_per_l = 0.004;
-    network.options_quality.relative_diffusivity = 1.3;
+    WaterQualitySolverOptions quality_options;
+    quality_options.analysis = WaterQualityAnalysisType::Chemical;
+    quality_options.chemical_name = QStringLiteral("Chlorine");
+    quality_options.chemical_tolerance_mg_per_l = 0.004;
+    quality_options.relative_diffusivity = 1.3;
     network.timestep_quality_s = 180;
 
     network.options_reaction.global_pipe_bulk_reaction.coefficient = -0.2;
@@ -853,7 +887,7 @@ void scenarioQualityInputChemical(TestContext &context)
     override_pipe.wall_reaction.coefficient = -0.4;
     override_pipe.wall_reaction.order = network.options_reaction.global_pipe_wall_reaction.order;
 
-    NativeSavedProject native(network);
+    NativeSavedProject native(network, quality_options);
     int quality_type = -1;
     int trace_node = -1;
     std::array<char, EN_MAXID + 1> chemical_name{};
@@ -927,11 +961,12 @@ void scenarioQualityInputChemical(TestContext &context)
 void scenarioQualityInputWaterAge(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
-    network.options_quality.analysis = WaterQualityAnalysisType::WaterAge;
-    network.options_quality.water_age_tolerance_h = 0.025;
+    WaterQualitySolverOptions quality_options;
+    quality_options.analysis = WaterQualityAnalysisType::WaterAge;
+    quality_options.water_age_tolerance_h = 0.025;
     network.nodes_junctions.first().initial_water_age_h = 2.5;
 
-    NativeSavedProject native(network);
+    NativeSavedProject native(network, quality_options);
     int quality_type = -1;
     int trace_node = -1;
     checkEpanet(EN_getqualtype(native.handle(), &quality_type, &trace_node), "EN_getqualtype(age)");
@@ -948,11 +983,12 @@ void scenarioQualityInputSourceTrace(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
     const HydraulicNodeReservoir &trace_source = network.nodes_reservoirs.first();
-    network.options_quality.analysis = WaterQualityAnalysisType::SourceTrace;
-    network.options_quality.trace_node_uuid = trace_source.uuid;
-    network.options_quality.source_trace_tolerance_percent = 0.2;
+    WaterQualitySolverOptions quality_options;
+    quality_options.analysis = WaterQualityAnalysisType::SourceTrace;
+    quality_options.trace_node_uuid = trace_source.uuid;
+    quality_options.source_trace_tolerance_percent = 0.2;
 
-    NativeSavedProject native(network);
+    NativeSavedProject native(network, quality_options);
     int quality_type = -1;
     int trace_node = -1;
     checkEpanet(EN_getqualtype(native.handle(), &quality_type, &trace_node), "EN_getqualtype(trace)");
@@ -994,9 +1030,14 @@ void registerExportFidelityScenarios(ScenarioRegistry &registry)
         &scenarioCoordinatesVertices});
     registry.add(ScenarioDefinition{
         "conformance-quality-input-none",
-        "Maps an explicitly disabled water-quality analysis into EPANET.",
+        "Maps a request without a water-quality analysis into EPANET's no-quality mode.",
         {"conformance", "quality", "mapping", "export"},
         &scenarioQualityInputNone});
+    registry.add(ScenarioDefinition{
+        "conformance-export-multiple-quality-rejected",
+        "Reject INP export requests containing more than one active water-quality analysis.",
+        {"conformance", "quality", "export", "negative"},
+        &scenarioInpRejectsMultipleQualityAnalyses});
     registry.add(ScenarioDefinition{
         "conformance-quality-input-tank-mixing-models",
         "Maps every supported tank water-quality mixing model into EPANET.",

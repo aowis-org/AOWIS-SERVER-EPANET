@@ -143,9 +143,12 @@ EpanetResultRun isolatedRun(
     HydraulicHeadlossFormula formula,
     const WaterQualitySolverOptions &quality_options)
 {
-    network.options_hydraulic.headloss_formula = formula;
-    network.options_quality = quality_options;
-    return EpanetRunner().run(network);
+    return EpanetRunner().run(runRequest(network, formula, {quality_options}));
+}
+
+const WaterQualitySimulationResultTimeline &singleQualityTimeline(const EpanetResultRun &result)
+{
+    return result.quality_results.constFirst().result_timeline;
 }
 
 const EpanetQualityResult *findQualityResult(
@@ -375,7 +378,7 @@ void compareMultiQualityWithIsolated(
     const EpanetQualityResult *quality_result = findQualityResult(multi_quality_result, quality_options);
     context.expect(quality_result != nullptr, prefix + ": multi-quality result must contain the requested quality child");
     if (quality_result != nullptr)
-        compareQualityTimelines(context, quality_result->result_timeline, isolated.quality_result_timeline, prefix + ".quality");
+        compareQualityTimelines(context, quality_result->result_timeline, singleQualityTimeline(isolated), prefix + ".quality");
 }
 
 void testMultiQualityIsolatedEquivalence(TestContext &context)
@@ -473,9 +476,9 @@ void testMultiQualityRepeatedSourceTrace(TestContext &context)
     const EpanetResultRun isolated_source = isolatedRun(network, formula, trace_source);
     const EpanetResultRun isolated_middle = isolatedRun(network, formula, trace_middle);
     if (source_child != nullptr)
-        compareQualityTimelines(context, source_child->result_timeline, isolated_source.quality_result_timeline, "trace-source");
+        compareQualityTimelines(context, source_child->result_timeline, singleQualityTimeline(isolated_source), "trace-source");
     if (middle_child != nullptr)
-        compareQualityTimelines(context, middle_child->result_timeline, isolated_middle.quality_result_timeline, "trace-middle");
+        compareQualityTimelines(context, middle_child->result_timeline, singleQualityTimeline(isolated_middle), "trace-middle");
 }
 
 void testMultiQualityFailureIsolation(TestContext &context)
@@ -508,7 +511,7 @@ void testMultiQualityFailureIsolation(TestContext &context)
     {
         context.expect(chemical_child->result_timeline.diagnostics.isEmpty(), "later successful quality run must not inherit diagnostics from the failed run");
         const EpanetResultRun isolated = isolatedRun(network, formula, chemical);
-        compareQualityTimelines(context, chemical_child->result_timeline, isolated.quality_result_timeline, "quality-failure-later-run");
+        compareQualityTimelines(context, chemical_child->result_timeline, singleQualityTimeline(isolated), "quality-failure-later-run");
     }
 }
 

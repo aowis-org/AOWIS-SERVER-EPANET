@@ -1,6 +1,7 @@
 #include <aowis/epanet/epanet_runner.h>
 
 #include "conformance/conformance_test_framework.h"
+#include "conformance/epanet_test_requests.h"
 #include "conformance/generated_network_stress_fixture.h"
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
@@ -91,7 +92,7 @@ void runGeneratedStressCase(const GeneratedStressCase &definition, TestContext &
             "native stress run must retain every generated pipe");
     }
 
-    const EpanetResultRun wrapper_run = EpanetRunner().run(fixture.network);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network));
     AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, fixture.network, context);
 }
 

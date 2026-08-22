@@ -2,6 +2,7 @@
 #include <aowis/epanet/epanet_runner.h>
 
 #include "conformance/conformance_test_framework.h"
+#include "conformance/epanet_test_requests.h"
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
 #include "conformance/net1_fixture.h"
@@ -60,7 +61,7 @@ class NativeSavedProject
 public:
     explicit NativeSavedProject(const NetworkHydraulic &network)
     {
-        const EpanetResultInp result = EpanetRunner().retrieveInp(network);
+        const EpanetResultInp result = EpanetRunner().retrieveInp(AowisEpanetTests::makeRunRequest(network));
         if (!result.status.success)
             throw std::runtime_error((QStringLiteral("retrieveInp failed: ") + result.status.message).toStdString());
         if (!this->directory_.isValid())
@@ -398,7 +399,7 @@ void testSimpleTimer(TestContext &context)
     context.expectEqual(static_cast<std::int64_t>(readback.type), static_cast<std::int64_t>(EN_TIMER), comparison("control.type"));
     context.expectNear(readback.level, 1800.0, NumericTolerance{0.0, 0.0}, comparison("control.timer_seconds"));
 
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(!run.result_timeline.results.isEmpty(), "timer control must return results");
     if (run.result_timeline.results.isEmpty())
         return;
@@ -423,7 +424,7 @@ void testSimpleTimeOfDay(TestContext &context)
     context.expectEqual(static_cast<std::int64_t>(readback.type), static_cast<std::int64_t>(EN_TIMEOFDAY), comparison("control.type"));
     context.expectNear(readback.level, 7.0 * 3600.0, NumericTolerance{0.0, 0.0}, comparison("control.clock_seconds"));
 
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(!run.result_timeline.results.isEmpty(), "time-of-day control must return results");
     bool saw_controlled_time = false;
     for (const HydraulicSimulationResult &result : run.result_timeline.results)
@@ -452,7 +453,7 @@ void testSimpleAction(TestContext &context, HydraulicControlActionType action, d
     const ControlReadback readback = readControl(native_project.handle(), 1);
     context.expectNear(readback.setting, expected_setting, NumericTolerance{0.0, 0.0}, comparison("control.setting"));
 
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(!run.result_timeline.results.isEmpty(), "simple-control action test must return a hydraulic result");
     if (run.result_timeline.results.isEmpty() || run.result_timeline.results.first().links_pumps.isEmpty())
         return;
@@ -494,8 +495,8 @@ void testDisabledSimpleControl(TestContext &context)
     NetworkHydraulic disabled_network = enabled_network;
     disabled_network.controls_simple[0].enabled = false;
 
-    const EpanetResultRun enabled_run = EpanetRunner().run(enabled_network);
-    const EpanetResultRun disabled_run = EpanetRunner().run(disabled_network);
+    const EpanetResultRun enabled_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(enabled_network));
+    const EpanetResultRun disabled_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(disabled_network));
     expectPumpOpen(context, enabled_run, false, "enabled zero-time simple control must close the pump");
     expectPumpOpen(context, disabled_run, true, "disabled zero-time simple control must not close the pump");
 }
@@ -920,7 +921,7 @@ void testRulePriority(TestContext &context)
     context.expectNear(close_priority, 1.0, NumericTolerance{0.0, 0.0}, comparison("rule.close_priority"));
     context.expectNear(open_priority, 5.0, NumericTolerance{0.0, 0.0}, comparison("rule.open_priority"));
 
-    const EpanetResultRun open_wins_run = EpanetRunner().run(open_wins);
+    const EpanetResultRun open_wins_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(open_wins));
     bool saw_open_at_priority_event = false;
     for (const HydraulicSimulationResult &result : open_wins_run.result_timeline.results)
     {
@@ -934,7 +935,7 @@ void testRulePriority(TestContext &context)
     NetworkHydraulic close_wins = open_wins;
     close_wins.controls_rules[0].priority = 5.0;
     close_wins.controls_rules[1].priority = 1.0;
-    const EpanetResultRun close_wins_run = EpanetRunner().run(close_wins);
+    const EpanetResultRun close_wins_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(close_wins));
     bool saw_closed_at_priority_event = false;
     for (const HydraulicSimulationResult &result : close_wins_run.result_timeline.results)
     {
@@ -965,8 +966,8 @@ void testDisabledRule(TestContext &context)
     NetworkHydraulic disabled_network = enabled_network;
     disabled_network.controls_rules[0].enabled = false;
 
-    const EpanetResultRun enabled_run = EpanetRunner().run(enabled_network);
-    const EpanetResultRun disabled_run = EpanetRunner().run(disabled_network);
+    const EpanetResultRun enabled_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(enabled_network));
+    const EpanetResultRun disabled_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(disabled_network));
 
     bool enabled_saw_closed = false;
     for (const HydraulicSimulationResult &result : enabled_run.result_timeline.results)
@@ -998,7 +999,7 @@ void testNextHydraulicEvent(TestContext &context)
     control.id = QStringLiteral("NEXT_EVENT_CONTROL");
     network.controls_simple.append(control);
 
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(!run.result_timeline.results.isEmpty(), "next-event test must return a hydraulic result");
     if (run.result_timeline.results.isEmpty())
         return;
@@ -1020,7 +1021,7 @@ void testControlEventIdentification(TestContext &context)
     const QUuid expected_uuid = control.uuid;
     network.controls_simple.append(control);
 
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(!run.result_timeline.results.isEmpty(), "control-event identification test must return a hydraulic result");
     if (run.result_timeline.results.isEmpty())
         return;
@@ -1389,7 +1390,7 @@ void testStatistics(TestContext &context)
 {
     const Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     const NativeHydraulicTimeline native_timeline = AowisEpanetTests::runNativeEpanetReference(nativeNet1Configuration());
-    const EpanetResultRun wrapper_run = EpanetRunner().run(fixture.network);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network));
     AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, fixture.network, context);
     context.expect(!wrapper_run.result_timeline.results.isEmpty(), "statistics test must return results");
     if (wrapper_run.result_timeline.results.isEmpty())
@@ -1405,7 +1406,7 @@ void testFlowBalance(TestContext &context)
 {
     const Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     const NativeHydraulicTimeline native_timeline = AowisEpanetTests::runNativeEpanetReference(nativeNet1Configuration());
-    const EpanetResultRun wrapper_run = EpanetRunner().run(fixture.network);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network));
     AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, fixture.network, context);
     context.expect(!wrapper_run.result_timeline.results.isEmpty(), "flow-balance test must return results");
     if (wrapper_run.result_timeline.results.isEmpty())
@@ -1425,7 +1426,7 @@ void testWarningDiagnostics(TestContext &context)
     fixture.network.options_hydraulic.demand_multiplier = 10.0;
     fixture.network.options_hydraulic.demand_model = HydraulicDemandModel::DemandDriven;
 
-    const EpanetResultRun run = EpanetRunner().run(fixture.network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network));
     context.expect(run.result_timeline.status.success, "EPANET warning must not become a fatal wrapper status");
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid,
         "warning-only hydraulic run must retain valid numerical results");
@@ -1463,7 +1464,7 @@ void testErrorDiagnostics(TestContext &context)
     rule.actions_then.append(closePumpAction(network));
     network.controls_rules.append(rule);
 
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(!run.result_timeline.status.success, "invalid rule reference must return an error status");
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Invalid,
         "pre-simulation rule-mapping error must invalidate numerical results");
@@ -1500,7 +1501,7 @@ void testErrorDiagnostics(TestContext &context)
 void testCancellationBeforeResults(TestContext &context)
 {
     const Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
-    const EpanetResultRun run = EpanetRunner().run(fixture.network, []()
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network), []()
     {
         return true;
     });
@@ -1515,7 +1516,7 @@ void testCancellationPartialResults(TestContext &context)
 {
     const Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     int cancellation_checks = 0;
-    const EpanetResultRun run = EpanetRunner().run(fixture.network, [&cancellation_checks]()
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network), [&cancellation_checks]()
     {
         cancellation_checks++;
         return cancellation_checks >= 8;

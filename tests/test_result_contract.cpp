@@ -3,6 +3,7 @@
 #include <aowis/epanet/epanet_runner.h>
 
 #include "conformance/conformance_test_framework.h"
+#include "conformance/epanet_test_requests.h"
 #include "conformance/result_contract_scenarios.h"
 
 #include <utility>
@@ -203,7 +204,7 @@ NetworkHydraulic makePumpNetwork(bool with_timer_control, quint64 duration_s)
 void testPhysicalResultContractAndLeakage(TestContext &context)
 {
     const NetworkHydraulic network = makeJunctionNetwork();
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "leakage network should produce valid results");
     context.expect(!run.result_timeline.results.isEmpty(), "leakage network should return timesteps");
     if (run.result_timeline.results.isEmpty())
@@ -241,7 +242,7 @@ void testPhysicalResultContractAndLeakage(TestContext &context)
 void testStructuredRuleControl(TestContext &context)
 {
     const NetworkHydraulic network = makeReservoirPipeNetwork();
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "rule-controlled network should produce valid results");
     context.expect(!run.result_timeline.results.isEmpty(), "rule-controlled network should return timesteps");
 
@@ -259,7 +260,7 @@ void testStructuredRuleControl(TestContext &context)
 void testTimerPumpControlAndEnergySummary(TestContext &context)
 {
     const NetworkHydraulic network = makePumpNetwork(true, 3600);
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "timer-controlled pump network should produce valid results");
     context.expect(!run.result_timeline.results.isEmpty(), "timer-controlled pump network should return timesteps");
     if (run.result_timeline.results.isEmpty())
@@ -325,7 +326,7 @@ void testUnsupportedPumpPowerRule(TestContext &context)
     rule.actions_then.append(action);
     network.controls_rules.append(rule);
 
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Invalid, "unsupported pump POWER rule should invalidate the run before simulation");
     context.expect(!run.result_timeline.status.success, "unsupported pump POWER rule should return an error status");
     context.expect(run.result_timeline.status.message.contains(QStringLiteral("POWER")), "unsupported pump POWER rule should return an explicit diagnostic");
@@ -370,8 +371,7 @@ void testWaterQualityModelBoundary(TestContext &context)
     context.expectNear(quality_options.source_trace_tolerance_percent, 0.1, NumericTolerance{0.0, 0.0}, comparison("source_trace_tolerance_percent"), "trace tolerance should be quantity-specific");
 
     EpanetResultRun run;
-    context.expect(run.quality_result_timeline.validity == WaterQualitySimulationResultValidity::NotRun, "quality timeline should explicitly distinguish not-run from invalid");
-    context.expect(run.quality_result_timeline.results.isEmpty(), "a newly constructed quality timeline should contain no results");
+    context.expect(run.quality_results.isEmpty(), "a newly constructed run should contain no quality analyses");
 
     WaterQualitySimulationResult result;
     WaterQualitySimulationResultNodeJunction node_result;
@@ -504,7 +504,7 @@ void testMultiQualitySequentialExecution(TestContext &context)
 void testSteadyStatePumpEnergyRegression(TestContext &context)
 {
     const NetworkHydraulic network = makePumpNetwork(false, 0);
-    const EpanetResultRun run = EpanetRunner().run(network);
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "steady-state pump network should produce valid results");
     context.expectEqual(static_cast<std::int64_t>(run.result_timeline.results.size()), std::int64_t{1}, comparison("results.size"), "steady-state run should return one timestep");
     if (run.result_timeline.results.isEmpty())

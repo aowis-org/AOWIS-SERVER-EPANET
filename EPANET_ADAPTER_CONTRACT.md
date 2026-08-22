@@ -88,6 +88,8 @@ EPANET reaction orders are network-wide. Enabled entity overrides must therefore
 
 One `EpanetRunRequest` performs exactly one hydraulic analysis. Its ordered `quality_runs` list may be empty or contain any number of quality analyses. The hydraulic solution is saved once and reused by every quality child.
 
+Water-quality analysis selection is execution state. `NetworkHydraulic` stores the network's quality inputs and reaction data, while each `WaterQualitySolverOptions` entry in `EpanetRunRequest::quality_runs` supplies the active analysis mode, chemical name, trace node, tolerance, and diffusivity for one child run. The adapter does not mutate the prepared network between quality children.
+
 Hydraulic and quality results use separate timelines because their timesteps and event boundaries can differ. Quality execution uses `EN_stepQ`, so every configured quality timestep is represented rather than only hydraulic event times.
 
 Each quality timeline contains its analysis mode, status, validity, diagnostics, simulation start, and timestep results. Analysis `None` produces a `NotRun` timeline. A failed or cancelled quality child does not invalidate completed hydraulics. Cancellation preserves samples already returned by the active solver lifecycle.
@@ -102,7 +104,7 @@ Controls and rules remain in the snapshot so their membership is preserved; thei
 
 Node coordinates, link vertices, map labels, and backdrop bounds use the model's WGS84 coordinate fields. Exported `[COORDINATES]`, `[VERTICES]`, and `[BACKDROP]` sections therefore use geographic degrees.
 
-INP export preserves supported project titles, comments, tags, patterns, curves, report options, coordinates, vertices, labels, and backdrop metadata. Generic curves are retained for backend fidelity even when no typed AOWIS entity references them.
+INP export preserves supported project titles, comments, tags, patterns, curves, report options, coordinates, vertices, labels, and backdrop metadata. Generic curves are retained for backend fidelity even when no typed AOWIS entity references them. `retrieveInp()` accepts an `EpanetRunRequest`; because one INP file can encode only one active quality analysis, export accepts zero or one quality child and rejects requests containing more than one.
 
 ## Diagnostics
 

@@ -1,6 +1,7 @@
 #include <aowis/epanet/epanet_runner.h>
 
 #include "conformance/conformance_test_framework.h"
+#include "conformance/epanet_test_requests.h"
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
 #include "conformance/net1_fixture.h"
@@ -156,7 +157,7 @@ void compareWithWrapper(const Net1Fixture &fixture, const NativeHydraulicTimelin
 {
     if (!native_timeline.success || native_timeline.results.isEmpty())
         return;
-    const EpanetResultRun wrapper_run = EpanetRunner().run(fixture.network);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network));
     AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, fixture.network, context);
 }
 

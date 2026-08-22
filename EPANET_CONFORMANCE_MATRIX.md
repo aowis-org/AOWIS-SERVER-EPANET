@@ -136,6 +136,7 @@ Export fidelity uses dedicated native-reopen scenarios:
 | `conformance-export-patterns-curves` | Pattern multipliers/comments plus tank-volume, pump-head, pump-efficiency, GPV head-loss, PCV characteristic, and generic curve type/data/comments survive native reopen |
 | `conformance-export-coordinates-vertices` | WGS84 node coordinates and ordered link vertices survive native reopen |
 | `conformance-export-report-options` | Report statistic, general flags, selected entities, every typed node/link report field, limits/precision, and backend overrides (including F-Factor) survive export and native parsing |
+| `conformance-export-multiple-quality-rejected` | INP export rejects a run request containing more than one quality analysis because one INP project has only one active quality configuration |
 
 
 Negative validation and disabled-reference hardening use dedicated scenarios:

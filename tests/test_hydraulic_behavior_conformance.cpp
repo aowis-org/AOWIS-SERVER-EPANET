@@ -1,6 +1,7 @@
 #include <aowis/epanet/epanet_runner.h>
 
 #include "conformance/conformance_test_framework.h"
+#include "conformance/epanet_test_requests.h"
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
 #include "conformance/net1_fixture.h"
@@ -162,7 +163,7 @@ void testDdaPda(TestContext &context)
         context.expect(dda_native.warning_codes.contains(6),
             "upstream DDA stress case must retain EPANET warning 6 for negative pressures");
 
-        const EpanetResultRun wrapper_run = EpanetRunner().run(dda_fixture.network);
+        const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(dda_fixture.network));
         AowisEpanetTests::compareHydraulicTimelines(dda_native, wrapper_run, dda_fixture.network, context);
     }
 
@@ -203,7 +204,7 @@ void testDdaPda(TestContext &context)
             comparison("upstream_golden.demand_deficit_m3_per_h", result.time_elapsed_s, "Junction", "21"));
     }
 
-    const EpanetResultRun wrapper_run = EpanetRunner().run(pda_fixture.network);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(pda_fixture.network));
     AowisEpanetTests::compareHydraulicTimelines(pda_native, wrapper_run, pda_fixture.network, context);
 }
 
@@ -265,7 +266,7 @@ void testLeakage(TestContext &context)
             comparison("upstream_invariant.favad_formula", result.time_elapsed_s, "Pipe", "21"));
     }
 
-    const EpanetResultRun wrapper_run = EpanetRunner().run(fixture.network);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network));
     AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, fixture.network, context);
 }
 
@@ -333,7 +334,7 @@ void testTankOverflow(TestContext &context)
     if (disabled_native.success)
     {
         verifyOverflowGolden(disabled_native, false, context);
-        const EpanetResultRun wrapper_run = EpanetRunner().run(disabled_fixture.network);
+        const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(disabled_fixture.network));
         AowisEpanetTests::compareHydraulicTimelines(
             disabled_native,
             wrapper_run,
@@ -351,7 +352,7 @@ void testTankOverflow(TestContext &context)
         return;
 
     verifyOverflowGolden(enabled_native, true, context);
-    const EpanetResultRun wrapper_run = EpanetRunner().run(enabled_fixture.network);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(enabled_fixture.network));
     AowisEpanetTests::compareHydraulicTimelines(
         enabled_native,
         wrapper_run,
@@ -449,7 +450,7 @@ void testPcv(TestContext &context)
             "upstream PCV head loss must retain the 35-percent-open upstream reference result");
     }
 
-    const EpanetResultRun wrapper_run = EpanetRunner().run(fixture.network);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network));
     AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, fixture.network, context);
 }
 
@@ -518,7 +519,7 @@ void testDemandPattern(TestContext &context)
         }
     }
 
-    const EpanetResultRun wrapper_run = EpanetRunner().run(fixture.network);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network));
     AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, fixture.network, context);
 }
 
@@ -558,7 +559,7 @@ void testSimpleControl(TestContext &context)
         }
     }
 
-    const EpanetResultRun wrapper_run = EpanetRunner().run(fixture.network);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network));
     AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, fixture.network, context);
 }
 
@@ -588,7 +589,7 @@ void testHydraulicStepping(TestContext &context)
         previous_time_s = result.time_elapsed_s;
     }
 
-    const EpanetResultRun wrapper_run = EpanetRunner().run(fixture.network);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network));
     AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, fixture.network, context);
 }
 }

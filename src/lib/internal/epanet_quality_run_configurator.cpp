@@ -115,17 +115,17 @@ double qualityTolerance(const WaterQualitySolverOptions &options)
 }
 
 double effectivePipeWallReactionCoefficient(
-    const NetworkHydraulic &request,
+    const NetworkHydraulic &network,
     const HydraulicLinkPipe &pipe)
 {
     if (pipe.override_reactions)
         return pipe.wall_reaction.coefficient;
 
-    const double factor = request.options_reaction.roughness_reaction_factor;
+    const double factor = network.options_reaction.roughness_reaction_factor;
     if (factor == 0.0)
-        return request.options_reaction.global_pipe_wall_reaction.coefficient;
+        return network.options_reaction.global_pipe_wall_reaction.coefficient;
 
-    switch (request.options_hydraulic.headloss_formula)
+    switch (network.options_hydraulic.headloss_formula)
     {
     case HydraulicHeadlossFormula::HazenWilliams:
         return pipe.roughness_hazen_williams > 0.0 ? factor / pipe.roughness_hazen_williams : 0.0;
@@ -140,9 +140,9 @@ double effectivePipeWallReactionCoefficient(
     return 0.0;
 }
 
-bool resolveTraceNodeId(const NetworkHydraulic &request, const QUuid &uuid, QByteArray &backend_id)
+bool resolveTraceNodeId(const NetworkHydraulic &network, const QUuid &uuid, QByteArray &backend_id)
 {
-    for (const HydraulicNodeJunction &node : request.nodes_junctions)
+    for (const HydraulicNodeJunction &node : network.nodes_junctions)
     {
         if (node.uuid == uuid)
         {
@@ -151,7 +151,7 @@ bool resolveTraceNodeId(const NetworkHydraulic &request, const QUuid &uuid, QByt
         }
     }
 
-    for (const HydraulicNodeReservoir &node : request.nodes_reservoirs)
+    for (const HydraulicNodeReservoir &node : network.nodes_reservoirs)
     {
         if (node.uuid == uuid)
         {
@@ -160,7 +160,7 @@ bool resolveTraceNodeId(const NetworkHydraulic &request, const QUuid &uuid, QByt
         }
     }
 
-    for (const HydraulicNodeTank &node : request.nodes_tanks)
+    for (const HydraulicNodeTank &node : network.nodes_tanks)
     {
         if (node.uuid == uuid)
         {
@@ -188,10 +188,10 @@ void collectConfigurationFailure(
 
 HydraulicSimulationStatus configureQualityAnalysis(
     EpanetProject &project,
-    const NetworkHydraulic &request,
-    const EpanetIndexRegistry &indices)
+    const NetworkHydraulic &network,
+    const EpanetIndexRegistry &indices,
+    const WaterQualitySolverOptions &options)
 {
-    const WaterQualitySolverOptions &options = request.options_quality;
     const bool has_initial_node_quality = options.analysis == WaterQualityAnalysisType::Chemical
         || options.analysis == WaterQualityAnalysisType::WaterAge;
     int backend_analysis = 0;
@@ -201,7 +201,7 @@ HydraulicSimulationStatus configureQualityAnalysis(
     QByteArray trace_node_id;
     if (options.analysis == WaterQualityAnalysisType::SourceTrace)
     {
-        if (!resolveTraceNodeId(request, options.trace_node_uuid, trace_node_id))
+        if (!resolveTraceNodeId(network, options.trace_node_uuid, trace_node_id))
             return makeEpanetStatus(HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::QualitySolver, QString(), QStringLiteral("Failed to resolve the source-trace node"));
     }
 
@@ -220,10 +220,10 @@ HydraulicSimulationStatus configureQualityAnalysis(
     const std::array<QualityOption, 6> quality_options = {{
         {EN_TOLERANCE, qualityTolerance(options), "EN_TOLERANCE"},
         {EN_SP_DIFFUS, options.relative_diffusivity, "EN_SP_DIFFUS"},
-        {EN_BULKORDER, request.options_reaction.global_pipe_bulk_reaction.order, "EN_BULKORDER"},
-        {EN_WALLORDER, request.options_reaction.global_pipe_wall_reaction.order, "EN_WALLORDER"},
-        {EN_TANKORDER, request.options_reaction.global_tank_bulk_reaction.order, "EN_TANKORDER"},
-        {EN_CONCENLIMIT, request.options_reaction.limiting_concentration_mg_per_l, "EN_CONCENLIMIT"}
+        {EN_BULKORDER, network.options_reaction.global_pipe_bulk_reaction.order, "EN_BULKORDER"},
+        {EN_WALLORDER, network.options_reaction.global_pipe_wall_reaction.order, "EN_WALLORDER"},
+        {EN_TANKORDER, network.options_reaction.global_tank_bulk_reaction.order, "EN_TANKORDER"},
+        {EN_CONCENLIMIT, network.options_reaction.limiting_concentration_mg_per_l, "EN_CONCENLIMIT"}
     }};
 
     for (const QualityOption &quality_option : quality_options)
@@ -276,7 +276,7 @@ HydraulicSimulationStatus configureQualityAnalysis(
         return processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureQuality, QStringLiteral("EN_setnodevalue(EN_INITQUAL)"), entity_type, id, uuid, QStringLiteral("Failed to configure node initial water quality"));
     };
 
-    for (const HydraulicNodeJunction &node : request.nodes_junctions)
+    for (const HydraulicNodeJunction &node : network.nodes_junctions)
     {
         const int node_index = indices.nodes_junctions.value(node.uuid, 0);
         HydraulicSimulationStatus status = makeEpanetSuccess();
@@ -291,7 +291,7 @@ HydraulicSimulationStatus configureQualityAnalysis(
             return status;
     }
 
-    for (const HydraulicNodeReservoir &node : request.nodes_reservoirs)
+    for (const HydraulicNodeReservoir &node : network.nodes_reservoirs)
     {
         const int node_index = indices.nodes_reservoirs.value(node.uuid, 0);
         HydraulicSimulationStatus status = makeEpanetSuccess();
@@ -306,7 +306,7 @@ HydraulicSimulationStatus configureQualityAnalysis(
             return status;
     }
 
-    for (const HydraulicNodeTank &node : request.nodes_tanks)
+    for (const HydraulicNodeTank &node : network.nodes_tanks)
     {
         const int node_index = indices.nodes_tanks.value(node.uuid, 0);
         HydraulicSimulationStatus status = makeEpanetSuccess();
@@ -338,32 +338,32 @@ HydraulicSimulationStatus configureQualityAnalysis(
 
 HydraulicSimulationStatus configureQualityReactions(
     EpanetProject &project,
-    const NetworkHydraulic &request,
+    const NetworkHydraulic &network,
     const EpanetIndexRegistry &indices)
 {
-    for (const HydraulicLinkPipe &pipe : request.links_pipes)
+    for (const HydraulicLinkPipe &pipe : network.links_pipes)
     {
         const int link_index = indices.links_pipes.value(pipe.uuid, 0);
         const double bulk_coefficient = pipe.override_reactions
             ? pipe.bulk_reaction.coefficient
-            : request.options_reaction.global_pipe_bulk_reaction.coefficient;
+            : network.options_reaction.global_pipe_bulk_reaction.coefficient;
 
         int error = EN_setlinkvalue(project.handle(), link_index, EN_KBULK, bulk_coefficient);
         if (error != 0)
             return processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureQuality, QStringLiteral("EN_setlinkvalue(EN_KBULK)"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to configure pipe bulk reaction coefficient"));
 
-        const double wall_coefficient = effectivePipeWallReactionCoefficient(request, pipe);
+        const double wall_coefficient = effectivePipeWallReactionCoefficient(network, pipe);
         error = EN_setlinkvalue(project.handle(), link_index, EN_KWALL, wall_coefficient);
         if (error != 0)
             return processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureQuality, QStringLiteral("EN_setlinkvalue(EN_KWALL)"), HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Failed to configure pipe wall reaction coefficient"));
     }
 
-    for (const HydraulicNodeTank &tank : request.nodes_tanks)
+    for (const HydraulicNodeTank &tank : network.nodes_tanks)
     {
         const int node_index = indices.nodes_tanks.value(tank.uuid, 0);
         const double bulk_coefficient = tank.override_bulk_reaction
             ? tank.bulk_reaction.coefficient
-            : request.options_reaction.global_tank_bulk_reaction.coefficient;
+            : network.options_reaction.global_tank_bulk_reaction.coefficient;
         const int error = EN_setnodevalue(project.handle(), node_index, EN_TANK_KBULK, bulk_coefficient);
         if (error != 0)
             return processEpanetReturnCode(project, error, HydraulicSimulationStatusStage::ConfigureOptions, HydraulicSimulationStatusOperation::ConfigureQuality, QStringLiteral("EN_setnodevalue(EN_TANK_KBULK)"), HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("Failed to configure tank bulk reaction coefficient"));
@@ -375,15 +375,16 @@ HydraulicSimulationStatus configureQualityReactions(
 
 HydraulicSimulationStatus configureEpanetQualityRun(
     EpanetProject &project,
-    const NetworkHydraulic &request,
-    const EpanetIndexRegistry &indices)
+    const NetworkHydraulic &network,
+    const EpanetIndexRegistry &indices,
+    const WaterQualitySolverOptions &options)
 {
     HydraulicSimulationStatus first_failure = makeEpanetSuccess();
 
-    HydraulicSimulationStatus status = configureQualityAnalysis(project, request, indices);
+    HydraulicSimulationStatus status = configureQualityAnalysis(project, network, indices, options);
     collectConfigurationFailure(project, status, first_failure);
 
-    status = configureQualityReactions(project, request, indices);
+    status = configureQualityReactions(project, network, indices);
     collectConfigurationFailure(project, status, first_failure);
 
     return first_failure.success ? makeEpanetSuccess() : first_failure;

@@ -39,13 +39,6 @@ HydraulicSimulationStatus EpanetQualitySolver::run(
 {
     cancelled = false;
 
-    if (this->network.options_quality.analysis == WaterQualityAnalysisType::None)
-    {
-        timeline.status = makeEpanetSuccess();
-        timeline.validity = WaterQualitySimulationResultValidity::NotRun;
-        return makeEpanetSuccess();
-    }
-
     if (cancellationRequested(cancellation_requested))
     {
         cancelled = true;

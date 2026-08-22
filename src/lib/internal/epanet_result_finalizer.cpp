@@ -1,8 +1,5 @@
 #include "epanet_result_finalizer.h"
 
-#include "epanet_diagnostic_helpers.h"
-#include "epanet_prepared_project.h"
-
 namespace
 {
 bool diagnosticInvalidatesResults(const HydraulicSimulationDiagnostic &diagnostic)
@@ -38,43 +35,6 @@ bool hasInvalidatingDiagnostic(const QList<HydraulicSimulationDiagnostic> &diagn
 }
 }
 
-
-EpanetResultRun finalizeEpanetCancelledRun(
-    EpanetResultRun result,
-    const EpanetPreparedProject &prepared_project,
-    bool hydraulics_complete,
-    bool quality_attempted,
-    bool quality_complete)
-{
-    result.cancelled = true;
-    result.report_lines = prepared_project.reportCollector().lines();
-
-    if (!hydraulics_complete)
-        markEpanetHydraulicResultCancelled(result.result_timeline);
-
-    if (quality_attempted && !quality_complete && result.quality_result_timeline.analysis != WaterQualityAnalysisType::None)
-        markEpanetQualityResultCancelled(result.quality_result_timeline);
-
-    return result;
-}
-
-EpanetResultRun finalizeEpanetFailedRun(
-    EpanetResultRun result,
-    const HydraulicSimulationStatus &status,
-    const EpanetPreparedProject &prepared_project)
-{
-    result.result_timeline.status = status;
-    result.report_lines = prepared_project.reportCollector().lines();
-
-    appendEpanetDiagnostics(result.result_timeline.diagnostics, prepared_project.project().diagnostics());
-
-    if (!status.success)
-        appendEpanetDiagnosticIfUnique(result.result_timeline.diagnostics, epanetDiagnosticFromStatus(status));
-
-    appendEpanetReportDiagnostics(result.result_timeline.diagnostics, result.report_lines);
-    finalizeEpanetHydraulicResultValidity(result.result_timeline);
-    return result;
-}
 
 void finalizeEpanetHydraulicResultValidity(HydraulicSimulationResultTimeline &timeline)
 {
