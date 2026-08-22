@@ -11,7 +11,7 @@ The matrix covers:
 - chemical, water-age, and source-trace execution on saved hydraulics;
 - junction, reservoir, tank, pipe, pump, valve, control, statistic, energy, flow-balance, and quality results;
 - diagnostics, cancellation, partial results, invalid input, and enabled-state handling;
-- INP import of project/global settings and core junction/reservoir/tank/pipe topology with canonical unit conversion, explicit completeness diagnostics, and native open-error provenance;
+- INP import of project/global settings, patterns, typed curves, junction/reservoir/tank/pipe topology, pumps, and all valve families with canonical native normalization, UUID-resolved references, explicit completeness diagnostics, and native open-error provenance;
 - INP export and native reopen fidelity;
 - deterministic generated-network hydraulic and quality differentials;
 - machine-checked model-field evidence and the vendored upstream-test inventory.
@@ -137,9 +137,12 @@ INP import uses native-open/readback scenarios and keeps import success separate
 | `conformance-import-project-globals-canonical-units` | A non-canonical EPANET source project is normalized by EPANET itself to CMH/metres before Toolkit readback, producing canonical AOWIS pressure-head, head-error, and flow-change units |
 | `conformance-import-core-topology-net1` | Net1 junctions, reservoir, tank, and pipes are reconstructed with canonical dimensions/demands, pipe inputs, and UUID-resolved endpoints |
 | `conformance-import-core-topology-canonical-units` | A purpose-built US-customary network reconstructs demand categories, emitter data, tank geometry, D-W roughness, pipe status/CV state, minor loss, and EPANET 2.3 leakage fields, then matches a direct native hydraulic run |
+| `conformance-import-hydraulic-assets-net1` | Net1 time pattern, pump-head curve, and pump are reconstructed with UUID-resolved references |
+| `conformance-import-patterns-curves-pumps-canonical-units` | US-source patterns, tank/pump/efficiency/generic curves, tank-volume references, curve/constant-power pumps, speed patterns, efficiency, and energy inputs are normalized into canonical AOWIS fields and native-compared |
+| `conformance-import-valves-canonical-units` | PRV, PSV, PBV, FCV, TCV, GPV, and PCV settings/statuses plus GPV/PCV curve references are reconstructed in canonical units and native-compared |
 | `conformance-import-open-error-diagnostic` | Native `EN_open` failures retain the input-open stage/operation, backend call, native error code/message, and a structured diagnostic |
 
-The current importer does not yet claim pumps/valves, patterns/curves, controls/rules, water-quality configuration, coordinates/vertices/map metadata, comments/tags, or full report-directive fidelity. When those source families are present, `EpanetResultImport::complete` is false and structured warning diagnostics identify the omitted content. Patterned node inputs retain their base values but do not fabricate unresolved pattern UUIDs.
+The current importer does not yet claim controls/rules, water-quality configuration, coordinates/vertices/map metadata, node/link comments/tags, or full report-directive fidelity. When those source families are present, `EpanetResultImport::complete` is false and structured warning diagnostics identify the omitted content. Imported pattern and typed-curve references are resolved to AOWIS UUIDs rather than retained as backend indices.
 
 Export fidelity uses dedicated native-reopen scenarios:
 

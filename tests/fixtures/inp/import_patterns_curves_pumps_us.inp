@@ -1,0 +1,66 @@
+[TITLE]
+Step 3 pump, pattern, and curve import fixture
+
+[JUNCTIONS]
+ J1 100 20 DMD
+ J2 110 5
+
+[RESERVOIRS]
+ R1 300 RPAT
+
+[TANKS]
+ T1 150 10 0 20 30 0 TVOL No
+
+[PIPES]
+ L1 J1 T1 1000 12 100 0 Open
+ L2 J2 T1 800 10 110 0 Open
+
+[PUMPS]
+ P1 R1 J1 HEAD PHEAD SPEED 0.8 PATTERN SPD
+ P2 R1 J2 POWER 25 SPEED 1.1
+
+[PATTERNS]
+ DMD 1.0 1.2 0.8
+ RPAT 1.0 1.01 0.99
+ SPD 1.0 0.9 1.1
+ PRICEG 1.0 1.5 0.5
+ PRICEP 1.0 2.0 0.75
+
+[CURVES]
+ TVOL 0 0
+ TVOL 10 5000
+ TVOL 20 12000
+ PHEAD 0 150
+ PHEAD 100 120
+ PHEAD 200 60
+ EFF 0 60
+ EFF 100 82
+ EFF 200 65
+ GEN 0 10
+ GEN 1 20
+
+[ENERGY]
+ Global Efficiency 78
+ Global Price 0.12
+ Global Pattern PRICEG
+ Pump P1 Effic EFF
+ Pump P1 Price 0.25
+ Pump P1 Pattern PRICEP
+ Pump P2 Price 0.30
+ Demand Charge 7.5
+
+[TIMES]
+ Duration 0:00
+
+[REPORT]
+ Status No
+ Summary No
+
+[OPTIONS]
+ Units GPM
+ Pressure PSI
+ Headloss H-W
+ Pattern DMD
+ Quality None
+
+[END]

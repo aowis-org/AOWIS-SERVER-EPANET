@@ -5,6 +5,7 @@
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <string>
@@ -66,6 +67,97 @@ const HydraulicLinkPipe *pipeById(const NetworkHydraulic &network, const QString
     {
         if (pipe.id == id)
             return &pipe;
+    }
+    return nullptr;
+}
+
+const HydraulicLinkPump *pumpById(const NetworkHydraulic &network, const QString &id)
+{
+    for (const HydraulicLinkPump &pump : network.links_pumps)
+    {
+        if (pump.id == id)
+            return &pump;
+    }
+    return nullptr;
+}
+
+const HydraulicLinkValve *valveById(const NetworkHydraulic &network, const QString &id)
+{
+    for (const HydraulicLinkValve &valve : network.links_valves)
+    {
+        if (valve.id == id)
+            return &valve;
+    }
+    return nullptr;
+}
+
+const HydraulicPatternTime *patternById(const NetworkHydraulic &network, const QString &id)
+{
+    for (const HydraulicPatternTime &pattern : network.patterns_time)
+    {
+        if (pattern.id == id)
+            return &pattern;
+    }
+    return nullptr;
+}
+
+const HydraulicCurvePumpHead *pumpHeadCurveById(const NetworkHydraulic &network, const QString &id)
+{
+    for (const HydraulicCurvePumpHead &curve : network.curves_pump_head)
+    {
+        if (curve.id == id)
+            return &curve;
+    }
+    return nullptr;
+}
+
+const HydraulicCurvePumpEfficiency *pumpEfficiencyCurveById(const NetworkHydraulic &network, const QString &id)
+{
+    for (const HydraulicCurvePumpEfficiency &curve : network.curves_pump_efficiency)
+    {
+        if (curve.id == id)
+            return &curve;
+    }
+    return nullptr;
+}
+
+const HydraulicCurveGeneric *genericCurveById(const NetworkHydraulic &network, const QString &id)
+{
+    for (const HydraulicCurveGeneric &curve : network.curves_generic)
+    {
+        if (curve.id == id)
+            return &curve;
+    }
+    return nullptr;
+}
+
+const HydraulicCurveTankVolume *tankVolumeCurveById(const NetworkHydraulic &network, const QString &id)
+{
+    for (const HydraulicCurveTankVolume &curve : network.curves_tank_volume)
+    {
+        if (curve.id == id)
+            return &curve;
+    }
+    return nullptr;
+}
+
+const HydraulicCurveValveHeadloss *valveHeadlossCurveById(const NetworkHydraulic &network, const QString &id)
+{
+    for (const HydraulicCurveValveHeadloss &curve : network.curves_valve_headloss)
+    {
+        if (curve.id == id)
+            return &curve;
+    }
+    return nullptr;
+}
+
+const HydraulicCurveValveCharacteristic *valveCharacteristicCurveById(
+    const NetworkHydraulic &network, const QString &id)
+{
+    for (const HydraulicCurveValveCharacteristic &curve : network.curves_valve_characteristic)
+    {
+        if (curve.id == id)
+            return &curve;
     }
     return nullptr;
 }
@@ -211,7 +303,7 @@ void scenarioImportCoreTopologyNet1(TestContext &context)
     const EpanetResultImport result = EpanetRunner().importInp(
         QStringLiteral(AOWIS_EPANET_TEST_NET1_INP));
     context.expect(result.status.success, "Net1 core topology import must succeed");
-    context.expect(!result.complete, "Net1 still contains deferred pumps, patterns, curves, controls, quality, and geometry metadata");
+    context.expect(!result.complete, "Net1 still contains deferred controls, quality, geometry metadata, and report directives");
 
     const NetworkHydraulic &network = result.request.network;
     const HydraulicNodeJunction *junction_11 = junctionById(network, QStringLiteral("11"));
@@ -368,6 +460,279 @@ void scenarioImportCoreTopologyCanonicalUnits(TestContext &context)
         AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, network, context);
 }
 
+void scenarioImportHydraulicAssetsNet1(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_NET1_INP));
+    context.expect(result.status.success, "Net1 hydraulic asset import must succeed");
+
+    const NetworkHydraulic &network = result.request.network;
+    context.expectEqual(static_cast<std::int64_t>(network.patterns_time.size()), std::int64_t{1}, comparison("pattern_count"));
+    context.expectEqual(static_cast<std::int64_t>(network.curves_pump_head.size()), std::int64_t{1}, comparison("pump_head_curve_count"));
+    context.expectEqual(static_cast<std::int64_t>(network.links_pumps.size()), std::int64_t{1}, comparison("pump_count"));
+
+    const HydraulicPatternTime *pattern = patternById(network, QStringLiteral("1"));
+    context.expect(pattern != nullptr, "Net1 demand pattern 1 must be imported");
+    if (pattern != nullptr)
+        context.expectEqual(static_cast<std::int64_t>(pattern->multipliers.size()), std::int64_t{12}, comparison("pattern_1.length"));
+
+    const HydraulicCurvePumpHead *curve = pumpHeadCurveById(network, QStringLiteral("1"));
+    context.expect(curve != nullptr, "Net1 pump head curve 1 must be imported");
+    if (curve != nullptr)
+    {
+        context.expectEqual(static_cast<std::int64_t>(curve->points.size()), std::int64_t{1}, comparison("curve_1.points"));
+        if (!curve->points.isEmpty())
+        {
+            context.expectNear(curve->points.first().flow_m3_per_h, 1500.0 * epanet_gpm_to_cmh, numeric_tolerance, comparison("curve_1.flow"));
+            context.expectNear(curve->points.first().head_gain_m, 250.0 * 0.3048, numeric_tolerance, comparison("curve_1.head"));
+        }
+    }
+
+    const HydraulicLinkPump *pump = pumpById(network, QStringLiteral("9"));
+    context.expect(pump != nullptr, "Net1 pump 9 must be imported");
+    if (pump != nullptr && curve != nullptr)
+    {
+        context.expectEqual(
+            static_cast<std::int64_t>(pump->definition_type),
+            static_cast<std::int64_t>(HydraulicLinkPumpDefinitionType::OnePointCurve),
+            comparison("pump_9.definition_type"));
+        context.expect(pump->head_curve_uuid == curve->uuid, "Net1 pump 9 must reference imported head curve 1");
+    }
+
+}
+
+void scenarioImportPatternsCurvesPumpsCanonicalUnits(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_PUMPS_US_INP));
+    context.expect(result.status.success, "pump/pattern/curve fixture must import successfully");
+
+    const NetworkHydraulic &network = result.request.network;
+    context.expectEqual(static_cast<std::int64_t>(network.patterns_time.size()), std::int64_t{5}, comparison("pattern_count"));
+    context.expectEqual(static_cast<std::int64_t>(network.curves_tank_volume.size()), std::int64_t{1}, comparison("tank_curve_count"));
+    context.expectEqual(static_cast<std::int64_t>(network.curves_pump_head.size()), std::int64_t{1}, comparison("pump_head_curve_count"));
+    context.expectEqual(static_cast<std::int64_t>(network.curves_pump_efficiency.size()), std::int64_t{1}, comparison("efficiency_curve_count"));
+    context.expectEqual(static_cast<std::int64_t>(network.curves_generic.size()), std::int64_t{1}, comparison("generic_curve_count"));
+    context.expectEqual(static_cast<std::int64_t>(network.links_pumps.size()), std::int64_t{2}, comparison("pump_count"));
+
+    const HydraulicPatternTime *demand_pattern = patternById(network, QStringLiteral("DMD"));
+    const HydraulicPatternTime *reservoir_pattern = patternById(network, QStringLiteral("RPAT"));
+    const HydraulicPatternTime *speed_pattern = patternById(network, QStringLiteral("SPD"));
+    const HydraulicPatternTime *global_price_pattern = patternById(network, QStringLiteral("PRICEG"));
+    const HydraulicPatternTime *pump_price_pattern = patternById(network, QStringLiteral("PRICEP"));
+    context.expect(demand_pattern != nullptr, "DMD pattern must be imported");
+    context.expect(reservoir_pattern != nullptr, "RPAT pattern must be imported");
+    context.expect(speed_pattern != nullptr, "SPD pattern must be imported");
+    context.expect(global_price_pattern != nullptr, "PRICEG pattern must be imported");
+    context.expect(pump_price_pattern != nullptr, "PRICEP pattern must be imported");
+
+    if (demand_pattern != nullptr)
+        context.expect(network.options_hydraulic.default_demand_pattern_uuid == demand_pattern->uuid, "default demand pattern must resolve to DMD UUID");
+    if (global_price_pattern != nullptr)
+        context.expect(network.options_energy.global_energy_price_pattern_uuid == global_price_pattern->uuid, "global energy-price pattern must resolve to PRICEG UUID");
+
+    const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
+    context.expect(junction != nullptr, "J1 must be imported");
+    if (junction != nullptr && !junction->demands.isEmpty() && demand_pattern != nullptr)
+    {
+        context.expect(
+            junction->demands.first().pattern_mode == HydraulicTimePatternMode::TimePattern,
+            "J1 demand must retain time-pattern mode");
+        context.expect(junction->demands.first().pattern_uuid == demand_pattern->uuid, "J1 demand must resolve DMD pattern UUID");
+    }
+
+    const HydraulicNodeJunction *junction_2 = junctionById(network, QStringLiteral("J2"));
+    context.expect(junction_2 != nullptr, "J2 must be imported");
+    if (junction_2 != nullptr && !junction_2->demands.isEmpty() && demand_pattern != nullptr)
+    {
+        context.expect(
+            junction_2->demands.first().pattern_mode == HydraulicTimePatternMode::TimePattern,
+            "J2 demand must make EPANET default-pattern semantics explicit");
+        context.expect(junction_2->demands.first().pattern_uuid == demand_pattern->uuid, "J2 demand must resolve the project default DMD pattern UUID");
+    }
+
+    const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
+    context.expect(reservoir != nullptr, "R1 must be imported");
+    if (reservoir != nullptr && reservoir_pattern != nullptr)
+        context.expect(reservoir->head_pattern_uuid == reservoir_pattern->uuid, "reservoir head pattern must resolve RPAT UUID");
+
+    const HydraulicCurveTankVolume *tank_curve = tankVolumeCurveById(network, QStringLiteral("TVOL"));
+    context.expect(tank_curve != nullptr, "TVOL must be imported as a tank-volume curve");
+    if (tank_curve != nullptr && tank_curve->points.size() == 3)
+    {
+        context.expectNear(tank_curve->points.at(1).water_level_m, 10.0 * 0.3048, numeric_tolerance, comparison("TVOL.level"));
+        context.expectNear(tank_curve->points.at(1).volume_m3, 5000.0 * 0.028316846592, numeric_tolerance, comparison("TVOL.volume"));
+    }
+    const HydraulicNodeTank *tank = tankById(network, QStringLiteral("T1"));
+    context.expect(tank != nullptr, "T1 must be imported");
+    if (tank != nullptr && tank_curve != nullptr)
+    {
+        context.expect(tank->geometry_input_type == HydraulicNodeTankGeometryInputType::VolumeCurve, "T1 must use volume-curve geometry");
+        context.expect(tank->volume_curve_uuid == tank_curve->uuid, "T1 must reference TVOL UUID");
+    }
+
+    const HydraulicCurvePumpHead *head_curve = pumpHeadCurveById(network, QStringLiteral("PHEAD"));
+    const HydraulicCurvePumpEfficiency *efficiency_curve = pumpEfficiencyCurveById(network, QStringLiteral("EFF"));
+    const HydraulicCurveGeneric *generic_curve = genericCurveById(network, QStringLiteral("GEN"));
+    context.expect(head_curve != nullptr, "PHEAD must be imported as pump-head curve");
+    context.expect(efficiency_curve != nullptr, "EFF must be imported as pump-efficiency curve");
+    context.expect(generic_curve != nullptr, "GEN must be imported as a generic curve");
+    if (head_curve != nullptr && head_curve->points.size() == 3)
+    {
+        context.expectNear(head_curve->points.at(1).flow_m3_per_h, 100.0 * epanet_gpm_to_cmh, numeric_tolerance, comparison("PHEAD.flow"));
+        context.expectNear(head_curve->points.at(1).head_gain_m, 120.0 * 0.3048, numeric_tolerance, comparison("PHEAD.head"));
+    }
+    if (efficiency_curve != nullptr && efficiency_curve->points.size() == 3)
+    {
+        context.expectNear(efficiency_curve->points.at(1).flow_m3_per_h, 100.0 * epanet_gpm_to_cmh, numeric_tolerance, comparison("EFF.flow"));
+        context.expectNear(efficiency_curve->points.at(1).efficiency_percent, 82.0, numeric_tolerance, comparison("EFF.efficiency"));
+    }
+    if (generic_curve != nullptr && generic_curve->points.size() == 2)
+    {
+        context.expectNear(generic_curve->points.at(1).x, 1.0, numeric_tolerance, comparison("GEN.x"));
+        context.expectNear(generic_curve->points.at(1).y, 20.0, numeric_tolerance, comparison("GEN.y"));
+    }
+
+    const HydraulicLinkPump *pump_1 = pumpById(network, QStringLiteral("P1"));
+    context.expect(pump_1 != nullptr, "P1 must be imported");
+    if (pump_1 != nullptr)
+    {
+        context.expect(pump_1->definition_type == HydraulicLinkPumpDefinitionType::ThreePointCurve, "P1 must retain three-point curve definition");
+        if (head_curve != nullptr)
+            context.expect(pump_1->head_curve_uuid == head_curve->uuid, "P1 must reference PHEAD UUID");
+        context.expectNear(pump_1->initial_speed_ratio, 0.8, numeric_tolerance, comparison("P1.speed"));
+        if (speed_pattern != nullptr)
+            context.expect(pump_1->speed_pattern_uuid == speed_pattern->uuid, "P1 must reference SPD UUID");
+        context.expect(pump_1->efficiency_input_type == HydraulicLinkPumpEfficiencyInputType::Curve, "P1 must retain efficiency-curve input");
+        if (efficiency_curve != nullptr)
+            context.expect(pump_1->efficiency_curve_uuid == efficiency_curve->uuid, "P1 must reference EFF UUID");
+        context.expect(pump_1->energy_price_input_type == HydraulicLinkPumpEnergyPriceInputType::Pattern, "P1 must retain patterned pump-specific energy price");
+        context.expectNear(pump_1->energy_price_per_kw_h, 0.25, numeric_tolerance, comparison("P1.energy_price"));
+        if (pump_price_pattern != nullptr)
+            context.expect(pump_1->price_pattern_uuid == pump_price_pattern->uuid, "P1 must reference PRICEP UUID");
+    }
+
+    const HydraulicLinkPump *pump_2 = pumpById(network, QStringLiteral("P2"));
+    context.expect(pump_2 != nullptr, "P2 must be imported");
+    if (pump_2 != nullptr)
+    {
+        context.expect(pump_2->definition_type == HydraulicLinkPumpDefinitionType::ConstantPower, "P2 must retain constant-power definition");
+        context.expectNear(pump_2->constant_power_kw, 25.0 * 0.7457, numeric_tolerance, comparison("P2.power"));
+        context.expectNear(pump_2->initial_speed_ratio, 1.1, numeric_tolerance, comparison("P2.speed"));
+        context.expect(pump_2->energy_price_input_type == HydraulicLinkPumpEnergyPriceInputType::Constant, "P2 must retain constant pump-specific energy price");
+        context.expectNear(pump_2->energy_price_per_kw_h, 0.30, numeric_tolerance, comparison("P2.energy_price"));
+    }
+
+    AowisEpanetTests::NativeReferenceConfiguration native_configuration;
+    native_configuration.input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_PUMPS_US_INP);
+    const AowisEpanetTests::NativeHydraulicTimeline native_timeline =
+        AowisEpanetTests::runNativeEpanetReference(native_configuration);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(result.request);
+    context.expect(native_timeline.success, "native pump fixture must solve successfully");
+    context.expect(wrapper_run.status.success, "imported pump fixture must solve successfully");
+    if (native_timeline.success && wrapper_run.status.success)
+        AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, network, context);
+}
+
+void scenarioImportValvesCanonicalUnits(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_VALVES_US_INP));
+    context.expect(result.status.success, "all-valve fixture must import successfully");
+
+    const NetworkHydraulic &network = result.request.network;
+    context.expectEqual(static_cast<std::int64_t>(network.links_valves.size()), std::int64_t{7}, comparison("valve_count"));
+    context.expectEqual(static_cast<std::int64_t>(network.curves_valve_headloss.size()), std::int64_t{1}, comparison("headloss_curve_count"));
+    context.expectEqual(static_cast<std::int64_t>(network.curves_valve_characteristic.size()), std::int64_t{1}, comparison("characteristic_curve_count"));
+
+    const double metres_per_psi = 0.3048 / 0.4333;
+    struct ValveExpectation
+    {
+        const char *id;
+        HydraulicLinkValveType type;
+        double setting;
+    };
+    const std::array<ValveExpectation, 5> scalar_valves = {{
+        {"VPRV", HydraulicLinkValveType::PRV, 50.0 * metres_per_psi},
+        {"VPSV", HydraulicLinkValveType::PSV, 30.0 * metres_per_psi},
+        {"VPBV", HydraulicLinkValveType::PBV, 20.0 * metres_per_psi},
+        {"VFCV", HydraulicLinkValveType::FCV, 100.0 * epanet_gpm_to_cmh},
+        {"VTCV", HydraulicLinkValveType::TCV, 2.5}
+    }};
+
+    for (const ValveExpectation &expected : scalar_valves)
+    {
+        const HydraulicLinkValve *valve = valveById(network, QString::fromLatin1(expected.id));
+        context.expect(valve != nullptr, std::string(expected.id) + " must be imported");
+        if (valve == nullptr)
+            continue;
+        context.expect(valve->type == expected.type, std::string(expected.id) + " must retain valve type");
+        context.expectNear(valve->diameter_mm, 12.0 * 25.4, numeric_tolerance, comparison(std::string(expected.id) + ".diameter"));
+        if (expected.type == HydraulicLinkValveType::PRV
+            || expected.type == HydraulicLinkValveType::PSV
+            || expected.type == HydraulicLinkValveType::PBV)
+        {
+            context.expectNear(valve->setting_pressure_head_m, expected.setting, numeric_tolerance, comparison(std::string(expected.id) + ".pressure_setting"));
+        }
+        else if (expected.type == HydraulicLinkValveType::FCV)
+        {
+            context.expectNear(valve->setting_flow_m3_per_h, expected.setting, numeric_tolerance, comparison(std::string(expected.id) + ".flow_setting"));
+        }
+        else
+        {
+            context.expectNear(valve->setting_loss_coefficient, expected.setting, numeric_tolerance, comparison(std::string(expected.id) + ".loss_setting"));
+        }
+    }
+
+    const HydraulicCurveValveHeadloss *headloss_curve = valveHeadlossCurveById(network, QStringLiteral("HLOSS"));
+    const HydraulicLinkValve *gpv = valveById(network, QStringLiteral("VGPV"));
+    context.expect(headloss_curve != nullptr, "HLOSS must be imported as valve head-loss curve");
+    context.expect(gpv != nullptr, "VGPV must be imported");
+    if (gpv != nullptr && headloss_curve != nullptr)
+    {
+        context.expect(gpv->type == HydraulicLinkValveType::GPV, "VGPV must retain GPV type");
+        context.expect(gpv->head_loss_curve_uuid == headloss_curve->uuid, "VGPV must reference HLOSS UUID");
+        context.expect(gpv->initial_status == HydraulicLinkValveInitialStatus::Open, "VGPV explicit Open status must be retained");
+    }
+    if (headloss_curve != nullptr && headloss_curve->points.size() == 3)
+    {
+        context.expectNear(headloss_curve->points.at(1).flow_m3_per_h, 100.0 * epanet_gpm_to_cmh, numeric_tolerance, comparison("HLOSS.flow"));
+        context.expectNear(headloss_curve->points.at(1).head_loss_m, 10.0 * 0.3048, numeric_tolerance, comparison("HLOSS.head"));
+    }
+
+    const HydraulicCurveValveCharacteristic *characteristic_curve =
+        valveCharacteristicCurveById(network, QStringLiteral("PCVC"));
+    const HydraulicLinkValve *pcv = valveById(network, QStringLiteral("VPCV"));
+    context.expect(characteristic_curve != nullptr, "PCVC must be imported as valve-characteristic curve");
+    context.expect(pcv != nullptr, "VPCV must be imported");
+    if (pcv != nullptr && characteristic_curve != nullptr)
+    {
+        context.expect(pcv->type == HydraulicLinkValveType::PCV, "VPCV must retain PCV type");
+        context.expectNear(pcv->setting_position_percent, 35.0, numeric_tolerance, comparison("VPCV.position"));
+        context.expect(pcv->characteristic_curve_uuid == characteristic_curve->uuid, "VPCV must reference PCVC UUID");
+        context.expect(pcv->initial_status == HydraulicLinkValveInitialStatus::Active, "VPCV default Active status must be retained");
+    }
+    if (characteristic_curve != nullptr && characteristic_curve->points.size() == 3)
+    {
+        context.expectNear(characteristic_curve->points.at(1).position_percent, 50.0, numeric_tolerance, comparison("PCVC.position"));
+        context.expectNear(characteristic_curve->points.at(1).relative_flow_percent, 35.0, numeric_tolerance, comparison("PCVC.relative_flow"));
+    }
+
+    const HydraulicLinkValve *tcv = valveById(network, QStringLiteral("VTCV"));
+    if (tcv != nullptr)
+        context.expect(tcv->initial_status == HydraulicLinkValveInitialStatus::Closed, "VTCV explicit Closed status must be retained");
+
+    AowisEpanetTests::NativeReferenceConfiguration native_configuration;
+    native_configuration.input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_VALVES_US_INP);
+    const AowisEpanetTests::NativeHydraulicTimeline native_timeline =
+        AowisEpanetTests::runNativeEpanetReference(native_configuration);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(result.request);
+    context.expect(native_timeline.success, "native valve fixture must solve successfully");
+    context.expect(wrapper_run.status.success, "imported valve fixture must solve successfully");
+    if (native_timeline.success && wrapper_run.status.success)
+        AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, network, context);
+}
+
 void scenarioImportOpenErrorDiagnostic(TestContext &context)
 {
     const EpanetResultImport result = EpanetRunner().importInp(
@@ -407,6 +772,21 @@ void registerInpImportScenarios(ScenarioRegistry &registry)
         "Imports demands, emitter data, tank geometry, pipe status, Darcy-Weisbach roughness, and leakage from US customary source units into canonical AOWIS fields.",
         {"conformance", "import", "hydraulic"},
         &scenarioImportCoreTopologyCanonicalUnits});
+    registry.add(ScenarioDefinition{
+        "conformance-import-hydraulic-assets-net1",
+        "Imports Net1 patterns, pump head curve, and pump references with UUID-resolved reference integrity.",
+        {"conformance", "import", "hydraulic"},
+        &scenarioImportHydraulicAssetsNet1});
+    registry.add(ScenarioDefinition{
+        "conformance-import-patterns-curves-pumps-canonical-units",
+        "Imports time patterns, typed curves, tank-volume references, curve/constant-power pumps, efficiency, speed, and energy inputs from US units into canonical AOWIS fields.",
+        {"conformance", "import", "hydraulic"},
+        &scenarioImportPatternsCurvesPumpsCanonicalUnits});
+    registry.add(ScenarioDefinition{
+        "conformance-import-valves-canonical-units",
+        "Imports all seven EPANET valve families, canonical settings, statuses, and GPV/PCV curve references.",
+        {"conformance", "import", "hydraulic"},
+        &scenarioImportValvesCanonicalUnits});
     registry.add(ScenarioDefinition{
         "conformance-import-open-error-diagnostic",
         "Rejects an unavailable INP path with native EPANET error details and a structured import diagnostic.",
