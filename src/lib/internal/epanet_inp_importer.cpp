@@ -7,6 +7,7 @@
 #include <aowis/epanet/epanet_api.h>
 
 #include <QFileInfo>
+#include <QHash>
 
 #include <array>
 #include <cmath>
@@ -14,10 +15,7 @@
 
 namespace
 {
-constexpr double meters_per_foot = 0.3048;
-constexpr double psi_per_foot = 0.4333;
-constexpr double kpa_per_psi = 6.895;
-constexpr double bar_per_psi = 0.068948;
+constexpr double pi = 3.14159265358979323846;
 
 HydraulicSimulationStatus readFailure(
     const EpanetProject &project,
@@ -35,6 +33,32 @@ HydraulicSimulationStatus readFailure(
         entity_type,
         QString(),
         message);
+}
+
+HydraulicSimulationStatus normalizeProjectToCanonicalUnits(EpanetProject &project)
+{
+    int error = EN_setflowunits(project.handle(), EN_CMH);
+    if (error != 0)
+    {
+        return readFailure(
+            project,
+            error,
+            QStringLiteral("EN_setflowunits(EN_CMH)"),
+            QStringLiteral("Failed to normalize EPANET flow and geometric units for INP import"));
+    }
+
+    error = EN_setoption(project.handle(), EN_PRESS_UNITS, EN_METERS);
+    if (error != 0)
+    {
+        return readFailure(
+            project,
+            error,
+            QStringLiteral("EN_setoption(EN_PRESS_UNITS, EN_METERS)"),
+            QStringLiteral("Failed to normalize EPANET pressure units for INP import"),
+            HydraulicSimulationStatusEntityType::HydraulicSolver);
+    }
+
+    return makeEpanetSuccess();
 }
 
 HydraulicSimulationStatus readOption(
@@ -109,66 +133,6 @@ HydraulicSimulationStatus readTimeParameterInt(
 
     value = static_cast<int>(backend_value);
     return makeEpanetSuccess();
-}
-
-bool isUsFlowUnit(int flow_unit)
-{
-    return flow_unit >= EN_CFS && flow_unit <= EN_AFD;
-}
-
-double flowToM3PerH(double value, int flow_unit)
-{
-    switch (flow_unit)
-    {
-    case EN_CFS:
-        return value * 101.9406477312;
-    case EN_GPM:
-        return value * 0.22712470704;
-    case EN_MGD:
-        return value * 157.725491;
-    case EN_IMGD:
-        return value * 189.42041666666667;
-    case EN_AFD:
-        return value * 51.39507656448;
-    case EN_LPS:
-        return value * 3.6;
-    case EN_LPM:
-        return value * 0.06;
-    case EN_MLD:
-        return value * (1000.0 / 24.0);
-    case EN_CMH:
-        return value;
-    case EN_CMD:
-        return value / 24.0;
-    case EN_CMS:
-        return value * 3600.0;
-    default:
-        return value;
-    }
-}
-
-double headToMeters(double value, int flow_unit)
-{
-    return isUsFlowUnit(flow_unit) ? value * meters_per_foot : value;
-}
-
-double pressureToHeadMeters(double value, int pressure_unit, double specific_gravity)
-{
-    switch (pressure_unit)
-    {
-    case EN_PSI:
-        return value / (psi_per_foot * specific_gravity) * meters_per_foot;
-    case EN_KPA:
-        return value / (kpa_per_psi * psi_per_foot * specific_gravity) * meters_per_foot;
-    case EN_METERS:
-        return value;
-    case EN_BAR:
-        return value / (bar_per_psi * psi_per_foot * specific_gravity) * meters_per_foot;
-    case EN_FEET:
-        return value * meters_per_foot;
-    default:
-        return value;
-    }
 }
 
 bool resolveHeadlossFormula(int backend_formula, HydraulicHeadlossFormula &formula)
@@ -350,43 +314,9 @@ HydraulicSimulationStatus importTimes(EpanetProject &project, NetworkHydraulic &
 
 HydraulicSimulationStatus importHydraulicOptions(EpanetProject &project, NetworkHydraulic &network)
 {
-    int flow_unit = 0;
-    int error = EN_getflowunits(project.handle(), &flow_unit);
-    if (error != 0)
-    {
-        return readFailure(
-            project,
-            error,
-            QStringLiteral("EN_getflowunits"),
-            QStringLiteral("Failed to read EPANET flow units"));
-    }
-    if (flow_unit < EN_CFS || flow_unit > EN_CMS)
-    {
-        return makeEpanetStatus(
-            HydraulicSimulationStatusStage::ReadInput,
-            HydraulicSimulationStatusOperation::ReadInput,
-            HydraulicSimulationStatusEntityType::HydraulicSolver,
-            QString(),
-            QStringLiteral("EPANET returned unsupported flow units"));
-    }
-
     double value = 0.0;
     HydraulicSimulationStatus status = readOption(
-        project, EN_PRESS_UNITS, value, QStringLiteral("EN_PRESS_UNITS"));
-    if (!status.success)
-        return status;
-    const int pressure_unit = static_cast<int>(std::llround(value));
-    if (pressure_unit < EN_PSI || pressure_unit > EN_FEET)
-    {
-        return makeEpanetStatus(
-            HydraulicSimulationStatusStage::ReadInput,
-            HydraulicSimulationStatusOperation::ReadInput,
-            HydraulicSimulationStatusEntityType::HydraulicSolver,
-            QString(),
-            QStringLiteral("EPANET returned unsupported pressure units"));
-    }
-
-    status = readOption(project, EN_SP_GRAVITY, value, QStringLiteral("EN_SP_GRAVITY"));
+        project, EN_SP_GRAVITY, value, QStringLiteral("EN_SP_GRAVITY"));
     if (!status.success)
         return status;
     network.options_hydraulic.specific_gravity = value;
@@ -395,7 +325,7 @@ HydraulicSimulationStatus importHydraulicOptions(EpanetProject &project, Network
     double minimum_pressure = 0.0;
     double required_pressure = 0.0;
     double pressure_exponent = 0.0;
-    error = EN_getdemandmodel(
+    const int error = EN_getdemandmodel(
         project.handle(),
         &demand_model,
         &minimum_pressure,
@@ -418,10 +348,8 @@ HydraulicSimulationStatus importHydraulicOptions(EpanetProject &project, Network
             QString(),
             QStringLiteral("EPANET returned an unsupported demand model"));
     }
-    network.options_hydraulic.minimum_pressure_head_m = pressureToHeadMeters(
-        minimum_pressure, pressure_unit, network.options_hydraulic.specific_gravity);
-    network.options_hydraulic.required_pressure_head_m = pressureToHeadMeters(
-        required_pressure, pressure_unit, network.options_hydraulic.specific_gravity);
+    network.options_hydraulic.minimum_pressure_head_m = minimum_pressure;
+    network.options_hydraulic.required_pressure_head_m = required_pressure;
     network.options_hydraulic.pressure_exponent = pressure_exponent;
 
     struct ScalarOption
@@ -484,8 +412,8 @@ HydraulicSimulationStatus importHydraulicOptions(EpanetProject &project, Network
     network.options_hydraulic.check_frequency = static_cast<int>(std::llround(values.at(4)));
     network.options_hydraulic.maximum_check = static_cast<int>(std::llround(values.at(5)));
     network.options_hydraulic.damping_limit = values.at(6);
-    network.options_hydraulic.maximum_head_error_m = headToMeters(values.at(7), flow_unit);
-    network.options_hydraulic.maximum_flow_change_m3_per_h = flowToM3PerH(values.at(8), flow_unit);
+    network.options_hydraulic.maximum_head_error_m = values.at(7);
+    network.options_hydraulic.maximum_flow_change_m3_per_h = values.at(8);
     network.options_hydraulic.demand_multiplier = values.at(9);
     network.options_hydraulic.emitters_can_backflow = static_cast<int>(std::llround(values.at(10))) == EN_TRUE;
     network.options_hydraulic.relative_viscosity = values.at(11);
@@ -550,6 +478,581 @@ HydraulicSimulationStatus importReportStatus(EpanetProject &project, NetworkHydr
     return makeEpanetSuccess();
 }
 
+HydraulicSimulationStatus readNodeValue(
+    const EpanetProject &project,
+    int node_index,
+    int property,
+    double &value,
+    HydraulicSimulationStatusEntityType entity_type,
+    const QString &property_name)
+{
+    const int error = EN_getnodevalue(project.handle(), node_index, property, &value);
+    if (error == 0)
+        return makeEpanetSuccess();
+    return readFailure(
+        project,
+        error,
+        QStringLiteral("EN_getnodevalue(%1)").arg(property_name),
+        QStringLiteral("Failed to read EPANET node input"),
+        entity_type);
+}
+
+HydraulicSimulationStatus readLinkValue(
+    const EpanetProject &project,
+    int link_index,
+    int property,
+    double &value,
+    HydraulicSimulationStatusEntityType entity_type,
+    const QString &property_name)
+{
+    const int error = EN_getlinkvalue(project.handle(), link_index, property, &value);
+    if (error == 0)
+        return makeEpanetSuccess();
+    return readFailure(
+        project,
+        error,
+        QStringLiteral("EN_getlinkvalue(%1)").arg(property_name),
+        QStringLiteral("Failed to read EPANET link input"),
+        entity_type);
+}
+
+HydraulicSimulationStatus importJunction(
+    EpanetProject &project,
+    EpanetResultImport &result,
+    int node_index,
+    const QString &node_id,
+    const QUuid &node_uuid,
+    double emitter_exponent,
+    bool &pattern_reference_present)
+{
+    HydraulicNodeJunction junction;
+    junction.id = node_id;
+    junction.uuid = node_uuid;
+    junction.elevation_input_type = HydraulicNodeElevationInputType::TotalElevation;
+
+    double value = 0.0;
+    HydraulicSimulationStatus status = readNodeValue(
+        project, node_index, EN_ELEVATION, value,
+        HydraulicSimulationStatusEntityType::Junction, QStringLiteral("EN_ELEVATION"));
+    if (!status.success)
+        return status;
+    junction.elevation_m = value;
+
+    int demand_count = 0;
+    int error = EN_getnumdemands(project.handle(), node_index, &demand_count);
+    if (error != 0)
+    {
+        return readFailure(
+            project,
+            error,
+            QStringLiteral("EN_getnumdemands"),
+            QStringLiteral("Failed to read EPANET junction demand categories"),
+            HydraulicSimulationStatusEntityType::Junction);
+    }
+
+    for (int demand_index = 1; demand_index <= demand_count; demand_index++)
+    {
+        HydraulicNodeJunctionDemand demand;
+        double base_demand = 0.0;
+        error = EN_getbasedemand(project.handle(), node_index, demand_index, &base_demand);
+        if (error != 0)
+        {
+            return readFailure(
+                project,
+                error,
+                QStringLiteral("EN_getbasedemand"),
+                QStringLiteral("Failed to read EPANET junction base demand"),
+                HydraulicSimulationStatusEntityType::Junction);
+        }
+        demand.base_demand_m3_per_h = base_demand;
+
+        char demand_name[EN_MAXID + 1] = {};
+        error = EN_getdemandname(project.handle(), node_index, demand_index, demand_name);
+        if (error != 0)
+        {
+            return readFailure(
+                project,
+                error,
+                QStringLiteral("EN_getdemandname"),
+                QStringLiteral("Failed to read EPANET junction demand category name"),
+                HydraulicSimulationStatusEntityType::Junction);
+        }
+        demand.category_name = QString::fromUtf8(demand_name);
+
+        int pattern_index = 0;
+        error = EN_getdemandpattern(project.handle(), node_index, demand_index, &pattern_index);
+        if (error != 0)
+        {
+            return readFailure(
+                project,
+                error,
+                QStringLiteral("EN_getdemandpattern"),
+                QStringLiteral("Failed to read EPANET junction demand pattern reference"),
+                HydraulicSimulationStatusEntityType::Junction);
+        }
+        demand.pattern_mode = HydraulicTimePatternMode::Constant;
+        if (pattern_index > 0)
+            pattern_reference_present = true;
+
+        junction.demands.append(demand);
+    }
+
+    status = readNodeValue(
+        project, node_index, EN_EMITTER, value,
+        HydraulicSimulationStatusEntityType::Junction, QStringLiteral("EN_EMITTER"));
+    if (!status.success)
+        return status;
+    junction.emitter.pressure_exponent = emitter_exponent;
+    junction.emitter.coefficient = value;
+
+    result.request.network.nodes_junctions.append(junction);
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus importReservoir(
+    EpanetProject &project,
+    EpanetResultImport &result,
+    int node_index,
+    const QString &node_id,
+    const QUuid &node_uuid,
+    bool &pattern_reference_present)
+{
+    HydraulicNodeReservoir reservoir;
+    reservoir.id = node_id;
+    reservoir.uuid = node_uuid;
+    reservoir.head_input_type = HydraulicNodeElevationInputType::TotalHead;
+
+    double value = 0.0;
+    HydraulicSimulationStatus status = readNodeValue(
+        project, node_index, EN_ELEVATION, value,
+        HydraulicSimulationStatusEntityType::Reservoir, QStringLiteral("EN_ELEVATION"));
+    if (!status.success)
+        return status;
+    reservoir.hydraulic_head_m = value;
+
+    status = readNodeValue(
+        project, node_index, EN_PATTERN, value,
+        HydraulicSimulationStatusEntityType::Reservoir, QStringLiteral("EN_PATTERN"));
+    if (!status.success)
+        return status;
+    reservoir.head_pattern_mode = HydraulicTimePatternMode::Constant;
+    if (static_cast<int>(std::llround(value)) > 0)
+        pattern_reference_present = true;
+
+    result.request.network.nodes_reservoirs.append(reservoir);
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus importTank(
+    EpanetProject &project,
+    EpanetResultImport &result,
+    int node_index,
+    const QString &node_id,
+    const QUuid &node_uuid,
+    bool &volume_curve_reference_present)
+{
+    HydraulicNodeTank tank;
+    tank.id = node_id;
+    tank.uuid = node_uuid;
+    tank.elevation_input_type = HydraulicNodeTankElevationInputType::BottomElevation;
+    tank.geometry_input_type = HydraulicNodeTankGeometryInputType::Cylindrical;
+
+    struct NodeValueField
+    {
+        int property;
+        const char *name;
+        double *target;
+    };
+
+    double elevation = 0.0;
+    double initial_level = 0.0;
+    double minimum_level = 0.0;
+    double maximum_level = 0.0;
+    double diameter = 0.0;
+    double minimum_volume = 0.0;
+    double maximum_volume = 0.0;
+    double volume_curve_index = 0.0;
+    double can_overflow = 0.0;
+    const std::array<NodeValueField, 9> fields = {{
+        {EN_ELEVATION, "EN_ELEVATION", &elevation},
+        {EN_TANKLEVEL, "EN_TANKLEVEL", &initial_level},
+        {EN_MINLEVEL, "EN_MINLEVEL", &minimum_level},
+        {EN_MAXLEVEL, "EN_MAXLEVEL", &maximum_level},
+        {EN_TANKDIAM, "EN_TANKDIAM", &diameter},
+        {EN_MINVOLUME, "EN_MINVOLUME", &minimum_volume},
+        {EN_MAXVOLUME, "EN_MAXVOLUME", &maximum_volume},
+        {EN_VOLCURVE, "EN_VOLCURVE", &volume_curve_index},
+        {EN_CANOVERFLOW, "EN_CANOVERFLOW", &can_overflow}
+    }};
+
+    for (const NodeValueField &field : fields)
+    {
+        HydraulicSimulationStatus status = readNodeValue(
+            project,
+            node_index,
+            field.property,
+            *field.target,
+            HydraulicSimulationStatusEntityType::Tank,
+            QString::fromLatin1(field.name));
+        if (!status.success)
+            return status;
+    }
+
+    tank.bottom_elevation_m = elevation;
+    tank.water_level_initial_m = initial_level;
+    tank.water_level_minimum_m = minimum_level;
+    tank.water_level_maximum_m = maximum_level;
+    tank.diameter_m = diameter;
+    tank.cross_section_area_m2 = pi * tank.diameter_m * tank.diameter_m / 4.0;
+    // Toolkit readback is intentionally semantic: EPANET may normalize source
+    // tokens such as a zero tank minimum volume into the geometric volume it
+    // actually simulates. Preserve that native semantic value in the model.
+    tank.minimum_volume_m3 = minimum_volume;
+    tank.volume_at_maximum_level_m3 = maximum_volume;
+    tank.can_overflow = static_cast<int>(std::llround(can_overflow)) == EN_TRUE;
+
+    if (static_cast<int>(std::llround(volume_curve_index)) > 0)
+        volume_curve_reference_present = true;
+
+    result.request.network.nodes_tanks.append(tank);
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus importPipe(
+    EpanetProject &project,
+    EpanetResultImport &result,
+    int link_index,
+    int link_type,
+    const QString &link_id,
+    const QUuid &link_uuid,
+    const QHash<int, QUuid> &node_uuids_by_index)
+{
+    int node_from_index = 0;
+    int node_to_index = 0;
+    int error = EN_getlinknodes(
+        project.handle(), link_index, &node_from_index, &node_to_index);
+    if (error != 0)
+    {
+        return readFailure(
+            project,
+            error,
+            QStringLiteral("EN_getlinknodes"),
+            QStringLiteral("Failed to read EPANET pipe endpoints"),
+            HydraulicSimulationStatusEntityType::Pipe);
+    }
+
+    if (!node_uuids_by_index.contains(node_from_index)
+        || !node_uuids_by_index.contains(node_to_index))
+    {
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::ReadInput,
+            HydraulicSimulationStatusOperation::ResolveEntity,
+            HydraulicSimulationStatusEntityType::Pipe,
+            link_id,
+            link_uuid,
+            QStringLiteral("Could not resolve imported EPANET pipe endpoint"));
+    }
+
+    HydraulicLinkPipe pipe;
+    pipe.id = link_id;
+    pipe.uuid = link_uuid;
+    pipe.node_uuid_from = node_uuids_by_index.value(node_from_index);
+    pipe.node_uuid_to = node_uuids_by_index.value(node_to_index);
+
+    struct LinkValueField
+    {
+        int property;
+        const char *name;
+        double *target;
+    };
+
+    double length = 0.0;
+    double diameter = 0.0;
+    double roughness = 0.0;
+    double minor_loss = 0.0;
+    double initial_status = 0.0;
+    double leak_area = 0.0;
+    double leak_expansion = 0.0;
+    const std::array<LinkValueField, 7> fields = {{
+        {EN_LENGTH, "EN_LENGTH", &length},
+        {EN_DIAMETER, "EN_DIAMETER", &diameter},
+        {EN_ROUGHNESS, "EN_ROUGHNESS", &roughness},
+        {EN_MINORLOSS, "EN_MINORLOSS", &minor_loss},
+        {EN_INITSTATUS, "EN_INITSTATUS", &initial_status},
+        {EN_LEAK_AREA, "EN_LEAK_AREA", &leak_area},
+        {EN_LEAK_EXPAN, "EN_LEAK_EXPAN", &leak_expansion}
+    }};
+
+    for (const LinkValueField &field : fields)
+    {
+        HydraulicSimulationStatus status = readLinkValue(
+            project,
+            link_index,
+            field.property,
+            *field.target,
+            HydraulicSimulationStatusEntityType::Pipe,
+            QString::fromLatin1(field.name));
+        if (!status.success)
+            return status;
+    }
+
+    pipe.length_measured_m = length;
+    pipe.diameter_mm = diameter;
+    pipe.minor_loss_coefficient = minor_loss;
+    pipe.leak_area_mm2_per_100m = leak_area;
+    pipe.leak_area_expansion_per_pressure_head_mm2_per_m = leak_expansion;
+
+    switch (result.request.network.options_hydraulic.headloss_formula)
+    {
+    case HydraulicHeadlossFormula::HazenWilliams:
+        pipe.roughness_hazen_williams = roughness;
+        break;
+    case HydraulicHeadlossFormula::DarcyWeisbach:
+        pipe.roughness_darcy_weisbach_mm = roughness;
+        break;
+    case HydraulicHeadlossFormula::ChezyManning:
+        pipe.roughness_chezy_manning = roughness;
+        break;
+    }
+
+    if (link_type == EN_CVPIPE)
+    {
+        pipe.initial_status = HydraulicLinkPipeInitialStatus::CheckValve;
+    }
+    else
+    {
+        const int backend_status = static_cast<int>(std::llround(initial_status));
+        if (backend_status == EN_OPEN)
+            pipe.initial_status = HydraulicLinkPipeInitialStatus::Open;
+        else if (backend_status == EN_CLOSED)
+            pipe.initial_status = HydraulicLinkPipeInitialStatus::Closed;
+        else
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Pipe,
+                link_id,
+                link_uuid,
+                QStringLiteral("EPANET returned an unsupported initial pipe status"));
+        }
+    }
+
+    result.request.network.links_pipes.append(pipe);
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus importCoreTopology(
+    EpanetProject &project,
+    EpanetResultImport &result)
+{
+    double emitter_exponent = 0.0;
+    HydraulicSimulationStatus status = readOption(
+        project,
+        EN_EMITEXPON,
+        emitter_exponent,
+        QStringLiteral("EN_EMITEXPON"),
+        HydraulicSimulationStatusEntityType::HydraulicSolver);
+    if (!status.success)
+        return status;
+
+    int node_count = 0;
+    int error = EN_getcount(project.handle(), EN_NODECOUNT, &node_count);
+    if (error != 0)
+    {
+        return readFailure(
+            project,
+            error,
+            QStringLiteral("EN_getcount(EN_NODECOUNT)"),
+            QStringLiteral("Failed to read EPANET node count"));
+    }
+
+    QHash<int, QUuid> node_uuids_by_index;
+    bool pattern_reference_present = false;
+    bool volume_curve_reference_present = false;
+    for (int node_index = 1; node_index <= node_count; node_index++)
+    {
+        char node_id_value[EN_MAXID + 1] = {};
+        error = EN_getnodeid(project.handle(), node_index, node_id_value);
+        if (error != 0)
+        {
+            return readFailure(
+                project,
+                error,
+                QStringLiteral("EN_getnodeid"),
+                QStringLiteral("Failed to read EPANET node ID"),
+                HydraulicSimulationStatusEntityType::Node);
+        }
+        const QString node_id = QString::fromUtf8(node_id_value);
+        const QUuid node_uuid = QUuid::createUuid();
+        node_uuids_by_index.insert(node_index, node_uuid);
+
+        int node_type = EN_JUNCTION;
+        error = EN_getnodetype(project.handle(), node_index, &node_type);
+        if (error != 0)
+        {
+            return readFailure(
+                project,
+                error,
+                QStringLiteral("EN_getnodetype"),
+                QStringLiteral("Failed to read EPANET node type"),
+                HydraulicSimulationStatusEntityType::Node);
+        }
+
+        if (node_type == EN_JUNCTION)
+        {
+            status = importJunction(
+                project,
+                result,
+                node_index,
+                node_id,
+                node_uuid,
+                emitter_exponent,
+                pattern_reference_present);
+        }
+        else if (node_type == EN_RESERVOIR)
+        {
+            status = importReservoir(
+                project,
+                result,
+                node_index,
+                node_id,
+                node_uuid,
+                pattern_reference_present);
+        }
+        else if (node_type == EN_TANK)
+        {
+            status = importTank(
+                project,
+                result,
+                node_index,
+                node_id,
+                node_uuid,
+                volume_curve_reference_present);
+        }
+        else
+        {
+            status = makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Node,
+                node_id,
+                node_uuid,
+                QStringLiteral("EPANET returned an unsupported node type"));
+        }
+        if (!status.success)
+            return status;
+    }
+
+    int link_count = 0;
+    error = EN_getcount(project.handle(), EN_LINKCOUNT, &link_count);
+    if (error != 0)
+    {
+        return readFailure(
+            project,
+            error,
+            QStringLiteral("EN_getcount(EN_LINKCOUNT)"),
+            QStringLiteral("Failed to read EPANET link count"));
+    }
+
+    int skipped_pump_count = 0;
+    int skipped_valve_count = 0;
+    for (int link_index = 1; link_index <= link_count; link_index++)
+    {
+        int link_type = EN_PIPE;
+        error = EN_getlinktype(project.handle(), link_index, &link_type);
+        if (error != 0)
+        {
+            return readFailure(
+                project,
+                error,
+                QStringLiteral("EN_getlinktype"),
+                QStringLiteral("Failed to read EPANET link type"),
+                HydraulicSimulationStatusEntityType::Link);
+        }
+
+        if (link_type == EN_PUMP)
+        {
+            skipped_pump_count++;
+            continue;
+        }
+        if (link_type >= EN_PRV && link_type <= EN_PCV)
+        {
+            skipped_valve_count++;
+            continue;
+        }
+        if (link_type != EN_PIPE && link_type != EN_CVPIPE)
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Link,
+                QString(),
+                QStringLiteral("EPANET returned an unsupported link type"));
+        }
+
+        char link_id_value[EN_MAXID + 1] = {};
+        error = EN_getlinkid(project.handle(), link_index, link_id_value);
+        if (error != 0)
+        {
+            return readFailure(
+                project,
+                error,
+                QStringLiteral("EN_getlinkid"),
+                QStringLiteral("Failed to read EPANET pipe ID"),
+                HydraulicSimulationStatusEntityType::Pipe);
+        }
+
+        status = importPipe(
+            project,
+            result,
+            link_index,
+            link_type,
+            QString::fromUtf8(link_id_value),
+            QUuid::createUuid(),
+            node_uuids_by_index);
+        if (!status.success)
+            return status;
+    }
+
+    if (pattern_reference_present)
+    {
+        appendImportWarning(
+            result,
+            QStringLiteral("Node demand or reservoir head pattern references are present; base values were imported but pattern assignment is deferred until pattern import is available."),
+            HydraulicSimulationStatusEntityType::Pattern);
+    }
+    if (volume_curve_reference_present)
+    {
+        appendImportWarning(
+            result,
+            QStringLiteral("Tank volume-curve references are present; tank scalar geometry was imported but the volume curve assignment is deferred until curve import is available."),
+            HydraulicSimulationStatusEntityType::Curve);
+    }
+    if (skipped_pump_count > 0)
+    {
+        appendImportWarning(
+            result,
+            QStringLiteral("%1 pump%2 %3 present but pump import is not available.")
+                .arg(skipped_pump_count)
+                .arg(skipped_pump_count == 1 ? QString() : QStringLiteral("s"))
+                .arg(skipped_pump_count == 1 ? QStringLiteral("is") : QStringLiteral("are")),
+            HydraulicSimulationStatusEntityType::Pump);
+    }
+    if (skipped_valve_count > 0)
+    {
+        appendImportWarning(
+            result,
+            QStringLiteral("%1 valve%2 %3 present but valve import is not available.")
+                .arg(skipped_valve_count)
+                .arg(skipped_valve_count == 1 ? QString() : QStringLiteral("s"))
+                .arg(skipped_valve_count == 1 ? QStringLiteral("is") : QStringLiteral("are")),
+            HydraulicSimulationStatusEntityType::Valve);
+    }
+
+    return makeEpanetSuccess();
+}
+
 HydraulicSimulationStatus collectDeferredImportDiagnostics(
     EpanetProject &project,
     EpanetResultImport &result)
@@ -561,9 +1064,7 @@ HydraulicSimulationStatus collectDeferredImportDiagnostics(
         HydraulicSimulationStatusEntityType entity_type;
     };
 
-    const std::array<CountCheck, 6> checks = {{
-        {EN_NODECOUNT, "Network nodes are present but node import is not available.", HydraulicSimulationStatusEntityType::Node},
-        {EN_LINKCOUNT, "Network links are present but link import is not available.", HydraulicSimulationStatusEntityType::Link},
+    const std::array<CountCheck, 4> checks = {{
         {EN_PATCOUNT, "Time patterns are present but pattern import is not available.", HydraulicSimulationStatusEntityType::Pattern},
         {EN_CURVECOUNT, "Curves are present but curve import is not available.", HydraulicSimulationStatusEntityType::Curve},
         {EN_CONTROLCOUNT, "Simple controls are present but control import is not available.", HydraulicSimulationStatusEntityType::Control},
@@ -662,6 +1163,10 @@ EpanetResultImport importEpanetInp(const QString &input_file_path)
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
+    status = normalizeProjectToCanonicalUnits(project);
+    if (!status.success)
+        return finishImport(std::move(result), status, project);
+
     NetworkHydraulic &network = result.request.network;
     status = importTitles(project, network);
     if (!status.success)
@@ -672,6 +1177,10 @@ EpanetResultImport importEpanetInp(const QString &input_file_path)
         return finishImport(std::move(result), status, project);
 
     status = importHydraulicOptions(project, network);
+    if (!status.success)
+        return finishImport(std::move(result), status, project);
+
+    status = importCoreTopology(project, result);
     if (!status.success)
         return finishImport(std::move(result), status, project);
 

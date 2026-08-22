@@ -103,7 +103,9 @@ Controls and rules remain in the snapshot so their membership is preserved; thei
 
 ## INP import
 
-`EpanetRunner::importInp()` opens a native EPANET input file and reconstructs supported source data into an `EpanetRunRequest`. Import conversion treats native flow and pressure selections strictly as source-file units; quantities are converted immediately into the canonical AOWIS units encoded by model field names.
+`EpanetRunner::importInp()` opens a native EPANET input file and reconstructs supported source data into an `EpanetRunRequest`. The supported import surface includes project/global settings and the core hydraulic topology formed by junctions, reservoirs, tanks, and pipes. After `EN_open`, the importer normalizes the live native project with `EN_setflowunits(..., EN_CMH)` and `EN_setoption(..., EN_PRESS_UNITS, EN_METERS)`. Node and pipe hydraulic inputs are then read back directly through the Toolkit in the canonical units encoded by AOWIS field names, while endpoint indices are resolved into AOWIS UUID references.
+
+Pattern references attached to imported node inputs are reported but are not fabricated: base values are retained and the import is marked incomplete until pattern import can resolve those references. Tanks that reference volume curves retain their native scalar geometry readback and are likewise reported incomplete until curve import is available.
 
 Import success and completeness are separate. A successful status means the file was opened and all fields claimed by the importer were read successfully. `complete == false` means additional native source content was detected but not represented, and structured warning diagnostics identify those omissions. Native open/read failures retain the EPANET error code, operation, and message.
 

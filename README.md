@@ -60,7 +60,7 @@ The standalone server executable exposes the `/status` liveness route. Simulatio
 
 ## INP import
 
-`EpanetRunner::importInp()` opens an EPANET-formatted input file through the native Toolkit and reconstructs supported data into an `EpanetRunRequest`. Source units are converted at the adapter boundary into the canonical units encoded by AOWIS model field names. Import success and completeness are separate: a successful import can report `complete == false` together with structured warnings when the source contains data that the importer cannot yet represent.
+`EpanetRunner::importInp()` opens an EPANET-formatted input file through the native Toolkit and reconstructs supported data into an `EpanetRunRequest`. The importer currently reconstructs project/global options plus junctions, reservoirs, tanks, and pipes, including endpoint references, demand categories, emitters, tank scalar geometry, pipe status/roughness/minor loss, and EPANET 2.3 leakage inputs. After opening the source file, the importer asks EPANET itself to normalize the live project to `EN_CMH` flow units and `EN_METERS` pressure units, then reads canonical values directly from the Toolkit into the AOWIS fields. Import success and completeness are separate: a successful import can report `complete == false` together with structured warnings when the source contains data that the importer cannot yet represent. Pumps, valves, patterns/curves, controls/rules, water-quality configuration, map geometry, comments/tags, and full report directives remain later import layers.
 
 ## Build
 

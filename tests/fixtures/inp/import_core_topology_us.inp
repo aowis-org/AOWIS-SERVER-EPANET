@@ -1,0 +1,45 @@
+[TITLE]
+Import Core Topology Fixture
+US customary topology and hydraulic entity inputs
+
+[JUNCTIONS]
+ J1 100 10
+ J2 110 0
+
+[RESERVOIRS]
+ R1 250
+
+[TANKS]
+ T1 150 10 0 20 30 100
+
+[PIPES]
+ P1 R1 J1 1000 12 0.5 0.2 Open
+ P2 J1 J2 500 8 0.4 0 Closed
+ P3 J2 T1 750 6 0.3 0 CV
+
+[DEMANDS]
+ J1 10
+ J1 5
+
+[EMITTERS]
+ J2 2.5
+
+[LEAKAGE]
+ P1 2.0 0.1
+
+[TIMES]
+ Duration 0:00
+
+[REPORT]
+ Status No
+ Summary No
+
+[OPTIONS]
+ Units GPM
+ Pressure PSI
+ Headloss D-W
+ Specific Gravity 1.0
+ Emitter Exponent 0.6
+ Quality None
+
+[END]

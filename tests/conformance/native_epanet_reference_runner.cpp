@@ -676,6 +676,7 @@ struct NativeUnitSystem
 {
     int flow_units = EN_CMH;
     int pressure_units = EN_METERS;
+    int headloss_formula = EN_HW;
     double specific_gravity = 1.0;
 };
 
@@ -849,6 +850,7 @@ NativeUnitSystem readUnitSystem(EN_Project project)
     NativeUnitSystem units;
     checkEpanet(EN_getflowunits(project, &units.flow_units), "EN_getflowunits");
     units.pressure_units = static_cast<int>(optionValue(project, EN_PRESS_UNITS));
+    units.headloss_formula = static_cast<int>(optionValue(project, EN_HEADLOSSFORM));
     units.specific_gravity = optionValue(project, EN_SP_GRAVITY);
     return units;
 }
@@ -953,6 +955,8 @@ void appendLinkResult(EN_Project project, int link_index, const NativeUnitSystem
         pipe.head_loss_m = headToMetres(linkValue(project, link_index, EN_HEADLOSS), units.flow_units);
         pipe.open = static_cast<int>(linkValue(project, link_index, EN_STATUS)) != EN_CLOSED;
         pipe.roughness = linkValue(project, link_index, EN_SETTING);
+        if (units.headloss_formula == EN_DW && usesUsLengthUnits(units.flow_units))
+            pipe.roughness *= kMetresPerFoot;
         pipe.appears_in_control = linkValue(project, link_index, EN_LINK_INCONTROL) != 0.0;
 
         const double length_m = headToMetres(linkValue(project, link_index, EN_LENGTH), units.flow_units);

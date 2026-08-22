@@ -11,7 +11,7 @@ The matrix covers:
 - chemical, water-age, and source-trace execution on saved hydraulics;
 - junction, reservoir, tank, pipe, pump, valve, control, statistic, energy, flow-balance, and quality results;
 - diagnostics, cancellation, partial results, invalid input, and enabled-state handling;
-- INP import with canonical unit conversion, explicit completeness diagnostics, and native open-error provenance;
+- INP import of project/global settings and core junction/reservoir/tank/pipe topology with canonical unit conversion, explicit completeness diagnostics, and native open-error provenance;
 - INP export and native reopen fidelity;
 - deterministic generated-network hydraulic and quality differentials;
 - machine-checked model-field evidence and the vendored upstream-test inventory.
@@ -133,11 +133,13 @@ INP import uses native-open/readback scenarios and keeps import success separate
 
 | Scenario | What it establishes |
 |---|---|
-| `conformance-import-project-globals-net1` | The vendored upstream Net1 INP opens through native EPANET and reconstructs supported project/global timing, hydraulic, energy, and report settings while explicitly reporting deferred topology/quality content |
-| `conformance-import-project-globals-canonical-units` | Non-canonical EPANET source flow/pressure units are converted at the import boundary into canonical AOWIS pressure-head, head-error, and flow-change units |
+| `conformance-import-project-globals-net1` | The vendored upstream Net1 INP opens through native EPANET and reconstructs supported project/global timing, hydraulic, energy, report, and core-topology content while explicitly reporting remaining deferred families |
+| `conformance-import-project-globals-canonical-units` | A non-canonical EPANET source project is normalized by EPANET itself to CMH/metres before Toolkit readback, producing canonical AOWIS pressure-head, head-error, and flow-change units |
+| `conformance-import-core-topology-net1` | Net1 junctions, reservoir, tank, and pipes are reconstructed with canonical dimensions/demands, pipe inputs, and UUID-resolved endpoints |
+| `conformance-import-core-topology-canonical-units` | A purpose-built US-customary network reconstructs demand categories, emitter data, tank geometry, D-W roughness, pipe status/CV state, minor loss, and EPANET 2.3 leakage fields, then matches a direct native hydraulic run |
 | `conformance-import-open-error-diagnostic` | Native `EN_open` failures retain the input-open stage/operation, backend call, native error code/message, and a structured diagnostic |
 
-The current importer does not claim topology, patterns/curves, controls/rules, water-quality configuration, or full report-directive fidelity. When those source families are present, `EpanetResultImport::complete` is false and structured warning diagnostics identify the omitted content.
+The current importer does not yet claim pumps/valves, patterns/curves, controls/rules, water-quality configuration, coordinates/vertices/map metadata, comments/tags, or full report-directive fidelity. When those source families are present, `EpanetResultImport::complete` is false and structured warning diagnostics identify the omitted content. Patterned node inputs retain their base values but do not fabricate unresolved pattern UUIDs.
 
 Export fidelity uses dedicated native-reopen scenarios:
 

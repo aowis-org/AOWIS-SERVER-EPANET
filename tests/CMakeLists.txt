@@ -131,6 +131,8 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-reentrancy-independent-runners
     conformance-import-project-globals-net1
     conformance-import-project-globals-canonical-units
+    conformance-import-core-topology-net1
+    conformance-import-core-topology-canonical-units
     conformance-import-open-error-diagnostic
     conformance-export-native-reopen
     conformance-export-titles-comments-tags
@@ -279,6 +281,7 @@ target_compile_definitions(aowis-server-epanet-conformance-tests
     PRIVATE
         AOWIS_EPANET_TEST_NET1_INP="${PROJECT_SOURCE_DIR}/external/epanet/example-networks/Net1.inp"
         AOWIS_EPANET_TEST_IMPORT_GLOBAL_OPTIONS_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_global_options_us.inp"
+        AOWIS_EPANET_TEST_IMPORT_CORE_TOPOLOGY_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_core_topology_us.inp"
 )
 
 foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_TEST_SCENARIOS)

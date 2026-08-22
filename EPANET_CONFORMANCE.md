@@ -11,7 +11,7 @@ The conformance target is the public `EpanetRunner` contract:
 - execute zero or more chemical, water-age, or source-trace analyses against the saved hydraulic solution;
 - return all modeled hydraulic and quality results, statuses, diagnostics, and partial-result states;
 - preserve supported INP data during export;
-- import supported INP project/global settings into canonical AOWIS request fields with explicit completeness diagnostics.
+- import supported INP project/global settings and core junction/reservoir/tank/pipe topology into canonical AOWIS request fields with explicit completeness diagnostics.
 
 Native project CRUD beyond the import/export adapter, direct project-handle access, and public binary Output API access are outside this target because they are not operations exposed by `EpanetRunner`.
 
@@ -145,7 +145,7 @@ Mismatch messages identify the scenario, timestep, entity type and stable ID, fi
 
 ## INP import evidence
 
-Importer conformance scenarios open native INP files through EPANET and verify reconstruction into canonical AOWIS project/global settings, including unit conversion. Import-open failures must retain native error details in structured diagnostics, and incomplete imports must explicitly report omitted source content.
+Importer conformance scenarios open native INP files through EPANET, normalize the live project to CMH/metres through the Toolkit, and verify reconstruction into canonical AOWIS project/global settings and core topology. Net1 proves native junction/reservoir/tank/pipe readback and endpoint reconstruction. A dedicated US-customary fixture verifies demand, emitter, tank, Darcy-Weisbach, pipe-status, and leakage conversion and then compares the hydraulics of the imported AOWIS network against a direct native run of the source INP. Import-open failures must retain native error details in structured diagnostics, and incomplete imports must explicitly report omitted source content.
 
 ## Upstream EPANET tests
 
