@@ -10,6 +10,7 @@ Public backend types:
 
 - `EpanetRunner` and `EpanetSimulationManager` select the EPANET backend.
 - `EpanetRunRequest`, `EpanetResultRun`, `EpanetQualityResult`, and `EpanetRunState` describe EPANET run orchestration around solver-neutral result timelines.
+- `EpanetResultImport` describes INP-to-model import results, including structured diagnostics and whether every detected source feature was represented.
 - `EpanetResolvers` converts supported AOWIS input forms into values required by EPANET.
 
 Internal types such as `EpanetProject`, builders, configurators, solvers, result readers, index registries, and report collectors may expose native concepts because they are confined to the adapter implementation. Native `EN_*` calls, constants, indices, error codes, and messages do not become shared model concepts.
@@ -100,6 +101,12 @@ The prepared simulation snapshot contains enabled nodes and links only. Disabled
 
 Controls and rules remain in the snapshot so their membership is preserved; their enabled flags determine whether EPANET may execute them. References from enabled entities, controls, or rules to missing or disabled entities are rejected. Report selections silently discard disabled entities but reject unresolved enabled references.
 
+## INP import
+
+`EpanetRunner::importInp()` opens a native EPANET input file and reconstructs supported source data into an `EpanetRunRequest`. Import conversion treats native flow and pressure selections strictly as source-file units; quantities are converted immediately into the canonical AOWIS units encoded by model field names.
+
+Import success and completeness are separate. A successful status means the file was opened and all fields claimed by the importer were read successfully. `complete == false` means additional native source content was detected but not represented, and structured warning diagnostics identify those omissions. Native open/read failures retain the EPANET error code, operation, and message.
+
 ## Geometry and export
 
 Node coordinates, link vertices, map labels, and backdrop bounds use the model's WGS84 coordinate fields. Exported `[COORDINATES]`, `[VERTICES]`, and `[BACKDROP]` sections therefore use geographic degrees.
@@ -120,9 +127,8 @@ Validation collects independent input problems where continued inspection is saf
 
 ## Public scope limits
 
-The adapter's public contract is model-to-EPANET simulation and INP export. It does not expose:
+The adapter's public contract includes model-to-EPANET simulation, INP import, and INP export. It does not expose:
 
-- arbitrary INP import into `NetworkHydraulic`;
 - mutation of an already-open native project through Toolkit CRUD calls;
 - direct project-handle access;
 - native pattern-file or hydraulic-file management;

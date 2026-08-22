@@ -3,6 +3,7 @@
 #include "internal/epanet_diagnostic_helpers.h"
 #include "internal/epanet_hydraulic_run_configurator.h"
 #include "internal/epanet_inp_exporter.h"
+#include "internal/epanet_inp_importer.h"
 #include "internal/epanet_multi_quality_run_executor.h"
 #include "internal/epanet_network_validator.h"
 #include "internal/epanet_prepared_project.h"
@@ -120,6 +121,11 @@ HydraulicSimulationStatus validateAndConfigureQualityForInp(
         prepared_project.indices(),
         options);
 }
+}
+
+EpanetResultImport EpanetRunner::importInp(const QString &input_file_path) const
+{
+    return importEpanetInp(input_file_path);
 }
 
 EpanetResultInp EpanetRunner::retrieveInp(const EpanetRunRequest &request) const

@@ -8,7 +8,7 @@ The following names identify the concrete EPANET backend and are therefore inten
 
 - Repository, CMake target, include path, and server executable names containing `epanet`.
 - `EpanetRunner` and `EpanetSimulationManager`, because selecting either explicitly selects the EPANET backend.
-- `EpanetRunRequest`, `EpanetResultRun`, `EpanetQualityResult`, and `EpanetRunState`, because they describe EPANET backend execution orchestration around solver-neutral hydraulic and quality timelines.
+- `EpanetRunRequest`, `EpanetResultRun`, `EpanetResultImport`, `EpanetQualityResult`, and `EpanetRunState`, because they describe EPANET backend execution/import orchestration around solver-neutral hydraulic and quality types.
 - `EpanetProject`, because it owns the native `EN_Project` handle.
 - `EpanetNetworkBuilder`, `EpanetHydraulicRunConfigurator`, `EpanetQualityRunConfigurator`, `EpanetHydraulicSolver`, `EpanetQualitySolver`, `EpanetResultReader`, `EpanetQualityResultReader`, `EpanetIndexRegistry`, and `EpanetReportCollector`, because they translate to or operate on the native EPANET API.
 - `EpanetResolvers`, because it resolves generic AOWIS input forms into values required by EPANET.
@@ -51,7 +51,9 @@ The adapter initializes every native EPANET project with `EN_CMH` and explicitly
 - Water-quality tolerance is quantity-specific for chemical concentration, water age, and source trace. AOWIS chemical concentration is canonical `mg/L`; the Model does not carry an arbitrary chemical-unit string.
 - Bulk and wall reaction coefficients are stored together with their reaction order because coefficient dimensions depend on that order. The coefficient itself therefore has no fixed standalone UCUM suffix unless a specific order is assumed.
 
-No m³/h-to-L/s conversion is performed by this adapter. `HydraulicSolverOptions` does not expose selectable native flow or pressure units; conversion to presentation or interchange units belongs outside the hydraulic solver.
+Simulation projects use canonical AOWIS units directly. INP import is the inverse boundary: the importer reads the source file's native flow and pressure selections only long enough to convert imported quantities into canonical AOWIS units, and does not preserve those native unit selectors as hydraulic model state.
+
+No m³/h-to-L/s conversion is performed by the simulation path. `HydraulicSolverOptions` does not expose selectable native flow or pressure units; conversion to presentation or interchange units belongs outside the hydraulic solver.
 
 Pipe roughness is selected according to `headloss_formula`: `roughness_hazen_williams` for Hazen-Williams, `roughness_darcy_weisbach_mm` for Darcy-Weisbach, and `roughness_chezy_manning` for Chezy-Manning.
 

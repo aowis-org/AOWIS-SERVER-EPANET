@@ -10,6 +10,7 @@ The adapter translates `NetworkHydraulic` into a native EPANET project, executes
 - `EpanetSimulationManager`: asynchronous Qt queue with independent cooperative cancellation for each job.
 - `EpanetRunRequest`: the complete execution request: one hydraulic network plus an ordered list of requested water-quality analyses.
 - `EpanetResultRun`: one hydraulic result timeline plus one child result for every requested quality analysis.
+- `EpanetResultImport`: an INP import result containing the reconstructed `EpanetRunRequest`, structured diagnostics, and a completeness flag.
 - `EpanetResolvers`: conversion helpers for supported AOWIS input forms.
 
 The implementation keeps native EPANET state behind adapter-internal builders, configurators, solvers, result readers, project wrappers, and index registries.
@@ -57,6 +58,10 @@ See `EPANET_BACKEND_SEMANTICS.md` for backend-specific units, translation rules,
 
 The standalone server executable exposes the `/status` liveness route. Simulation execution is provided by the adapter API and `EpanetSimulationManager`; `server.cpp` does not expose a solver transport endpoint.
 
+## INP import
+
+`EpanetRunner::importInp()` opens an EPANET-formatted input file through the native Toolkit and reconstructs supported data into an `EpanetRunRequest`. Source units are converted at the adapter boundary into the canonical units encoded by AOWIS model field names. Import success and completeness are separate: a successful import can report `complete == false` together with structured warnings when the source contains data that the importer cannot yet represent.
+
 ## Build
 
 ```bash
@@ -84,7 +89,7 @@ ctest --test-dir build-linux-tests -N
 ctest --test-dir build-linux-tests -R <scenario-name> --verbose
 ```
 
-Useful label groups include `contract`, `conformance`, `hydraulic`, `quality`, `negative`, `export`, `stress`, `proof`, and `upstream`.
+Useful label groups include `contract`, `conformance`, `hydraulic`, `quality`, `negative`, `import`, `export`, `stress`, `proof`, and `upstream`.
 
 `EPANET_CONFORMANCE.md` defines the conformance target, evidence model, test groups, acceptance rule, and supported hydraulic and water-quality coverage. `EPANET_CONFORMANCE_MATRIX.md` contains the detailed scenario and field-level evidence matrix.
 

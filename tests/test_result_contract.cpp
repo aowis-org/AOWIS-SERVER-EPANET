@@ -177,9 +177,6 @@ NetworkHydraulic makePumpNetwork(bool with_timer_control, quint64 duration_s)
     pump.head_curve_uuid = curve.uuid;
     pump.initial_status = HydraulicLinkPumpInitialStatus::On;
     pump.initial_speed_ratio = 1.0;
-    pump.control_type = with_timer_control
-        ? HydraulicLinkPumpControlType::TimeBased
-        : HydraulicLinkPumpControlType::None;
 
     network.nodes_reservoirs.append(source);
     network.nodes_reservoirs.append(sink);

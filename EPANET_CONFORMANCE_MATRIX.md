@@ -1,6 +1,6 @@
 # EPANET Conformance Matrix
 
-This document is the detailed evidence matrix for the AOWIS model-driven EPANET 2.3 adapter. It complements `EPANET_CONFORMANCE.md` by mapping supported inputs, execution behavior, results, validation paths, export behavior, and upstream EPANET tests to concrete registered scenarios.
+This document is the detailed evidence matrix for the AOWIS model-driven EPANET 2.3 adapter. It complements `EPANET_CONFORMANCE.md` by mapping supported model inputs, INP import behavior, execution behavior, results, validation paths, export behavior, and upstream EPANET tests to concrete registered scenarios.
 
 ## Scope
 
@@ -11,6 +11,7 @@ The matrix covers:
 - chemical, water-age, and source-trace execution on saved hydraulics;
 - junction, reservoir, tank, pipe, pump, valve, control, statistic, energy, flow-balance, and quality results;
 - diagnostics, cancellation, partial results, invalid input, and enabled-state handling;
+- INP import with canonical unit conversion, explicit completeness diagnostics, and native open-error provenance;
 - INP export and native reopen fidelity;
 - deterministic generated-network hydraulic and quality differentials;
 - machine-checked model-field evidence and the vendored upstream-test inventory.
@@ -64,11 +65,12 @@ ctest --test-dir build-linux-tests -L conformance --output-on-failure
 ctest --test-dir build-linux-tests -L contract --output-on-failure
 ctest --test-dir build-linux-tests -L quality --output-on-failure
 ctest --test-dir build-linux-tests -L negative --output-on-failure
+ctest --test-dir build-linux-tests -L import --output-on-failure
 ctest --test-dir build-linux-tests -L upstream --output-on-failure
 ctest --test-dir build-linux-tests -L proof --output-on-failure
 ```
 
-`conformance` contains native-backed hydraulic and water-quality scenarios. `contract` contains public wrapper contract and regression scenarios. `hydraulic` and `quality` select their respective solver domains. `negative` covers invalid-input and reference hardening. `export` covers INP fidelity. `stress` covers deterministic generated-network differentials. `proof` contains the scenario-manifest, upstream-inventory, field-audit, multi-quality isolation/order checks, and independent-run reentrancy proof. `upstream` always contains the source inventory and can also include the original upstream Boost suite when enabled.
+`conformance` contains native-backed hydraulic and water-quality scenarios. `contract` contains public wrapper contract and regression scenarios. `hydraulic` and `quality` select their respective solver domains. `negative` covers invalid-input and reference hardening. `import` covers INP-to-model reconstruction and import diagnostics. `export` covers INP fidelity. `stress` covers deterministic generated-network differentials. `proof` contains the scenario-manifest, upstream-inventory, field-audit, multi-quality isolation/order checks, and independent-run reentrancy proof. `upstream` always contains the source inventory and can also include the original upstream Boost suite when enabled.
 
 ### Optional original upstream Boost suite
 
@@ -126,6 +128,16 @@ Controls, solver options, and operational behavior use stable scenario families.
 | `conformance-options-hydraulic-*` | every supported hydraulic solver option branch, including DDA/PDA and both unbalanced behaviors |
 | `conformance-operational-*` | statistics, flow balance, warning diagnostics, error diagnostics, cancellation-before-results, cancellation-with-partial-results |
 | `contract-reject-pump-power-rule` | explicit unsupported pump `POWER` premise rejection |
+
+INP import uses native-open/readback scenarios and keeps import success separate from source completeness:
+
+| Scenario | What it establishes |
+|---|---|
+| `conformance-import-project-globals-net1` | The vendored upstream Net1 INP opens through native EPANET and reconstructs supported project/global timing, hydraulic, energy, and report settings while explicitly reporting deferred topology/quality content |
+| `conformance-import-project-globals-canonical-units` | Non-canonical EPANET source flow/pressure units are converted at the import boundary into canonical AOWIS pressure-head, head-error, and flow-change units |
+| `conformance-import-open-error-diagnostic` | Native `EN_open` failures retain the input-open stage/operation, backend call, native error code/message, and a structured diagnostic |
+
+The current importer does not claim topology, patterns/curves, controls/rules, water-quality configuration, or full report-directive fidelity. When those source families are present, `EpanetResultImport::complete` is false and structured warning diagnostics identify the omitted content.
 
 Export fidelity uses dedicated native-reopen scenarios:
 

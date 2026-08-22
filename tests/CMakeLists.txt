@@ -129,6 +129,9 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-operational-cancellation-before-results
     conformance-operational-cancellation-partial-results
     conformance-reentrancy-independent-runners
+    conformance-import-project-globals-net1
+    conformance-import-project-globals-canonical-units
+    conformance-import-open-error-diagnostic
     conformance-export-native-reopen
     conformance-export-titles-comments-tags
     conformance-export-patterns-curves
@@ -234,6 +237,7 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/result_contract_scenarios.h
     conformance/hydraulic_behavior_scenarios.h
     conformance/input_mapping_scenarios.h
+    conformance/inp_import_scenarios.h
     conformance/pump_scenarios.h
     conformance/valve_scenarios.h
     conformance/controls_options_operations_scenarios.h
@@ -248,6 +252,7 @@ add_executable(aowis-server-epanet-conformance-tests
     test_result_contract.cpp
     test_hydraulic_behavior_conformance.cpp
     test_input_mapping_conformance.cpp
+    test_inp_import_conformance.cpp
     test_pump_conformance.cpp
     test_valve_conformance.cpp
     test_controls_options_operations_conformance.cpp
@@ -273,6 +278,7 @@ target_compile_features(aowis-server-epanet-conformance-tests PRIVATE cxx_std_20
 target_compile_definitions(aowis-server-epanet-conformance-tests
     PRIVATE
         AOWIS_EPANET_TEST_NET1_INP="${PROJECT_SOURCE_DIR}/external/epanet/example-networks/Net1.inp"
+        AOWIS_EPANET_TEST_IMPORT_GLOBAL_OPTIONS_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_global_options_us.inp"
 )
 
 foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_TEST_SCENARIOS)
@@ -310,7 +316,8 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
         set(AOWIS_SERVER_EPANET_TEST_LABELS "conformance;hydraulic")
     endif()
 
-    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-negative-|^conformance-multi-quality-failure-isolation$")
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-negative-|^conformance-multi-quality-failure-isolation$"
+       OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-import-open-error-diagnostic")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "negative")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-export-")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "export")
@@ -320,6 +327,10 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
 
     if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "coordinates-vertices|map-label")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "coordinate")
+    endif()
+
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-import-")
+        list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "import")
     endif()
 
     if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-multi-quality-(isolated-equivalence|order-independence)$")

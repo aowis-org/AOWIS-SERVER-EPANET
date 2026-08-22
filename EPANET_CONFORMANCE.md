@@ -10,9 +10,10 @@ The conformance target is the public `EpanetRunner` contract:
 - execute one complete hydraulic analysis;
 - execute zero or more chemical, water-age, or source-trace analyses against the saved hydraulic solution;
 - return all modeled hydraulic and quality results, statuses, diagnostics, and partial-result states;
-- preserve supported INP data during export.
+- preserve supported INP data during export;
+- import supported INP project/global settings into canonical AOWIS request fields with explicit completeness diagnostics.
 
-Native project CRUD, arbitrary INP import, direct project-handle access, and public binary Output API access are outside this target because they are not operations exposed by `EpanetRunner`.
+Native project CRUD beyond the import/export adapter, direct project-handle access, and public binary Output API access are outside this target because they are not operations exposed by `EpanetRunner`.
 
 ## Evidence model
 
@@ -52,6 +53,7 @@ ctest --test-dir build-linux-tests -L conformance --output-on-failure
 ctest --test-dir build-linux-tests -L hydraulic --output-on-failure
 ctest --test-dir build-linux-tests -L quality --output-on-failure
 ctest --test-dir build-linux-tests -L negative --output-on-failure
+ctest --test-dir build-linux-tests -L import --output-on-failure
 ctest --test-dir build-linux-tests -L export --output-on-failure
 ctest --test-dir build-linux-tests -L stress --output-on-failure
 ctest --test-dir build-linux-tests -L proof --output-on-failure
@@ -140,6 +142,10 @@ Mismatch messages identify the scenario, timestep, entity type and stable ID, fi
 - `excluded-runtime-metadata`, with a reason explaining why it is unstable backend-local state.
 
 `aowis-server-epanet-model-field-conformance-audit`, implemented by `tests/conformance/verify_model_field_conformance.cmake`, compares that policy with the model headers and the registered scenario manifest. It fails when a field or struct appears without policy, policy references a removed model field, or evidence names an unregistered scenario.
+
+## INP import evidence
+
+Importer conformance scenarios open native INP files through EPANET and verify reconstruction into canonical AOWIS project/global settings, including unit conversion. Import-open failures must retain native error details in structured diagnostics, and incomplete imports must explicitly report omitted source content.
 
 ## Upstream EPANET tests
 

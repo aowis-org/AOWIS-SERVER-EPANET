@@ -11,6 +11,7 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/internal/epanet_hydraulic_run_configurator.cpp
     src/lib/internal/epanet_hydraulic_solver.cpp
     src/lib/internal/epanet_inp_exporter.cpp
+    src/lib/internal/epanet_inp_importer.cpp
     src/lib/internal/epanet_network_builder.cpp
     src/lib/internal/epanet_network_builder_controls.cpp
     src/lib/internal/epanet_network_builder_links.cpp
@@ -40,6 +41,7 @@ set(AOWIS_SERVER_EPANET_PUBLIC_HEADERS
     include/aowis/epanet/epanet.h
     include/aowis/epanet/epanet_api.h
     include/aowis/epanet/epanet_resolvers.h
+    include/aowis/epanet/epanet_result_import.h
     include/aowis/epanet/epanet_result_inp.h
     include/aowis/epanet/epanet_result_run.h
     include/aowis/epanet/epanet_run_request.h
@@ -58,6 +60,7 @@ set(AOWIS_SERVER_EPANET_INTERNAL_HEADERS
     src/lib/internal/epanet_hydraulic_run_configurator.h
     src/lib/internal/epanet_hydraulic_solver.h
     src/lib/internal/epanet_inp_exporter.h
+    src/lib/internal/epanet_inp_importer.h
     src/lib/internal/epanet_index_registry.h
     src/lib/internal/epanet_network_builder.h
     src/lib/internal/epanet_network_builder_support.h

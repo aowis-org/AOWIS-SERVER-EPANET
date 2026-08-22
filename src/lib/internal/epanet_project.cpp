@@ -2,10 +2,17 @@
 
 #include "epanet_status_helpers.h"
 
+#include <QByteArray>
+#include <QFile>
+
 EpanetProject::~EpanetProject()
 {
-    if (this->project != nullptr)
-        EN_deleteproject(this->project);
+    if (this->project == nullptr)
+        return;
+
+    if (this->input_open)
+        EN_close(this->project);
+    EN_deleteproject(this->project);
 }
 
 HydraulicSimulationStatus EpanetProject::create()
@@ -21,6 +28,33 @@ HydraulicSimulationStatus EpanetProject::create()
             return epanet_status;
     }
 
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus EpanetProject::openInput(const QString &input_file_path)
+{
+    HydraulicSimulationStatus status = create();
+    if (!status.success)
+        return status;
+
+    const QByteArray input_path = QFile::encodeName(input_file_path);
+    const int error = EN_open(this->project, input_path.constData(), "", "");
+    if (error != 0)
+    {
+        const HydraulicSimulationStatus status = processEpanetReturnCode(
+            *this,
+            error,
+            HydraulicSimulationStatusStage::OpenInput,
+            HydraulicSimulationStatusOperation::OpenInput,
+            QStringLiteral("EN_open"),
+            HydraulicSimulationStatusEntityType::Project,
+            input_file_path,
+            QStringLiteral("Failed to open EPANET INP file"));
+        if (!status.success)
+            return status;
+    }
+
+    this->input_open = true;
     return makeEpanetSuccess();
 }
 

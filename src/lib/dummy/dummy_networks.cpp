@@ -714,7 +714,6 @@ NetworkHydraulic DummyNetworks::networkFull()
     curve_pump.head_curve_uuid = pump_head_curve.uuid;
     curve_pump.initial_speed_ratio = 1.0;
     curve_pump.initial_status = HydraulicLinkPumpInitialStatus::On;
-    curve_pump.control_type = HydraulicLinkPumpControlType::LevelBased;
     curve_pump.constant_efficiency_percent = 78.0;
     curve_pump.energy_price_per_kw_h = 0.22;
     network.links_pumps.append(curve_pump);
@@ -728,7 +727,6 @@ NetworkHydraulic DummyNetworks::networkFull()
     power_pump.constant_power_kw = 11.0;
     power_pump.initial_speed_ratio = 0.85;
     power_pump.initial_status = HydraulicLinkPumpInitialStatus::Off;
-    power_pump.control_type = HydraulicLinkPumpControlType::TimeBased;
     power_pump.constant_efficiency_percent = 72.0;
     power_pump.energy_price_per_kw_h = 0.22;
     network.links_pumps.append(power_pump);

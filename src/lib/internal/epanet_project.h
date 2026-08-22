@@ -18,6 +18,7 @@ public:
     EpanetProject &operator=(const EpanetProject &) = delete;
 
     HydraulicSimulationStatus create();
+    HydraulicSimulationStatus openInput(const QString &input_file_path);
     EN_Project handle() const;
     QString errorMessage(int error_code) const;
     const QList<HydraulicSimulationDiagnostic> &diagnostics() const;
@@ -25,6 +26,7 @@ public:
 
 private:
     EN_Project project = nullptr;
+    bool input_open = false;
     mutable QList<HydraulicSimulationDiagnostic> diagnostics_collected;
 };
 

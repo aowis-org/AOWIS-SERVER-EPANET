@@ -3,6 +3,7 @@
 #include "result_contract_scenarios.h"
 #include "hydraulic_behavior_scenarios.h"
 #include "input_mapping_scenarios.h"
+#include "inp_import_scenarios.h"
 #include "pump_scenarios.h"
 #include "valve_scenarios.h"
 #include "controls_options_operations_scenarios.h"
@@ -23,6 +24,7 @@ int main(int argc, char *argv[])
     AowisEpanetTests::registerNet1ConformanceScenarios(registry);
     AowisEpanetTests::registerHydraulicBehaviorScenarios(registry);
     AowisEpanetTests::registerInputMappingScenarios(registry);
+    AowisEpanetTests::registerInpImportScenarios(registry);
     AowisEpanetTests::registerPumpScenarios(registry);
     AowisEpanetTests::registerValveScenarios(registry);
     AowisEpanetTests::registerControlsOptionsOperationsScenarios(registry);
