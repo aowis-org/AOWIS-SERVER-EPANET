@@ -17,3 +17,4 @@ Current purpose-built fixtures:
 - `import_quality_mixing_reactions_ug_l.inp` exercises all four tank mixing models, two-compartment fraction, positive/zero/negative reaction orders, global bulk/wall reactions, independent pipe bulk/wall overrides, tank override ranges, limiting concentration, roughness correlation, reaction-coefficient canonicalization from `ug/L` to `mg/L`, and native quality equivalence.
 - `import_quality_age.inp` exercises AGE mode, initial water age, tolerance, quality timestep, and native quality equivalence.
 - `import_quality_trace.inp` exercises TRACE mode, trace-node UUID resolution, percent tolerance, quality timestep, and native quality equivalence.
+- `import_quality_wall_reaction_us.inp`: US-customary CHEMICAL fixture proving zero-order wall-reaction area-basis conversion to canonical square-metre semantics.

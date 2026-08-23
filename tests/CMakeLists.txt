@@ -143,6 +143,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-import-quality-source-trace
     conformance-import-quality-sources-canonical-units
     conformance-import-quality-mixing-reactions-canonical-units
+    conformance-import-quality-net1-equivalence
     conformance-import-open-error-diagnostic
     conformance-export-native-reopen
     conformance-export-titles-comments-tags
@@ -298,6 +299,7 @@ target_compile_definitions(aowis-server-epanet-conformance-tests
         AOWIS_EPANET_TEST_IMPORT_QUALITY_CHEMICAL_UG_L_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_chemical_ug_l.inp"
         AOWIS_EPANET_TEST_IMPORT_QUALITY_SOURCES_UG_L_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_sources_ug_l.inp"
         AOWIS_EPANET_TEST_IMPORT_QUALITY_MIXING_REACTIONS_UG_L_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_mixing_reactions_ug_l.inp"
+        AOWIS_EPANET_TEST_IMPORT_QUALITY_WALL_REACTION_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_wall_reaction_us.inp"
         AOWIS_EPANET_TEST_IMPORT_QUALITY_AGE_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_age.inp"
         AOWIS_EPANET_TEST_IMPORT_QUALITY_TRACE_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_trace.inp"
 )
@@ -358,6 +360,8 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "proof")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-reentrancy-independent-runners")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "quality" "proof")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-import-quality-net1-equivalence")
+        list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "proof")
     endif()
 
     set_tests_properties(

@@ -326,6 +326,23 @@ void compareImportedQualityTimeline(
     }
 }
 
+void expectNoDeferredQualityImportDiagnostics(
+    TestContext &context,
+    const EpanetResultImport &result)
+{
+    for (const HydraulicSimulationDiagnostic &diagnostic : result.diagnostics)
+    {
+        const bool quality_diagnostic =
+            diagnostic.entity.type == HydraulicSimulationStatusEntityType::QualitySolver
+            || diagnostic.message.contains(QStringLiteral("quality"), Qt::CaseInsensitive)
+            || diagnostic.message.contains(QStringLiteral("reaction"), Qt::CaseInsensitive)
+            || diagnostic.message.contains(QStringLiteral("mixing"), Qt::CaseInsensitive);
+        context.expect(
+            !quality_diagnostic,
+            "supported EPANET quality import must not emit a deferred quality diagnostic");
+    }
+}
+
 QString linkIdForUuid(const NetworkHydraulic &network, const QUuid &uuid)
 {
     for (const HydraulicLinkPipe &pipe : network.links_pipes)
@@ -435,6 +452,7 @@ void scenarioImportCanonicalGlobalUnits(TestContext &context)
         QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GLOBAL_OPTIONS_US_INP));
 
     context.expect(result.status.success, "custom global-options INP import must open successfully");
+    expectNoDeferredQualityImportDiagnostics(context, result);
     context.expect(!result.complete, "global-options fixture still omits report directives and coordinate metadata");
     context.expect(result.request.quality_runs.isEmpty(), "QUALITY NONE must import as a hydraulics-only request");
     const NetworkHydraulic &network = result.request.network;
@@ -500,7 +518,7 @@ void scenarioImportCoreTopologyNet1(TestContext &context)
     const EpanetResultImport result = EpanetRunner().importInp(
         QStringLiteral(AOWIS_EPANET_TEST_NET1_INP));
     context.expect(result.status.success, "Net1 core topology import must succeed");
-    context.expect(!result.complete, "Net1 still contains deferred quality sources/reactions, geometry metadata, and report directives");
+    context.expect(!result.complete, "Net1 still contains deferred non-quality import layers such as report directives");
 
     const NetworkHydraulic &network = result.request.network;
     const HydraulicNodeJunction *junction_11 = junctionById(network, QStringLiteral("11"));
@@ -1288,6 +1306,7 @@ void scenarioImportQualityChemicalCanonicalUnits(TestContext &context)
     const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_CHEMICAL_UG_L_INP);
     const EpanetResultImport result = EpanetRunner().importInp(input_file);
     context.expect(result.status.success, "chemical quality fixture must import successfully");
+    expectNoDeferredQualityImportDiagnostics(context, result);
     context.expectEqual(
         static_cast<std::int64_t>(result.request.quality_runs.size()),
         std::int64_t{1},
@@ -1346,6 +1365,7 @@ void scenarioImportQualitySourcesCanonicalUnits(TestContext &context)
     const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_SOURCES_UG_L_INP);
     const EpanetResultImport result = EpanetRunner().importInp(input_file);
     context.expect(result.status.success, "quality-source fixture must import successfully");
+    expectNoDeferredQualityImportDiagnostics(context, result);
     context.expectEqual(
         static_cast<std::int64_t>(result.request.quality_runs.size()),
         std::int64_t{1},
@@ -1430,6 +1450,7 @@ void scenarioImportQualityMixingReactionsCanonicalUnits(TestContext &context)
     const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_MIXING_REACTIONS_UG_L_INP);
     const EpanetResultImport result = EpanetRunner().importInp(input_file);
     context.expect(result.status.success, "quality mixing/reaction fixture must import successfully");
+    expectNoDeferredQualityImportDiagnostics(context, result);
     context.expectEqual(
         static_cast<std::int64_t>(result.request.quality_runs.size()),
         std::int64_t{1},
@@ -1601,6 +1622,35 @@ void scenarioImportQualityMixingReactionsCanonicalUnits(TestContext &context)
     const EpanetResultRun run = EpanetRunner().run(result.request);
     compareImportedQualityTimeline(
         context, native, run, WaterQualityAnalysisType::Chemical, NumericTolerance{5.0e-6, 5.0e-6});
+
+    const QString us_wall_input = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_WALL_REACTION_US_INP);
+    const EpanetResultImport us_wall_result = EpanetRunner().importInp(us_wall_input);
+    context.expect(us_wall_result.status.success, "US zero-order wall-reaction fixture must import successfully");
+    expectNoDeferredQualityImportDiagnostics(context, us_wall_result);
+    context.expectEqual(
+        static_cast<std::int64_t>(us_wall_result.request.quality_runs.size()),
+        std::int64_t{1},
+        comparison("us_wall.quality_runs.size"));
+    if (us_wall_result.request.quality_runs.size() == 1)
+    {
+        const NetworkHydraulic &us_wall_network = us_wall_result.request.network;
+        context.expectNear(
+            us_wall_network.options_reaction.global_pipe_wall_reaction.order,
+            0.0,
+            numeric_tolerance,
+            comparison("us_wall.global_pipe_wall_reaction.order"));
+        context.expectNear(
+            us_wall_network.options_reaction.global_pipe_wall_reaction.coefficient,
+            -0.5381955208354862,
+            numeric_tolerance,
+            comparison("us_wall.global_pipe_wall_reaction.coefficient"));
+
+        const AowisEpanetTests::NativeQualityReferenceTimeline us_wall_native =
+            AowisEpanetTests::runNativeQualityReference(us_wall_input, us_wall_network);
+        const EpanetResultRun us_wall_run = EpanetRunner().run(us_wall_result.request);
+        compareImportedQualityTimeline(
+            context, us_wall_native, us_wall_run, WaterQualityAnalysisType::Chemical);
+    }
 }
 
 void scenarioImportQualityWaterAge(TestContext &context)
@@ -1608,6 +1658,7 @@ void scenarioImportQualityWaterAge(TestContext &context)
     const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_AGE_INP);
     const EpanetResultImport result = EpanetRunner().importInp(input_file);
     context.expect(result.status.success, "water-age quality fixture must import successfully");
+    expectNoDeferredQualityImportDiagnostics(context, result);
     context.expectEqual(
         static_cast<std::int64_t>(result.request.quality_runs.size()),
         std::int64_t{1},
@@ -1657,6 +1708,7 @@ void scenarioImportQualitySourceTrace(TestContext &context)
     const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_TRACE_INP);
     const EpanetResultImport result = EpanetRunner().importInp(input_file);
     context.expect(result.status.success, "source-trace quality fixture must import successfully");
+    expectNoDeferredQualityImportDiagnostics(context, result);
     context.expectEqual(
         static_cast<std::int64_t>(result.request.quality_runs.size()),
         std::int64_t{1},
@@ -1687,6 +1739,43 @@ void scenarioImportQualitySourceTrace(TestContext &context)
         AowisEpanetTests::runNativeQualityReference(input_file, network);
     const EpanetResultRun run = EpanetRunner().run(result.request);
     compareImportedQualityTimeline(context, native, run, WaterQualityAnalysisType::SourceTrace);
+}
+
+void scenarioImportQualityNet1Equivalence(TestContext &context)
+{
+    const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_NET1_INP);
+    const EpanetResultImport result = EpanetRunner().importInp(input_file);
+    context.expect(result.status.success, "upstream Net1 quality proof must import successfully");
+    expectNoDeferredQualityImportDiagnostics(context, result);
+    context.expectEqual(
+        static_cast<std::int64_t>(result.request.quality_runs.size()),
+        std::int64_t{1},
+        comparison("quality_runs.size"));
+    if (result.request.quality_runs.size() != 1)
+        return;
+
+    const NetworkHydraulic &network = result.request.network;
+    const WaterQualitySolverOptions &quality = result.request.quality_runs.constFirst();
+    context.expect(
+        quality.analysis == WaterQualityAnalysisType::Chemical,
+        "upstream Net1 must retain its CHEMICAL water-quality analysis");
+
+    const WaterQualityReactionOptions &reactions = network.options_reaction;
+    context.expectNear(
+        reactions.global_pipe_wall_reaction.order,
+        1.0,
+        numeric_tolerance,
+        comparison("global_pipe_wall_reaction.order"));
+    context.expectNear(
+        reactions.global_pipe_wall_reaction.coefficient,
+        -0.3048,
+        numeric_tolerance,
+        comparison("global_pipe_wall_reaction.coefficient"));
+
+    const AowisEpanetTests::NativeQualityReferenceTimeline native =
+        AowisEpanetTests::runNativeQualityReference(input_file, network);
+    const EpanetResultRun run = EpanetRunner().run(result.request);
+    compareImportedQualityTimeline(context, native, run, WaterQualityAnalysisType::Chemical);
 }
 
 void scenarioImportOpenErrorDiagnostic(TestContext &context)
@@ -1768,6 +1857,11 @@ void registerInpImportScenarios(ScenarioRegistry &registry)
         "Imports every tank mixing model plus global and entity reaction configuration, including independent pipe overrides, roughness correlation, limiting concentration, negative-order Michaelis-Menten tank kinetics, and ug/L-to-mg/L coefficient scaling, then proves native quality equivalence.",
         {"conformance", "import", "quality"},
         &scenarioImportQualityMixingReactionsCanonicalUnits});
+    registry.add(ScenarioDefinition{
+        "conformance-import-quality-net1-equivalence",
+        "Imports the upstream Net1 CHEMICAL model with no deferred quality diagnostics and proves its full native-vs-imported quality timeline.",
+        {"conformance", "import", "quality", "proof"},
+        &scenarioImportQualityNet1Equivalence});
     registry.add(ScenarioDefinition{
         "conformance-import-quality-water-age",
         "Imports AGE configuration, tolerance, quality timestep, and initial node water age, then proves native quality equivalence.",

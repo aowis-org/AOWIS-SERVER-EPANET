@@ -22,6 +22,7 @@ namespace
 {
 constexpr double pi = 3.14159265358979323846;
 constexpr double kw_per_hp = 0.7457;
+constexpr double meters_per_foot = 0.3048;
 constexpr int epanet_active_valve_status = 2;
 constexpr int epanet_no_quality_source_error = 240;
 
@@ -3054,6 +3055,31 @@ double reactionCoefficientScaleToCanonicalMg(
     return std::pow(chemical_scale_to_canonical_mg, 1.0 - dimensional_order);
 }
 
+double wallReactionSourceCoefficientScaleToCanonical(
+    double chemical_scale_to_canonical_mg,
+    double wall_order,
+    int source_flow_units)
+{
+    const double source_length_to_m = flowUnitsAreSi(source_flow_units) ? 1.0 : meters_per_foot;
+    if (wall_order == 0.0)
+    {
+        return chemical_scale_to_canonical_mg
+            / (source_length_to_m * source_length_to_m);
+    }
+
+    return source_length_to_m;
+}
+
+double wallReactionLiveProjectCoefficientScaleToCanonical(
+    double chemical_scale_to_canonical_mg,
+    double wall_order)
+{
+    if (wall_order == 0.0)
+        return chemical_scale_to_canonical_mg;
+
+    return 1.0;
+}
+
 bool importTankMixingModel(int backend_model, HydraulicNodeTankMixingModel &mixing_model)
 {
     switch (backend_model)
@@ -3276,7 +3302,8 @@ HydraulicSimulationStatus importQualityReactions(
     EpanetProject &project,
     const QString &input_file_path,
     NetworkHydraulic &network,
-    double chemical_scale_to_canonical_mg)
+    double chemical_scale_to_canonical_mg,
+    int source_flow_units)
 {
     ReactionSourceMetadata metadata;
     HydraulicSimulationStatus status = readReactionSourceMetadata(
@@ -3312,7 +3339,9 @@ HydraulicSimulationStatus importQualityReactions(
 
     const double pipe_bulk_scale = reactionCoefficientScaleToCanonicalMg(
         chemical_scale_to_canonical_mg, pipe_bulk_order);
-    const double pipe_wall_scale = reactionCoefficientScaleToCanonicalMg(
+    const double pipe_wall_source_scale = wallReactionSourceCoefficientScaleToCanonical(
+        chemical_scale_to_canonical_mg, pipe_wall_order, source_flow_units);
+    const double pipe_wall_live_scale = wallReactionLiveProjectCoefficientScaleToCanonical(
         chemical_scale_to_canonical_mg, pipe_wall_order);
     const double tank_bulk_scale = reactionCoefficientScaleToCanonicalMg(
         chemical_scale_to_canonical_mg, tank_bulk_order);
@@ -3322,14 +3351,14 @@ HydraulicSimulationStatus importQualityReactions(
         metadata.global_bulk_coefficient * pipe_bulk_scale;
     network.options_reaction.global_pipe_wall_reaction.order = pipe_wall_order;
     network.options_reaction.global_pipe_wall_reaction.coefficient =
-        metadata.global_wall_coefficient * pipe_wall_scale;
+        metadata.global_wall_coefficient * pipe_wall_source_scale;
     network.options_reaction.global_tank_bulk_reaction.order = tank_bulk_order;
     network.options_reaction.global_tank_bulk_reaction.coefficient =
         metadata.global_bulk_coefficient * tank_bulk_scale;
     network.options_reaction.limiting_concentration_mg_per_l =
         limiting_concentration * chemical_scale_to_canonical_mg;
     network.options_reaction.roughness_reaction_factor =
-        metadata.roughness_reaction_factor * pipe_wall_scale;
+        metadata.roughness_reaction_factor * pipe_wall_source_scale;
 
     for (HydraulicLinkPipe &pipe : network.links_pipes)
     {
@@ -3370,7 +3399,7 @@ HydraulicSimulationStatus importQualityReactions(
                 HydraulicSimulationStatusEntityType::Pipe);
         }
         pipe.wall_reaction.order = pipe_wall_order;
-        pipe.wall_reaction.coefficient = wall_coefficient * pipe_wall_scale;
+        pipe.wall_reaction.coefficient = wall_coefficient * pipe_wall_live_scale;
         pipe.override_wall_reaction = metadata.explicit_wall_pipe_ids.contains(pipe.id);
     }
 
@@ -3410,7 +3439,8 @@ HydraulicSimulationStatus importWaterQualityConfiguration(
     EpanetProject &project,
     const QString &input_file_path,
     EpanetResultImport &result,
-    const ImportReferences &references)
+    const ImportReferences &references,
+    int source_flow_units)
 {
     int quality_type = EN_NONE;
     char chemical_name[EN_MAXID + 1] = {};
@@ -3574,7 +3604,7 @@ HydraulicSimulationStatus importWaterQualityConfiguration(
     if (options.analysis == WaterQualityAnalysisType::Chemical)
     {
         status = importQualityReactions(
-            project, input_file_path, network, chemical_concentration_scale);
+            project, input_file_path, network, chemical_concentration_scale, source_flow_units);
         if (!status.success)
             return status;
     }
@@ -3651,7 +3681,8 @@ EpanetResultImport importEpanetInp(const QString &input_file_path)
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
-    status = importWaterQualityConfiguration(project, input_file_path, result, references);
+    status = importWaterQualityConfiguration(
+        project, input_file_path, result, references, source_flow_units);
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
