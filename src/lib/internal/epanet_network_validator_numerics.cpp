@@ -39,9 +39,9 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
 
 
     const WaterQualityReactionOptions &reactions = network.options_reaction;
-    status = EpanetNetworkValidatorSupport::validateFiniteNonNegative(reactions.global_pipe_bulk_reaction.order, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_pipe_bulk_reaction.order"));
+    status = EpanetNetworkValidatorSupport::validateFinite(reactions.global_pipe_bulk_reaction.order, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_pipe_bulk_reaction.order"));
     EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);
-    status = EpanetNetworkValidatorSupport::validateFiniteNonNegative(reactions.global_tank_bulk_reaction.order, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_tank_bulk_reaction.order"));
+    status = EpanetNetworkValidatorSupport::validateFinite(reactions.global_tank_bulk_reaction.order, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_tank_bulk_reaction.order"));
     EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);
     status = EpanetNetworkValidatorSupport::validateFinite(reactions.global_pipe_bulk_reaction.coefficient, HydraulicSimulationStatusEntityType::QualitySolver, network.id, network.uuid, QStringLiteral("options_reaction.global_pipe_bulk_reaction.coefficient"));
     EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);
@@ -337,7 +337,7 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
             failures.append(EpanetNetworkValidatorSupport::invalidNumeric(HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("mixing_fraction"), QStringLiteral("must be finite and between 0 and 1")));
         status = EpanetNetworkValidatorSupport::validateFinite(tank.bulk_reaction.coefficient, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("bulk_reaction.coefficient"));
         EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);
-        status = EpanetNetworkValidatorSupport::validateFiniteNonNegative(tank.bulk_reaction.order, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("bulk_reaction.order"));
+        status = EpanetNetworkValidatorSupport::validateFinite(tank.bulk_reaction.order, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("bulk_reaction.order"));
         EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);
         if (tank.override_bulk_reaction && std::isfinite(tank.bulk_reaction.order) && std::abs(tank.bulk_reaction.order - reactions.global_tank_bulk_reaction.order) > 1.0e-12)
             failures.append(EpanetNetworkValidatorSupport::validationStatus(HydraulicSimulationStatusOperation::ConfigureQuality, HydraulicSimulationStatusEntityType::Tank, tank.id, tank.uuid, QStringLiteral("Tank bulk reaction order must match the network-wide EPANET tank reaction order")));
@@ -386,7 +386,7 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
             continue;
         status = EpanetNetworkValidatorSupport::validateFinite(pipe.bulk_reaction.coefficient, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("bulk_reaction.coefficient"));
         EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);
-        status = EpanetNetworkValidatorSupport::validateFiniteNonNegative(pipe.bulk_reaction.order, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("bulk_reaction.order"));
+        status = EpanetNetworkValidatorSupport::validateFinite(pipe.bulk_reaction.order, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("bulk_reaction.order"));
         EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);
         status = EpanetNetworkValidatorSupport::validateFinite(pipe.wall_reaction.coefficient, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("wall_reaction.coefficient"));
         EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);

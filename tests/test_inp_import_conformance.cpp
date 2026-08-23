@@ -220,9 +220,9 @@ void compareImportedQualityNodes(
     const QList<ResultType> &actual,
     const AowisEpanetTests::NativeQualityReferenceStep &expected,
     WaterQualityAnalysisType analysis,
-    const QString &entity_type)
+    const QString &entity_type,
+    NumericTolerance quality_tolerance)
 {
-    constexpr NumericTolerance quality_tolerance{2.0e-6, 2.0e-6};
     for (const ResultType &result : actual)
     {
         context.expect(
@@ -258,9 +258,9 @@ void compareImportedQualityLinks(
     const QList<ResultType> &actual,
     const AowisEpanetTests::NativeQualityReferenceStep &expected,
     WaterQualityAnalysisType analysis,
-    const QString &entity_type)
+    const QString &entity_type,
+    NumericTolerance quality_tolerance)
 {
-    constexpr NumericTolerance quality_tolerance{2.0e-6, 2.0e-6};
     for (const ResultType &result : actual)
     {
         context.expect(
@@ -280,7 +280,8 @@ void compareImportedQualityTimeline(
     TestContext &context,
     const AowisEpanetTests::NativeQualityReferenceTimeline &native,
     const EpanetResultRun &run,
-    WaterQualityAnalysisType analysis)
+    WaterQualityAnalysisType analysis,
+    NumericTolerance quality_tolerance = NumericTolerance{2.0e-6, 2.0e-6})
 {
     context.expect(native.success, "native quality reference must solve successfully");
     context.expect(run.status.success, "imported quality request must solve successfully");
@@ -311,17 +312,17 @@ void compareImportedQualityTimeline(
             expected_step.time_s,
             comparison("quality_time_s"));
         compareImportedQualityNodes(
-            context, actual_step.nodes_junctions, expected_step, analysis, QStringLiteral("Junction"));
+            context, actual_step.nodes_junctions, expected_step, analysis, QStringLiteral("Junction"), quality_tolerance);
         compareImportedQualityNodes(
-            context, actual_step.nodes_reservoirs, expected_step, analysis, QStringLiteral("Reservoir"));
+            context, actual_step.nodes_reservoirs, expected_step, analysis, QStringLiteral("Reservoir"), quality_tolerance);
         compareImportedQualityNodes(
-            context, actual_step.nodes_tanks, expected_step, analysis, QStringLiteral("Tank"));
+            context, actual_step.nodes_tanks, expected_step, analysis, QStringLiteral("Tank"), quality_tolerance);
         compareImportedQualityLinks(
-            context, actual_step.links_pipes, expected_step, analysis, QStringLiteral("Pipe"));
+            context, actual_step.links_pipes, expected_step, analysis, QStringLiteral("Pipe"), quality_tolerance);
         compareImportedQualityLinks(
-            context, actual_step.links_pumps, expected_step, analysis, QStringLiteral("Pump"));
+            context, actual_step.links_pumps, expected_step, analysis, QStringLiteral("Pump"), quality_tolerance);
         compareImportedQualityLinks(
-            context, actual_step.links_valves, expected_step, analysis, QStringLiteral("Valve"));
+            context, actual_step.links_valves, expected_step, analysis, QStringLiteral("Valve"), quality_tolerance);
     }
 }
 
@@ -1424,6 +1425,184 @@ void scenarioImportQualitySourcesCanonicalUnits(TestContext &context)
     compareImportedQualityTimeline(context, native, run, WaterQualityAnalysisType::Chemical);
 }
 
+void scenarioImportQualityMixingReactionsCanonicalUnits(TestContext &context)
+{
+    const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_MIXING_REACTIONS_UG_L_INP);
+    const EpanetResultImport result = EpanetRunner().importInp(input_file);
+    context.expect(result.status.success, "quality mixing/reaction fixture must import successfully");
+    context.expectEqual(
+        static_cast<std::int64_t>(result.request.quality_runs.size()),
+        std::int64_t{1},
+        comparison("quality_runs.size"));
+    if (result.request.quality_runs.size() != 1)
+        return;
+
+    const NetworkHydraulic &network = result.request.network;
+    const WaterQualityReactionOptions &reactions = network.options_reaction;
+
+    context.expectNear(
+        reactions.global_pipe_bulk_reaction.order,
+        2.0,
+        numeric_tolerance,
+        comparison("global_pipe_bulk_reaction.order"));
+    context.expectNear(
+        reactions.global_pipe_bulk_reaction.coefficient,
+        -0.0001,
+        numeric_tolerance,
+        comparison("global_pipe_bulk_reaction.coefficient"));
+    context.expectNear(
+        reactions.global_pipe_wall_reaction.order,
+        0.0,
+        numeric_tolerance,
+        comparison("global_pipe_wall_reaction.order"));
+    context.expectNear(
+        reactions.global_pipe_wall_reaction.coefficient,
+        -0.002,
+        numeric_tolerance,
+        comparison("global_pipe_wall_reaction.coefficient"));
+    context.expectNear(
+        reactions.global_tank_bulk_reaction.order,
+        -1.0,
+        numeric_tolerance,
+        comparison("global_tank_bulk_reaction.order"));
+    context.expectNear(
+        reactions.global_tank_bulk_reaction.coefficient,
+        -1.0e-10,
+        numeric_tolerance,
+        comparison("global_tank_bulk_reaction.coefficient"));
+    context.expectNear(
+        reactions.limiting_concentration_mg_per_l,
+        5.0,
+        numeric_tolerance,
+        comparison("limiting_concentration_mg_per_l"));
+    context.expectNear(
+        reactions.roughness_reaction_factor,
+        -0.01,
+        numeric_tolerance,
+        comparison("roughness_reaction_factor"));
+
+    struct MixingExpectation
+    {
+        const char *id;
+        HydraulicNodeTankMixingModel model;
+        double fraction;
+    };
+    const std::array<MixingExpectation, 4> mixing_expectations = {{
+        {"T1", HydraulicNodeTankMixingModel::CompleteMix, 1.0},
+        {"T2", HydraulicNodeTankMixingModel::TwoCompartment, 0.60},
+        {"T3", HydraulicNodeTankMixingModel::FirstInFirstOut, 1.0},
+        {"T4", HydraulicNodeTankMixingModel::LastInFirstOut, 1.0}
+    }};
+    for (const MixingExpectation &expected : mixing_expectations)
+    {
+        const HydraulicNodeTank *tank = tankById(network, QString::fromLatin1(expected.id));
+        context.expect(tank != nullptr, "every quality fixture tank must be imported");
+        if (tank == nullptr)
+            continue;
+        context.expect(
+            tank->mixing_model == expected.model,
+            "tank mixing model must match the source INP");
+        context.expectNear(
+            tank->mixing_fraction,
+            expected.fraction,
+            numeric_tolerance,
+            comparison(std::string(expected.id) + ".mixing_fraction"));
+    }
+
+    const HydraulicLinkPipe *bulk_override = pipeById(network, QStringLiteral("P1"));
+    const HydraulicLinkPipe *wall_override = pipeById(network, QStringLiteral("P2"));
+    const HydraulicLinkPipe *roughness_derived = pipeById(network, QStringLiteral("P3"));
+    context.expect(
+        bulk_override != nullptr && wall_override != nullptr && roughness_derived != nullptr,
+        "reaction fixture pipes must be imported");
+    if (bulk_override != nullptr)
+    {
+        context.expect(bulk_override->override_bulk_reaction, "P1 must retain its explicit bulk override");
+        context.expect(!bulk_override->override_wall_reaction, "P1 must not gain a wall override");
+        context.expectNear(
+            bulk_override->bulk_reaction.coefficient,
+            -0.0002,
+            numeric_tolerance,
+            comparison("P1.bulk_reaction.coefficient"));
+        context.expectNear(
+            bulk_override->bulk_reaction.order,
+            2.0,
+            numeric_tolerance,
+            comparison("P1.bulk_reaction.order"));
+    }
+    if (wall_override != nullptr)
+    {
+        context.expect(!wall_override->override_bulk_reaction, "P2 must not gain a bulk override");
+        context.expect(wall_override->override_wall_reaction, "P2 must retain its explicit wall override");
+        context.expectNear(
+            wall_override->wall_reaction.coefficient,
+            -0.004,
+            numeric_tolerance,
+            comparison("P2.wall_reaction.coefficient"));
+        context.expectNear(
+            wall_override->wall_reaction.order,
+            0.0,
+            numeric_tolerance,
+            comparison("P2.wall_reaction.order"));
+    }
+    if (roughness_derived != nullptr)
+    {
+        context.expect(!roughness_derived->override_wall_reaction, "P3 must remain roughness-derived");
+        context.expectNear(
+            roughness_derived->wall_reaction.coefficient,
+            -0.0001,
+            numeric_tolerance,
+            comparison("P3.wall_reaction.coefficient"));
+    }
+
+    const HydraulicNodeTank *global_tank = tankById(network, QStringLiteral("T1"));
+    const HydraulicNodeTank *override_tank_2 = tankById(network, QStringLiteral("T2"));
+    const HydraulicNodeTank *override_tank_3 = tankById(network, QStringLiteral("T3"));
+    const HydraulicNodeTank *global_tank_4 = tankById(network, QStringLiteral("T4"));
+    context.expect(
+        global_tank != nullptr && override_tank_2 != nullptr
+            && override_tank_3 != nullptr && global_tank_4 != nullptr,
+        "reaction fixture tanks must be imported");
+    if (global_tank != nullptr)
+    {
+        context.expect(!global_tank->override_bulk_reaction, "T1 must use the global tank reaction");
+        context.expectNear(
+            global_tank->bulk_reaction.coefficient,
+            -1.0e-10,
+            numeric_tolerance,
+            comparison("T1.bulk_reaction.coefficient"));
+        context.expectNear(
+            global_tank->bulk_reaction.order,
+            -1.0,
+            numeric_tolerance,
+            comparison("T1.bulk_reaction.order"));
+    }
+    for (const HydraulicNodeTank *tank : {override_tank_2, override_tank_3})
+    {
+        if (tank == nullptr)
+            continue;
+        context.expect(tank->override_bulk_reaction, "T2-T3 range must import as tank bulk overrides");
+        context.expectNear(
+            tank->bulk_reaction.coefficient,
+            -0.05,
+            numeric_tolerance,
+            comparison(tank->id.toStdString() + ".bulk_reaction.coefficient"));
+        context.expectNear(
+            tank->bulk_reaction.order,
+            -1.0,
+            numeric_tolerance,
+            comparison(tank->id.toStdString() + ".bulk_reaction.order"));
+    }
+    if (global_tank_4 != nullptr)
+        context.expect(!global_tank_4->override_bulk_reaction, "T4 must use the global tank reaction");
+
+    const AowisEpanetTests::NativeQualityReferenceTimeline native =
+        AowisEpanetTests::runNativeQualityReference(input_file, network);
+    const EpanetResultRun run = EpanetRunner().run(result.request);
+    compareImportedQualityTimeline(
+        context, native, run, WaterQualityAnalysisType::Chemical, NumericTolerance{5.0e-6, 5.0e-6});
+}
+
 void scenarioImportQualityWaterAge(TestContext &context)
 {
     const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_AGE_INP);
@@ -1584,6 +1763,11 @@ void registerInpImportScenarios(ScenarioRegistry &registry)
         "Imports all four EPANET chemical source types, canonical source strengths, and UUID-resolved source patterns, then proves native quality and source-mass equivalence.",
         {"conformance", "import", "quality"},
         &scenarioImportQualitySourcesCanonicalUnits});
+    registry.add(ScenarioDefinition{
+        "conformance-import-quality-mixing-reactions-canonical-units",
+        "Imports every tank mixing model plus global and entity reaction configuration, including independent pipe overrides, roughness correlation, limiting concentration, negative-order Michaelis-Menten tank kinetics, and ug/L-to-mg/L coefficient scaling, then proves native quality equivalence.",
+        {"conformance", "import", "quality"},
+        &scenarioImportQualityMixingReactionsCanonicalUnits});
     registry.add(ScenarioDefinition{
         "conformance-import-quality-water-age",
         "Imports AGE configuration, tolerance, quality timestep, and initial node water age, then proves native quality equivalence.",

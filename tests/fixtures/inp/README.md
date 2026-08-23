@@ -14,5 +14,6 @@ Current purpose-built fixtures:
 
 - `import_quality_chemical_ug_l.inp` exercises CHEMICAL mode, documented `ug/L` to canonical `mg/L` conversion, tolerance/diffusivity, initial node quality, and native quality equivalence without sources or reactions.
 - `import_quality_sources_ug_l.inp` exercises CONCEN, MASS, FLOWPACED, and SETPOINT sources, source-pattern UUID reconstruction, `ug/L` to canonical `mg/L` concentration conversion, `ug/min` to canonical `mg/min` mass-injection conversion, and native source behavior.
+- `import_quality_mixing_reactions_ug_l.inp` exercises all four tank mixing models, two-compartment fraction, positive/zero/negative reaction orders, global bulk/wall reactions, independent pipe bulk/wall overrides, tank override ranges, limiting concentration, roughness correlation, reaction-coefficient canonicalization from `ug/L` to `mg/L`, and native quality equivalence.
 - `import_quality_age.inp` exercises AGE mode, initial water age, tolerance, quality timestep, and native quality equivalence.
 - `import_quality_trace.inp` exercises TRACE mode, trace-node UUID resolution, percent tolerance, quality timestep, and native quality equivalence.

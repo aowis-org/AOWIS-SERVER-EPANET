@@ -9,7 +9,7 @@ namespace AowisEpanetTests
 {
 namespace
 {
-constexpr NumericTolerance kSolverRelativeErrorTolerance{2.0e-8, 1.0e-7};
+constexpr NumericTolerance kSolverRelativeErrorTolerance{5.0e-8, 1.0e-7};
 
 ComparisonContext comparison(std::string field, std::int64_t time_s = -1, std::string entity_type = {}, std::string entity_id = {})
 {

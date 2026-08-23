@@ -9,10 +9,12 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
+#include <QSet>
 #include <QStringList>
 
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <utility>
 
@@ -2865,6 +2867,214 @@ double qualityConcentrationScaleToCanonicalMgPerL(const QString &units, bool &su
     return 1.0;
 }
 
+struct ReactionSourceMetadata
+{
+    double global_bulk_coefficient = 0.0;
+    double global_wall_coefficient = 0.0;
+    double roughness_reaction_factor = 0.0;
+    QSet<QString> explicit_bulk_pipe_ids;
+    QSet<QString> explicit_wall_pipe_ids;
+    QSet<QString> explicit_tank_ids;
+};
+
+long epanetAtoLong(const QString &text)
+{
+    const QByteArray bytes = text.toLatin1();
+    return std::atol(bytes.constData());
+}
+
+bool reactionRangeContainsId(
+    const QString &id,
+    const QString &first_id,
+    const QString &last_id)
+{
+    const long first_number = epanetAtoLong(first_id);
+    const long last_number = epanetAtoLong(last_id);
+    if (first_number > 0 && last_number > 0)
+    {
+        const long id_number = epanetAtoLong(id);
+        return id_number >= first_number && id_number <= last_number;
+    }
+
+    return QString::compare(first_id, id, Qt::CaseSensitive) <= 0
+        && QString::compare(last_id, id, Qt::CaseSensitive) >= 0;
+}
+
+void collectPipeReactionOverrideIds(
+    const NetworkHydraulic &network,
+    const QStringList &tokens,
+    QSet<QString> &ids)
+{
+    if (tokens.size() == 3)
+    {
+        const QString &id = tokens.at(1);
+        for (const HydraulicLinkPipe &pipe : network.links_pipes)
+        {
+            if (pipe.id == id)
+            {
+                ids.insert(pipe.id);
+                return;
+            }
+        }
+        return;
+    }
+
+    if (tokens.size() < 4)
+        return;
+
+    const QString &first_id = tokens.at(1);
+    const QString &last_id = tokens.at(2);
+    for (const HydraulicLinkPipe &pipe : network.links_pipes)
+    {
+        if (reactionRangeContainsId(pipe.id, first_id, last_id))
+            ids.insert(pipe.id);
+    }
+}
+
+void collectTankReactionOverrideIds(
+    const NetworkHydraulic &network,
+    const QStringList &tokens,
+    QSet<QString> &ids)
+{
+    if (tokens.size() == 3)
+    {
+        const QString &id = tokens.at(1);
+        for (const HydraulicNodeTank &tank : network.nodes_tanks)
+        {
+            if (tank.id == id)
+            {
+                ids.insert(tank.id);
+                return;
+            }
+        }
+        return;
+    }
+
+    if (tokens.size() < 4)
+        return;
+
+    const QString &first_id = tokens.at(1);
+    const QString &last_id = tokens.at(2);
+    for (const HydraulicNodeTank &tank : network.nodes_tanks)
+    {
+        if (reactionRangeContainsId(tank.id, first_id, last_id))
+            ids.insert(tank.id);
+    }
+}
+
+HydraulicSimulationStatus readReactionSourceMetadata(
+    const QString &input_file_path,
+    const NetworkHydraulic &network,
+    ReactionSourceMetadata &metadata)
+{
+    QFile file(input_file_path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::ReadInput,
+            HydraulicSimulationStatusOperation::ReadInput,
+            HydraulicSimulationStatusEntityType::QualitySolver,
+            QString(),
+            QStringLiteral("Could not read the source INP [REACTIONS] section: %1")
+                .arg(file.errorString()));
+    }
+
+    bool in_reactions = false;
+    const QString content = QString::fromUtf8(file.readAll());
+    const QStringList lines = content.split(QLatin1Char('\n'));
+    for (QString line : lines)
+    {
+        const qsizetype comment_index = line.indexOf(QLatin1Char(';'));
+        if (comment_index >= 0)
+            line.truncate(comment_index);
+        line = line.trimmed();
+        if (line.isEmpty())
+            continue;
+
+        if (line.startsWith(QLatin1Char('[')))
+        {
+            in_reactions = line.compare(QStringLiteral("[REACTIONS]"), Qt::CaseInsensitive) == 0;
+            continue;
+        }
+        if (!in_reactions)
+            continue;
+
+        const QStringList tokens = line.simplified().split(QLatin1Char(' '));
+        if (tokens.size() < 3)
+            continue;
+
+        bool value_ok = false;
+        const double value = tokens.constLast().toDouble(&value_ok);
+        if (!value_ok)
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::QualitySolver,
+                QString(),
+                QStringLiteral("Could not parse a source INP reaction coefficient"));
+        }
+
+        const QString &keyword = tokens.at(0);
+        if (keyword.compare(QStringLiteral("GLOBAL"), Qt::CaseInsensitive) == 0)
+        {
+            if (tokens.at(1).compare(QStringLiteral("BULK"), Qt::CaseInsensitive) == 0)
+                metadata.global_bulk_coefficient = value;
+            else if (tokens.at(1).compare(QStringLiteral("WALL"), Qt::CaseInsensitive) == 0)
+                metadata.global_wall_coefficient = value;
+            continue;
+        }
+        if (keyword.compare(QStringLiteral("ROUGHNESS"), Qt::CaseInsensitive) == 0)
+        {
+            metadata.roughness_reaction_factor = value;
+            continue;
+        }
+        if (keyword.compare(QStringLiteral("BULK"), Qt::CaseInsensitive) == 0)
+        {
+            collectPipeReactionOverrideIds(network, tokens, metadata.explicit_bulk_pipe_ids);
+            continue;
+        }
+        if (keyword.compare(QStringLiteral("WALL"), Qt::CaseInsensitive) == 0)
+        {
+            collectPipeReactionOverrideIds(network, tokens, metadata.explicit_wall_pipe_ids);
+            continue;
+        }
+        if (keyword.compare(QStringLiteral("TANK"), Qt::CaseInsensitive) == 0)
+            collectTankReactionOverrideIds(network, tokens, metadata.explicit_tank_ids);
+    }
+
+    return makeEpanetSuccess();
+}
+
+double reactionCoefficientScaleToCanonicalMg(
+    double chemical_scale_to_canonical_mg,
+    double reaction_order)
+{
+    const double dimensional_order = reaction_order < 0.0 ? 0.0 : reaction_order;
+    return std::pow(chemical_scale_to_canonical_mg, 1.0 - dimensional_order);
+}
+
+bool importTankMixingModel(int backend_model, HydraulicNodeTankMixingModel &mixing_model)
+{
+    switch (backend_model)
+    {
+    case EN_MIX1:
+        mixing_model = HydraulicNodeTankMixingModel::CompleteMix;
+        return true;
+    case EN_MIX2:
+        mixing_model = HydraulicNodeTankMixingModel::TwoCompartment;
+        return true;
+    case EN_FIFO:
+        mixing_model = HydraulicNodeTankMixingModel::FirstInFirstOut;
+        return true;
+    case EN_LIFO:
+        mixing_model = HydraulicNodeTankMixingModel::LastInFirstOut;
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool importQualitySourceType(int backend_type, HydraulicNodeQualitySourceType &source_type)
 {
     switch (backend_type)
@@ -3016,8 +3226,189 @@ HydraulicSimulationStatus importInitialQualityForNodes(
     return makeEpanetSuccess();
 }
 
+HydraulicSimulationStatus importTankMixing(
+    EpanetProject &project,
+    NetworkHydraulic &network)
+{
+    for (HydraulicNodeTank &tank : network.nodes_tanks)
+    {
+        const QByteArray tank_id_utf8 = tank.id.toUtf8();
+        int node_index = 0;
+        int error = EN_getnodeindex(project.handle(), tank_id_utf8.constData(), &node_index);
+        if (error != 0)
+        {
+            return readFailure(
+                project, error, QStringLiteral("EN_getnodeindex"),
+                QStringLiteral("Failed to resolve tank while importing water-quality mixing"),
+                HydraulicSimulationStatusEntityType::Tank);
+        }
+
+        double mixing_model_value = 0.0;
+        HydraulicSimulationStatus status = readNodeValue(
+            project, node_index, EN_MIXMODEL, mixing_model_value,
+            HydraulicSimulationStatusEntityType::Tank, QStringLiteral("EN_MIXMODEL"));
+        if (!status.success)
+            return status;
+
+        const int backend_mixing_model = static_cast<int>(std::llround(mixing_model_value));
+        if (!importTankMixingModel(backend_mixing_model, tank.mixing_model))
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Tank,
+                tank.id,
+                tank.uuid,
+                QStringLiteral("EPANET returned an unsupported tank mixing model"));
+        }
+
+        status = readNodeValue(
+            project, node_index, EN_MIXFRACTION, tank.mixing_fraction,
+            HydraulicSimulationStatusEntityType::Tank, QStringLiteral("EN_MIXFRACTION"));
+        if (!status.success)
+            return status;
+    }
+
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus importQualityReactions(
+    EpanetProject &project,
+    const QString &input_file_path,
+    NetworkHydraulic &network,
+    double chemical_scale_to_canonical_mg)
+{
+    ReactionSourceMetadata metadata;
+    HydraulicSimulationStatus status = readReactionSourceMetadata(
+        input_file_path, network, metadata);
+    if (!status.success)
+        return status;
+
+    double pipe_bulk_order = 0.0;
+    double pipe_wall_order = 0.0;
+    double tank_bulk_order = 0.0;
+    double limiting_concentration = 0.0;
+
+    status = readOption(
+        project, EN_BULKORDER, pipe_bulk_order, QStringLiteral("EN_BULKORDER"),
+        HydraulicSimulationStatusEntityType::QualitySolver);
+    if (!status.success)
+        return status;
+    status = readOption(
+        project, EN_WALLORDER, pipe_wall_order, QStringLiteral("EN_WALLORDER"),
+        HydraulicSimulationStatusEntityType::QualitySolver);
+    if (!status.success)
+        return status;
+    status = readOption(
+        project, EN_TANKORDER, tank_bulk_order, QStringLiteral("EN_TANKORDER"),
+        HydraulicSimulationStatusEntityType::QualitySolver);
+    if (!status.success)
+        return status;
+    status = readOption(
+        project, EN_CONCENLIMIT, limiting_concentration, QStringLiteral("EN_CONCENLIMIT"),
+        HydraulicSimulationStatusEntityType::QualitySolver);
+    if (!status.success)
+        return status;
+
+    const double pipe_bulk_scale = reactionCoefficientScaleToCanonicalMg(
+        chemical_scale_to_canonical_mg, pipe_bulk_order);
+    const double pipe_wall_scale = reactionCoefficientScaleToCanonicalMg(
+        chemical_scale_to_canonical_mg, pipe_wall_order);
+    const double tank_bulk_scale = reactionCoefficientScaleToCanonicalMg(
+        chemical_scale_to_canonical_mg, tank_bulk_order);
+
+    network.options_reaction.global_pipe_bulk_reaction.order = pipe_bulk_order;
+    network.options_reaction.global_pipe_bulk_reaction.coefficient =
+        metadata.global_bulk_coefficient * pipe_bulk_scale;
+    network.options_reaction.global_pipe_wall_reaction.order = pipe_wall_order;
+    network.options_reaction.global_pipe_wall_reaction.coefficient =
+        metadata.global_wall_coefficient * pipe_wall_scale;
+    network.options_reaction.global_tank_bulk_reaction.order = tank_bulk_order;
+    network.options_reaction.global_tank_bulk_reaction.coefficient =
+        metadata.global_bulk_coefficient * tank_bulk_scale;
+    network.options_reaction.limiting_concentration_mg_per_l =
+        limiting_concentration * chemical_scale_to_canonical_mg;
+    network.options_reaction.roughness_reaction_factor =
+        metadata.roughness_reaction_factor * pipe_wall_scale;
+
+    for (HydraulicLinkPipe &pipe : network.links_pipes)
+    {
+        const QByteArray pipe_id_utf8 = pipe.id.toUtf8();
+        int link_index = 0;
+        const int index_error = EN_getlinkindex(
+            project.handle(), pipe_id_utf8.constData(), &link_index);
+        if (index_error != 0)
+        {
+            return readFailure(
+                project, index_error, QStringLiteral("EN_getlinkindex"),
+                QStringLiteral("Failed to resolve pipe while importing water-quality reactions"),
+                HydraulicSimulationStatusEntityType::Pipe);
+        }
+
+        double bulk_coefficient = 0.0;
+        int error = EN_getlinkvalue(
+            project.handle(), link_index, EN_KBULK, &bulk_coefficient);
+        if (error != 0)
+        {
+            return readFailure(
+                project, error, QStringLiteral("EN_getlinkvalue(EN_KBULK)"),
+                QStringLiteral("Failed to read pipe bulk reaction coefficient"),
+                HydraulicSimulationStatusEntityType::Pipe);
+        }
+        pipe.bulk_reaction.order = pipe_bulk_order;
+        pipe.bulk_reaction.coefficient = bulk_coefficient * pipe_bulk_scale;
+        pipe.override_bulk_reaction = metadata.explicit_bulk_pipe_ids.contains(pipe.id);
+
+        double wall_coefficient = 0.0;
+        error = EN_getlinkvalue(
+            project.handle(), link_index, EN_KWALL, &wall_coefficient);
+        if (error != 0)
+        {
+            return readFailure(
+                project, error, QStringLiteral("EN_getlinkvalue(EN_KWALL)"),
+                QStringLiteral("Failed to read pipe wall reaction coefficient"),
+                HydraulicSimulationStatusEntityType::Pipe);
+        }
+        pipe.wall_reaction.order = pipe_wall_order;
+        pipe.wall_reaction.coefficient = wall_coefficient * pipe_wall_scale;
+        pipe.override_wall_reaction = metadata.explicit_wall_pipe_ids.contains(pipe.id);
+    }
+
+    for (HydraulicNodeTank &tank : network.nodes_tanks)
+    {
+        const QByteArray tank_id_utf8 = tank.id.toUtf8();
+        int node_index = 0;
+        const int index_error = EN_getnodeindex(
+            project.handle(), tank_id_utf8.constData(), &node_index);
+        if (index_error != 0)
+        {
+            return readFailure(
+                project, index_error, QStringLiteral("EN_getnodeindex"),
+                QStringLiteral("Failed to resolve tank while importing water-quality reactions"),
+                HydraulicSimulationStatusEntityType::Tank);
+        }
+
+        double bulk_coefficient = 0.0;
+        const int error = EN_getnodevalue(
+            project.handle(), node_index, EN_TANK_KBULK, &bulk_coefficient);
+        if (error != 0)
+        {
+            return readFailure(
+                project, error, QStringLiteral("EN_getnodevalue(EN_TANK_KBULK)"),
+                QStringLiteral("Failed to read tank bulk reaction coefficient"),
+                HydraulicSimulationStatusEntityType::Tank);
+        }
+        tank.bulk_reaction.order = tank_bulk_order;
+        tank.bulk_reaction.coefficient = bulk_coefficient * tank_bulk_scale;
+        tank.override_bulk_reaction = metadata.explicit_tank_ids.contains(tank.id);
+    }
+
+    return makeEpanetSuccess();
+}
+
 HydraulicSimulationStatus importWaterQualityConfiguration(
     EpanetProject &project,
+    const QString &input_file_path,
     EpanetResultImport &result,
     const ImportReferences &references)
 {
@@ -3175,37 +3566,25 @@ HydraulicSimulationStatus importWaterQualityConfiguration(
             return status;
     }
 
+    NetworkHydraulic &network = result.request.network;
+    status = importTankMixing(project, network);
+    if (!status.success)
+        return status;
+
+    if (options.analysis == WaterQualityAnalysisType::Chemical)
+    {
+        status = importQualityReactions(
+            project, input_file_path, network, chemical_concentration_scale);
+        if (!status.success)
+            return status;
+    }
+
     result.request.quality_runs.append(options);
     return makeEpanetSuccess();
 }
 
-HydraulicSimulationStatus collectDeferredImportDiagnostics(
-    EpanetProject &project,
-    EpanetResultImport &result)
+HydraulicSimulationStatus collectDeferredImportDiagnostics(EpanetResultImport &result)
 {
-    int quality_type = EN_NONE;
-    char chemical_name[EN_MAXID + 1] = {};
-    char chemical_units[EN_MAXID + 1] = {};
-    int trace_node = 0;
-    const int quality_error = EN_getqualinfo(
-        project.handle(), &quality_type, chemical_name, chemical_units, &trace_node);
-    if (quality_error != 0)
-    {
-        return readFailure(
-            project,
-            quality_error,
-            QStringLiteral("EN_getqualinfo"),
-            QStringLiteral("Failed to inspect EPANET water-quality input"),
-            HydraulicSimulationStatusEntityType::QualitySolver);
-    }
-    if (quality_type != EN_NONE)
-    {
-        appendImportWarning(
-            result,
-            QStringLiteral("Tank mixing and reactions are outside the current import surface."),
-            HydraulicSimulationStatusEntityType::QualitySolver);
-    }
-
     appendImportWarning(
         result,
         QStringLiteral("Report directives beyond status level and statistic are not imported."),
@@ -3272,7 +3651,7 @@ EpanetResultImport importEpanetInp(const QString &input_file_path)
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
-    status = importWaterQualityConfiguration(project, result, references);
+    status = importWaterQualityConfiguration(project, input_file_path, result, references);
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
@@ -3288,7 +3667,7 @@ EpanetResultImport importEpanetInp(const QString &input_file_path)
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
-    status = collectDeferredImportDiagnostics(project, result);
+    status = collectDeferredImportDiagnostics(result);
     if (!status.success)
         return finishImport(std::move(result), status, project);
 

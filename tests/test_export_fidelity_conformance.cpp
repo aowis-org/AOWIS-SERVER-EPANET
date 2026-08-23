@@ -872,6 +872,14 @@ void scenarioQualityInputChemical(TestContext &context)
     setpoint.quality_source.chemical_concentration_mg_per_l = 0.8;
 
     HydraulicNodeTank &tank = network.nodes_tanks.first();
+    tank.bottom_elevation_m = 0.0;
+    tank.water_level_initial_m = 10.0;
+    tank.water_level_minimum_m = 0.0;
+    tank.water_level_maximum_m = 20.0;
+    tank.geometry_input_type = HydraulicNodeTankGeometryInputType::Cylindrical;
+    tank.diameter_m = 10.0;
+    tank.minimum_volume_m3 = 0.0;
+    tank.volume_curve_uuid = {};
     tank.initial_chemical_concentration_mg_per_l = 0.45;
     tank.mixing_model = HydraulicNodeTankMixingModel::TwoCompartment;
     tank.mixing_fraction = 0.65;
@@ -953,6 +961,33 @@ void scenarioQualityInputChemical(TestContext &context)
     checkEpanet(EN_getnodevalue(native.handle(), tank_index, EN_TANK_KBULK, &value), "EN_getnodevalue(EN_TANK_KBULK)");
     context.expectNear(value, -0.55, NumericTolerance{1.0e-12, 1.0e-9}, comparison("tank.bulk_reaction.coefficient", "Tank", tank.id.toStdString()));
 
+    double initial_volume_before_tank_data_round_trip = 0.0;
+    double initial_volume_after_tank_data_round_trip = 0.0;
+    checkEpanet(
+        EN_getnodevalue(native.handle(), tank_index, EN_INITVOLUME, &initial_volume_before_tank_data_round_trip),
+        "EN_getnodevalue(EN_INITVOLUME before EN_settankdata)");
+    checkEpanet(
+        EN_settankdata(
+            native.handle(),
+            tank_index,
+            tank.bottom_elevation_m,
+            tank.water_level_initial_m,
+            tank.water_level_minimum_m,
+            tank.water_level_maximum_m,
+            tank.diameter_m,
+            tank.minimum_volume_m3,
+            ""),
+        "EN_settankdata identical cylindrical tank data");
+    checkEpanet(
+        EN_getnodevalue(native.handle(), tank_index, EN_INITVOLUME, &initial_volume_after_tank_data_round_trip),
+        "EN_getnodevalue(EN_INITVOLUME after EN_settankdata)");
+    context.expectNear(
+        initial_volume_after_tank_data_round_trip,
+        initial_volume_before_tank_data_round_trip,
+        NumericTolerance{0.0, 0.0},
+        comparison("tank.initial_volume.setter_round_trip", "Tank", tank.id.toStdString()),
+        "EN_settankdata must preserve the parser-created cylindrical tank volume exactly when identical data is reapplied");
+
     const int global_pipe_index = linkIndex(native.handle(), global_pipe.id);
     checkEpanet(EN_getlinkvalue(native.handle(), global_pipe_index, EN_KBULK, &value), "EN_getlinkvalue(EN_KBULK global)");
     context.expectNear(value, -0.2, NumericTolerance{1.0e-12, 1.0e-9}, comparison("pipe.bulk_reaction.coefficient", "Pipe", global_pipe.id.toStdString()));
@@ -970,6 +1005,13 @@ void scenarioQualityInputChemical(TestContext &context)
     context.expectNear(value, -0.2, NumericTolerance{1.0e-12, 1.0e-9}, comparison("pipe.bulk_reaction.wall_only_fallback", "Pipe", wall_override_pipe.id.toStdString()));
     checkEpanet(EN_getlinkvalue(native.handle(), wall_override_pipe_index, EN_KWALL, &value), "EN_getlinkvalue(EN_KWALL wall-only override)");
     context.expectNear(value, -0.4, NumericTolerance{1.0e-12, 1.0e-9}, comparison("pipe.wall_reaction.override", "Pipe", wall_override_pipe.id.toStdString()));
+
+    checkEpanet(EN_setoption(native.handle(), EN_BULKORDER, -1.0), "EN_setoption(EN_BULKORDER negative)");
+    checkEpanet(EN_getoption(native.handle(), EN_BULKORDER, &value), "EN_getoption(EN_BULKORDER negative)");
+    context.expectNear(value, -1.0, NumericTolerance{1.0e-12, 1.0e-9}, comparison("reaction.bulk_order.negative"));
+    checkEpanet(EN_setoption(native.handle(), EN_TANKORDER, -1.0), "EN_setoption(EN_TANKORDER negative)");
+    checkEpanet(EN_getoption(native.handle(), EN_TANKORDER, &value), "EN_getoption(EN_TANKORDER negative)");
+    context.expectNear(value, -1.0, NumericTolerance{1.0e-12, 1.0e-9}, comparison("reaction.tank_order.negative"));
 }
 
 void scenarioQualityInputWaterAge(TestContext &context)
