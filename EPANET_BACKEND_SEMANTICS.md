@@ -57,6 +57,8 @@ INP water-quality mode is read through `EN_getqualinfo()` after node UUID recons
 
 Simple controls and rules use different native storage paths but both are read after the same project normalization. `EN_getcontrol()` applies the live project unit factors when returning simple-control thresholds/settings; rule values are updated by EPANET's own rule-unit normalization when flow units change. The importer therefore stores both directly in AOWIS canonical quantity fields. The public simple-control API does not expose GPV OPEN/CLOSED status separately, so the importer combines Toolkit readback with the corresponding source `[CONTROLS]` action token. Reservoirs, tanks, and junctions are all valid simple-control trigger nodes and are reconstructed directly. EPANET also stores the leading textual `IF` premise internally with its AND logical code; importer reconstruction uses premise position for the leading `IF` and the returned logical code for subsequent AND/OR premises.
 
+Documented EPANET `ug/L` chemical input is converted at the importer boundary to canonical AOWIS `mg/L`; the same mass-unit scale converts MASS source injection from `ug/min` to canonical `mg/min`.
+
 No m³/h-to-L/s conversion is performed by the simulation path. `HydraulicSolverOptions` does not expose selectable native flow or pressure units; conversion to presentation or interchange units belongs outside the hydraulic solver.
 
 Pipe roughness is selected according to `headloss_formula`: `roughness_hazen_williams` for Hazen-Williams, `roughness_darcy_weisbach_mm` for Darcy-Weisbach, and `roughness_chezy_manning` for Chezy-Manning.

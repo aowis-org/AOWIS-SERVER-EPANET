@@ -141,6 +141,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-import-quality-chemical-canonical-units
     conformance-import-quality-water-age
     conformance-import-quality-source-trace
+    conformance-import-quality-sources-canonical-units
     conformance-import-open-error-diagnostic
     conformance-export-native-reopen
     conformance-export-titles-comments-tags
@@ -294,6 +295,7 @@ target_compile_definitions(aowis-server-epanet-conformance-tests
         AOWIS_EPANET_TEST_IMPORT_VALVES_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_valves_us.inp"
         AOWIS_EPANET_TEST_IMPORT_CONTROLS_RULES_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_controls_rules_us.inp"
         AOWIS_EPANET_TEST_IMPORT_QUALITY_CHEMICAL_UG_L_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_chemical_ug_l.inp"
+        AOWIS_EPANET_TEST_IMPORT_QUALITY_SOURCES_UG_L_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_sources_ug_l.inp"
         AOWIS_EPANET_TEST_IMPORT_QUALITY_AGE_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_age.inp"
         AOWIS_EPANET_TEST_IMPORT_QUALITY_TRACE_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_trace.inp"
 )

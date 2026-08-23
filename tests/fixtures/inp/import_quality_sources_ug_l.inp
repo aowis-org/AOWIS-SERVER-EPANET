@@ -1,0 +1,50 @@
+[TITLE]
+AOWIS quality import fixture - sources ug/L
+
+[JUNCTIONS]
+;ID Elevation Demand
+ J1 0 1
+ J2 0 1
+
+[RESERVOIRS]
+;ID Head
+ R1 30
+
+[TANKS]
+;ID Elev Init Min Max Diam MinVol VolCurve Overflow
+ T1 0 5 0 100 100 0 * NO
+
+[PIPES]
+;ID Node1 Node2 Length Diameter Roughness MinorLoss Status
+ P1 R1 J1 300 200 100 0 OPEN
+ P2 J1 J2 300 200 100 0 OPEN
+ P3 J2 T1 300 200 100 0 OPEN
+
+[PATTERNS]
+ SRC 1.0 0.5 1.5 1.0
+
+[SOURCES]
+;Node Type      Strength Pattern
+ R1   CONCEN    1500     SRC
+ J1   MASS      12000    SRC
+ J2   FLOWPACED 350
+ T1   SETPOINT  800
+
+[OPTIONS]
+ UNITS LPS
+ HEADLOSS H-W
+ QUALITY Chlorine ug/L
+ TOLERANCE 5
+ DIFFUSIVITY 1.0
+
+[TIMES]
+ DURATION 2:00
+ HYDRAULIC TIMESTEP 1:00
+ QUALITY TIMESTEP 0:05
+ PATTERN TIMESTEP 0:30
+ REPORT TIMESTEP 0:30
+
+[REPORT]
+ STATUS NO
+
+[END]

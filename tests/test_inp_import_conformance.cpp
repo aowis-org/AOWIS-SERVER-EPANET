@@ -235,6 +235,20 @@ void compareImportedQualityNodes(
             expected.node_quality.value(result.id),
             quality_tolerance,
             qualityComparison(expected.time_s, entity_type, result.id));
+
+        context.expect(
+            expected.node_source_mass_mg_per_min.contains(result.id),
+            "native quality reference must contain source-mass output for every imported node");
+        if (expected.node_source_mass_mg_per_min.contains(result.id))
+        {
+            ComparisonContext source_mass = qualityComparison(expected.time_s, entity_type, result.id);
+            source_mass.field = "source_mass_flow_mg_per_min";
+            context.expectNear(
+                result.source_mass_flow_mg_per_min,
+                expected.node_source_mass_mg_per_min.value(result.id),
+                quality_tolerance,
+                source_mass);
+        }
     }
 }
 
@@ -1326,6 +1340,90 @@ void scenarioImportQualityChemicalCanonicalUnits(TestContext &context)
     compareImportedQualityTimeline(context, native, run, WaterQualityAnalysisType::Chemical);
 }
 
+void scenarioImportQualitySourcesCanonicalUnits(TestContext &context)
+{
+    const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_SOURCES_UG_L_INP);
+    const EpanetResultImport result = EpanetRunner().importInp(input_file);
+    context.expect(result.status.success, "quality-source fixture must import successfully");
+    context.expectEqual(
+        static_cast<std::int64_t>(result.request.quality_runs.size()),
+        std::int64_t{1},
+        comparison("quality_runs.size"));
+    if (result.request.quality_runs.size() != 1)
+        return;
+
+    const NetworkHydraulic &network = result.request.network;
+    const HydraulicPatternTime *pattern = patternById(network, QStringLiteral("SRC"));
+    const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
+    const HydraulicNodeJunction *mass = junctionById(network, QStringLiteral("J1"));
+    const HydraulicNodeJunction *flow_paced = junctionById(network, QStringLiteral("J2"));
+    const HydraulicNodeTank *setpoint = tankById(network, QStringLiteral("T1"));
+    context.expect(
+        pattern != nullptr && reservoir != nullptr && mass != nullptr
+            && flow_paced != nullptr && setpoint != nullptr,
+        "quality-source fixture entities and source pattern must be imported");
+    if (pattern == nullptr || reservoir == nullptr || mass == nullptr
+        || flow_paced == nullptr || setpoint == nullptr)
+    {
+        return;
+    }
+
+    context.expect(
+        reservoir->quality_source.type == HydraulicNodeQualitySourceType::Concentration,
+        "R1 must import as a concentration source");
+    context.expectNear(
+        reservoir->quality_source.chemical_concentration_mg_per_l,
+        1.5,
+        numeric_tolerance,
+        comparison("R1.quality_source.chemical_concentration_mg_per_l"));
+    context.expectEqual(
+        reservoir->quality_source.pattern_uuid.toString().toStdString(),
+        pattern->uuid.toString().toStdString(),
+        comparison("R1.quality_source.pattern_uuid"));
+
+    context.expect(
+        mass->quality_source.type == HydraulicNodeQualitySourceType::MassBooster,
+        "J1 must import as a mass-booster source");
+    context.expectNear(
+        mass->quality_source.chemical_mass_flow_mg_per_min,
+        12.0,
+        numeric_tolerance,
+        comparison("J1.quality_source.chemical_mass_flow_mg_per_min"));
+    context.expectEqual(
+        mass->quality_source.pattern_uuid.toString().toStdString(),
+        pattern->uuid.toString().toStdString(),
+        comparison("J1.quality_source.pattern_uuid"));
+
+    context.expect(
+        flow_paced->quality_source.type == HydraulicNodeQualitySourceType::FlowPacedBooster,
+        "J2 must import as a flow-paced source");
+    context.expectNear(
+        flow_paced->quality_source.chemical_concentration_mg_per_l,
+        0.35,
+        numeric_tolerance,
+        comparison("J2.quality_source.chemical_concentration_mg_per_l"));
+    context.expect(
+        flow_paced->quality_source.pattern_uuid.isNull(),
+        "J2 source must retain the absence of a pattern");
+
+    context.expect(
+        setpoint->quality_source.type == HydraulicNodeQualitySourceType::SetpointBooster,
+        "T1 must import as a setpoint source");
+    context.expectNear(
+        setpoint->quality_source.chemical_concentration_mg_per_l,
+        0.8,
+        numeric_tolerance,
+        comparison("T1.quality_source.chemical_concentration_mg_per_l"));
+    context.expect(
+        setpoint->quality_source.pattern_uuid.isNull(),
+        "T1 source must retain the absence of a pattern");
+
+    const AowisEpanetTests::NativeQualityReferenceTimeline native =
+        AowisEpanetTests::runNativeQualityReference(input_file, network);
+    const EpanetResultRun run = EpanetRunner().run(result.request);
+    compareImportedQualityTimeline(context, native, run, WaterQualityAnalysisType::Chemical);
+}
+
 void scenarioImportQualityWaterAge(TestContext &context)
 {
     const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_AGE_INP);
@@ -1481,6 +1579,11 @@ void registerInpImportScenarios(ScenarioRegistry &registry)
         "Imports CHEMICAL quality configuration and initial node quality, converting documented ug/L source values to canonical AOWIS mg/L, and proves native quality equivalence.",
         {"conformance", "import", "quality"},
         &scenarioImportQualityChemicalCanonicalUnits});
+    registry.add(ScenarioDefinition{
+        "conformance-import-quality-sources-canonical-units",
+        "Imports all four EPANET chemical source types, canonical source strengths, and UUID-resolved source patterns, then proves native quality and source-mass equivalence.",
+        {"conformance", "import", "quality"},
+        &scenarioImportQualitySourcesCanonicalUnits});
     registry.add(ScenarioDefinition{
         "conformance-import-quality-water-age",
         "Imports AGE configuration, tolerance, quality timestep, and initial node water age, then proves native quality equivalence.",

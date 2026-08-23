@@ -21,6 +21,7 @@ namespace
 constexpr double pi = 3.14159265358979323846;
 constexpr double kw_per_hp = 0.7457;
 constexpr int epanet_active_valve_status = 2;
+constexpr int epanet_no_quality_source_error = 240;
 
 struct ImportReferences
 {
@@ -2864,6 +2865,114 @@ double qualityConcentrationScaleToCanonicalMgPerL(const QString &units, bool &su
     return 1.0;
 }
 
+bool importQualitySourceType(int backend_type, HydraulicNodeQualitySourceType &source_type)
+{
+    switch (backend_type)
+    {
+    case EN_CONCEN:
+        source_type = HydraulicNodeQualitySourceType::Concentration;
+        return true;
+    case EN_MASS:
+        source_type = HydraulicNodeQualitySourceType::MassBooster;
+        return true;
+    case EN_FLOWPACED:
+        source_type = HydraulicNodeQualitySourceType::FlowPacedBooster;
+        return true;
+    case EN_SETPOINT:
+        source_type = HydraulicNodeQualitySourceType::SetpointBooster;
+        return true;
+    default:
+        return false;
+    }
+}
+
+template<typename NodeType>
+HydraulicSimulationStatus importQualitySourcesForNodes(
+    EpanetProject &project,
+    QList<NodeType> &nodes,
+    double chemical_scale_to_canonical_mg,
+    HydraulicSimulationStatusEntityType entity_type,
+    const ImportReferences &references)
+{
+    for (NodeType &node : nodes)
+    {
+        const QByteArray node_id_utf8 = node.id.toUtf8();
+        int node_index = 0;
+        int error = EN_getnodeindex(project.handle(), node_id_utf8.constData(), &node_index);
+        if (error != 0)
+        {
+            return readFailure(
+                project, error, QStringLiteral("EN_getnodeindex"),
+                QStringLiteral("Failed to resolve node while importing water-quality source"),
+                entity_type);
+        }
+
+        double backend_source_type_value = 0.0;
+        error = EN_getnodevalue(project.handle(), node_index, EN_SOURCETYPE, &backend_source_type_value);
+        if (error == epanet_no_quality_source_error)
+            continue;
+        if (error != 0)
+        {
+            return readFailure(
+                project, error, QStringLiteral("EN_getnodevalue(EN_SOURCETYPE)"),
+                QStringLiteral("Failed to read node water-quality source type"),
+                entity_type);
+        }
+
+        HydraulicNodeQualitySource source;
+        const int backend_source_type = static_cast<int>(std::llround(backend_source_type_value));
+        if (!importQualitySourceType(backend_source_type, source.type))
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                entity_type,
+                node.id,
+                node.uuid,
+                QStringLiteral("EPANET returned an unsupported node water-quality source type"));
+        }
+
+        double source_strength = 0.0;
+        HydraulicSimulationStatus status = readNodeValue(
+            project, node_index, EN_SOURCEQUAL, source_strength, entity_type,
+            QStringLiteral("EN_SOURCEQUAL"));
+        if (!status.success)
+            return status;
+
+        if (source.type == HydraulicNodeQualitySourceType::MassBooster)
+            source.chemical_mass_flow_mg_per_min = source_strength * chemical_scale_to_canonical_mg;
+        else
+            source.chemical_concentration_mg_per_l = source_strength * chemical_scale_to_canonical_mg;
+
+        double pattern_index_value = 0.0;
+        status = readNodeValue(
+            project, node_index, EN_SOURCEPAT, pattern_index_value, entity_type,
+            QStringLiteral("EN_SOURCEPAT"));
+        if (!status.success)
+            return status;
+
+        const int pattern_index = static_cast<int>(std::llround(pattern_index_value));
+        if (pattern_index > 0)
+        {
+            if (!references.pattern_uuids_by_index.contains(pattern_index))
+            {
+                return makeEpanetStatus(
+                    HydraulicSimulationStatusStage::ReadInput,
+                    HydraulicSimulationStatusOperation::ResolveEntity,
+                    entity_type,
+                    node.id,
+                    node.uuid,
+                    QStringLiteral("Could not resolve EPANET water-quality source pattern"));
+            }
+            source.pattern_uuid = references.pattern_uuids_by_index.value(pattern_index);
+        }
+
+        node.quality_source = source;
+    }
+
+    return makeEpanetSuccess();
+}
+
 template<typename NodeType>
 HydraulicSimulationStatus importInitialQualityForNodes(
     EpanetProject &project,
@@ -3046,6 +3155,26 @@ HydraulicSimulationStatus importWaterQualityConfiguration(
             return status;
     }
 
+    if (options.analysis == WaterQualityAnalysisType::Chemical)
+    {
+        NetworkHydraulic &network = result.request.network;
+        status = importQualitySourcesForNodes(
+            project, network.nodes_junctions, chemical_concentration_scale,
+            HydraulicSimulationStatusEntityType::Junction, references);
+        if (!status.success)
+            return status;
+        status = importQualitySourcesForNodes(
+            project, network.nodes_reservoirs, chemical_concentration_scale,
+            HydraulicSimulationStatusEntityType::Reservoir, references);
+        if (!status.success)
+            return status;
+        status = importQualitySourcesForNodes(
+            project, network.nodes_tanks, chemical_concentration_scale,
+            HydraulicSimulationStatusEntityType::Tank, references);
+        if (!status.success)
+            return status;
+    }
+
     result.request.quality_runs.append(options);
     return makeEpanetSuccess();
 }
@@ -3073,7 +3202,7 @@ HydraulicSimulationStatus collectDeferredImportDiagnostics(
     {
         appendImportWarning(
             result,
-            QStringLiteral("Water-quality sources, tank mixing, and reactions are outside the current import surface."),
+            QStringLiteral("Tank mixing and reactions are outside the current import surface."),
             HydraulicSimulationStatusEntityType::QualitySolver);
     }
 
