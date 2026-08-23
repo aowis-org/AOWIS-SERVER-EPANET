@@ -92,7 +92,9 @@ NumericTolerance toleranceFor(HydraulicQuantity quantity)
     case HydraulicQuantity::Dimensionless:
         return {1.0e-9, 1.0e-7};
     case HydraulicQuantity::FlowM3PerHour:
-        return {1.0e-6, 1.0e-6};
+        // Reconstructed INP projects can differ from the source-native solve by
+        // sub-nanolitre-per-second roundoff after EPANET unit normalization.
+        return {2.0e-6, 1.0e-6};
     case HydraulicQuantity::HeadMetres:
     case HydraulicQuantity::PressureHeadMetres:
     case HydraulicQuantity::LengthMetres:

@@ -59,7 +59,9 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addControlSimple(const Hydraulic
         {
             trigger_node_index = this->indices.nodes_tanks.value(control.trigger_node_uuid, 0);
             if (trigger_node_index == 0)
-                return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("A level control trigger must reference a junction or tank"));
+                trigger_node_index = this->indices.nodes_reservoirs.value(control.trigger_node_uuid, 0);
+            if (trigger_node_index == 0)
+                return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("A level control trigger must reference a junction, reservoir, or tank"));
             if (!std::isfinite(control.trigger_water_level_m))
                 return makeEpanetStatus(HydraulicSimulationStatusStage::AddControl, HydraulicSimulationStatusOperation::AddControl, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("Simple control trigger water level must be finite"));
             trigger_value = control.trigger_water_level_m;

@@ -182,6 +182,55 @@ QString nodeIdForUuid(const NetworkHydraulic &network, const QUuid &uuid)
     return QString();
 }
 
+QString linkIdForUuid(const NetworkHydraulic &network, const QUuid &uuid)
+{
+    for (const HydraulicLinkPipe &pipe : network.links_pipes)
+    {
+        if (pipe.uuid == uuid)
+            return pipe.id;
+    }
+    for (const HydraulicLinkPump &pump : network.links_pumps)
+    {
+        if (pump.uuid == uuid)
+            return pump.id;
+    }
+    for (const HydraulicLinkValve &valve : network.links_valves)
+    {
+        if (valve.uuid == uuid)
+            return valve.id;
+    }
+    return QString();
+}
+
+const HydraulicControlSimple *simpleControlById(
+    const NetworkHydraulic &network, const QString &id)
+{
+    for (const HydraulicControlSimple &control : network.controls_simple)
+    {
+        if (control.id == id)
+            return &control;
+    }
+    return nullptr;
+}
+
+const HydraulicControlRule *ruleById(const NetworkHydraulic &network, const QString &id)
+{
+    for (const HydraulicControlRule &rule : network.controls_rules)
+    {
+        if (rule.id == id)
+            return &rule;
+    }
+    return nullptr;
+}
+
+void mapNativeControlIds(
+    const NetworkHydraulic &network,
+    AowisEpanetTests::NativeReferenceConfiguration &configuration)
+{
+    for (int index = 0; index < network.controls_simple.size(); index++)
+        configuration.control_ids_by_index.insert(index + 1, network.controls_simple.at(index).id);
+}
+
 void scenarioImportNet1ProjectGlobals(TestContext &context)
 {
     const EpanetResultImport result = EpanetRunner().importInp(
@@ -733,6 +782,358 @@ void scenarioImportValvesCanonicalUnits(TestContext &context)
         AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, network, context);
 }
 
+void scenarioImportControlsNet1Equivalence(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_NET1_INP));
+    context.expect(result.status.success, "Net1 controls must import successfully");
+
+    const NetworkHydraulic &network = result.request.network;
+    context.expectEqual(
+        static_cast<std::int64_t>(network.controls_simple.size()),
+        std::int64_t{2}, comparison("simple_control_count"));
+    context.expect(network.controls_rules.isEmpty(), "Net1 contains no rule-based controls");
+
+    const HydraulicControlSimple *open_control = simpleControlById(
+        network, QStringLiteral("CONTROL_1"));
+    const HydraulicControlSimple *close_control = simpleControlById(
+        network, QStringLiteral("CONTROL_2"));
+    context.expect(open_control != nullptr, "Net1 control 1 must be imported");
+    context.expect(close_control != nullptr, "Net1 control 2 must be imported");
+
+    if (open_control != nullptr)
+    {
+        context.expect(
+            open_control->type == HydraulicControlSimpleType::LowLevel,
+            "Net1 control 1 must retain its low-level trigger");
+        context.expect(
+            open_control->action == HydraulicControlActionType::Open,
+            "Net1 control 1 must retain its OPEN action");
+        context.expectEqual(
+            linkIdForUuid(network, open_control->link_uuid).toStdString(),
+            std::string("9"), comparison("control_1.link"));
+        context.expectEqual(
+            nodeIdForUuid(network, open_control->trigger_node_uuid).toStdString(),
+            std::string("2"), comparison("control_1.trigger_node"));
+        context.expectNear(
+            open_control->trigger_water_level_m,
+            110.0 * 0.3048,
+            numeric_tolerance,
+            comparison("control_1.trigger_water_level_m"));
+        context.expect(open_control->enabled, "Net1 control 1 must remain enabled");
+    }
+
+    if (close_control != nullptr)
+    {
+        context.expect(
+            close_control->type == HydraulicControlSimpleType::HighLevel,
+            "Net1 control 2 must retain its high-level trigger");
+        context.expect(
+            close_control->action == HydraulicControlActionType::Close,
+            "Net1 control 2 must retain its CLOSED action");
+        context.expectNear(
+            close_control->trigger_water_level_m,
+            140.0 * 0.3048,
+            numeric_tolerance,
+            comparison("control_2.trigger_water_level_m"));
+        context.expect(close_control->enabled, "Net1 control 2 must remain enabled");
+    }
+
+    AowisEpanetTests::NativeReferenceConfiguration native_configuration;
+    native_configuration.input_file = QStringLiteral(AOWIS_EPANET_TEST_NET1_INP);
+    mapNativeControlIds(network, native_configuration);
+    const AowisEpanetTests::NativeHydraulicTimeline native_timeline =
+        AowisEpanetTests::runNativeEpanetReference(native_configuration);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(result.request);
+    context.expect(native_timeline.success, "native Net1 with controls must solve successfully");
+    context.expect(wrapper_run.status.success, "imported Net1 with controls must solve successfully");
+    if (native_timeline.success && wrapper_run.status.success)
+        AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, network, context);
+}
+
+void scenarioImportStructuredRulesCanonicalUnits(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_CONTROLS_RULES_US_INP));
+    context.expect(result.status.success, "controls/rules fixture must import successfully");
+
+    const NetworkHydraulic &network = result.request.network;
+    context.expectEqual(
+        static_cast<std::int64_t>(network.controls_simple.size()),
+        std::int64_t{10}, comparison("simple_control_count"));
+    context.expectEqual(
+        static_cast<std::int64_t>(network.controls_rules.size()),
+        std::int64_t{3}, comparison("rule_count"));
+
+    const HydraulicControlSimple *timer = simpleControlById(
+        network, QStringLiteral("CONTROL_3"));
+    const HydraulicControlSimple *time_of_day = simpleControlById(
+        network, QStringLiteral("CONTROL_4"));
+    const HydraulicControlSimple *disabled = simpleControlById(
+        network, QStringLiteral("CONTROL_5"));
+    const HydraulicControlSimple *junction_pressure = simpleControlById(
+        network, QStringLiteral("CONTROL_6"));
+    const HydraulicControlSimple *reservoir_level = simpleControlById(
+        network, QStringLiteral("CONTROL_7"));
+    const HydraulicControlSimple *numeric_unit_speed = simpleControlById(
+        network, QStringLiteral("CONTROL_8"));
+    const HydraulicControlSimple *gpv_open = simpleControlById(
+        network, QStringLiteral("CONTROL_9"));
+    const HydraulicControlSimple *gpv_close = simpleControlById(
+        network, QStringLiteral("CONTROL_10"));
+    context.expect(timer != nullptr, "timer control must be imported");
+    context.expect(time_of_day != nullptr, "time-of-day control must be imported");
+    context.expect(disabled != nullptr, "disabled control must be imported");
+    context.expect(junction_pressure != nullptr, "junction-pressure control must be imported");
+    context.expect(reservoir_level != nullptr, "reservoir-triggered control must be imported");
+    context.expect(numeric_unit_speed != nullptr, "numeric pump speed 1.0 control must be imported");
+    context.expect(gpv_open != nullptr, "GPV OPEN control must be imported");
+    context.expect(gpv_close != nullptr, "GPV CLOSED control must be imported");
+    if (timer != nullptr)
+    {
+        context.expect(timer->type == HydraulicControlSimpleType::Timer, "control 3 must be a timer");
+        context.expect(timer->action == HydraulicControlActionType::Setting, "control 3 must set pump speed");
+        context.expectEqual(
+            static_cast<std::int64_t>(timer->trigger_elapsed_time_s),
+            std::int64_t{7200}, comparison("control_3.elapsed_time_s"));
+        context.expect(timer->setting.pump_speed_ratio.has_value(), "control 3 must contain pump speed setting");
+        if (timer->setting.pump_speed_ratio.has_value())
+            context.expectNear(timer->setting.pump_speed_ratio.value(), 0.8, numeric_tolerance, comparison("control_3.speed"));
+    }
+    if (time_of_day != nullptr)
+    {
+        context.expect(time_of_day->type == HydraulicControlSimpleType::TimeOfDay, "control 4 must be time-of-day");
+        context.expectEqual(
+            static_cast<std::int64_t>(time_of_day->trigger_time_of_day_s),
+            std::int64_t{10800}, comparison("control_4.clock_time_s"));
+        context.expect(time_of_day->setting.valve_pressure_head_m.has_value(), "control 4 must contain a PRV pressure setting");
+        if (time_of_day->setting.valve_pressure_head_m.has_value())
+        {
+            context.expectNear(
+                time_of_day->setting.valve_pressure_head_m.value(),
+                31.654742672513269,
+                numeric_tolerance,
+                comparison("control_4.pressure_head_m"));
+        }
+    }
+    if (disabled != nullptr)
+    {
+        context.expect(!disabled->enabled, "control 5 must retain disabled state");
+        context.expect(disabled->action == HydraulicControlActionType::Close, "control 5 must retain CLOSED action");
+    }
+    if (junction_pressure != nullptr)
+    {
+        context.expect(!junction_pressure->enabled, "control 6 must retain disabled state");
+        context.expect(junction_pressure->type == HydraulicControlSimpleType::LowLevel, "control 6 must be a low-pressure trigger");
+        context.expectEqual(
+            nodeIdForUuid(network, junction_pressure->trigger_node_uuid).toStdString(),
+            std::string("J2"),
+            comparison("control_6.trigger_node"));
+        context.expectNear(
+            junction_pressure->trigger_pressure_head_m,
+            17.585968151396262,
+            numeric_tolerance,
+            comparison("control_6.trigger_pressure_head_m"));
+        context.expect(junction_pressure->setting.valve_pressure_head_m.has_value(), "control 6 must retain the PRV setting");
+        if (junction_pressure->setting.valve_pressure_head_m.has_value())
+        {
+            context.expectNear(
+                junction_pressure->setting.valve_pressure_head_m.value(),
+                31.654742672513269,
+                numeric_tolerance,
+                comparison("control_6.setting_pressure_head_m"));
+        }
+    }
+
+    if (reservoir_level != nullptr)
+    {
+        context.expect(!reservoir_level->enabled, "control 7 must retain disabled state");
+        context.expect(reservoir_level->type == HydraulicControlSimpleType::LowLevel, "control 7 must retain reservoir low-level trigger");
+        context.expect(reservoir_level->action == HydraulicControlActionType::Open, "control 7 must retain OPEN action");
+        context.expectEqual(
+            nodeIdForUuid(network, reservoir_level->trigger_node_uuid).toStdString(),
+            std::string("R1"),
+            comparison("control_7.trigger_node"));
+        context.expectNear(
+            reservoir_level->trigger_water_level_m,
+            5.0 * 0.3048,
+            numeric_tolerance,
+            comparison("control_7.trigger_water_level_m"));
+    }
+    if (numeric_unit_speed != nullptr)
+    {
+        context.expect(!numeric_unit_speed->enabled, "control 8 must retain disabled state");
+        context.expect(numeric_unit_speed->action == HydraulicControlActionType::Setting, "numeric pump speed 1.0 must remain a numeric setting, not collapse to OPEN");
+        context.expect(numeric_unit_speed->setting.pump_speed_ratio.has_value(), "control 8 must retain pump speed");
+        if (numeric_unit_speed->setting.pump_speed_ratio.has_value())
+            context.expectNear(numeric_unit_speed->setting.pump_speed_ratio.value(), 1.0, numeric_tolerance, comparison("control_8.speed"));
+    }
+    if (gpv_open != nullptr)
+    {
+        context.expect(gpv_open->action == HydraulicControlActionType::Open, "control 9 must recover GPV OPEN from the source statement");
+        context.expectEqual(linkIdForUuid(network, gpv_open->link_uuid).toStdString(), std::string("VGPV"), comparison("control_9.link"));
+    }
+    if (gpv_close != nullptr)
+    {
+        context.expect(gpv_close->action == HydraulicControlActionType::Close, "control 10 must recover GPV CLOSED from the source statement");
+        context.expectEqual(linkIdForUuid(network, gpv_close->link_uuid).toStdString(), std::string("VGPV"), comparison("control_10.link"));
+    }
+
+    const HydraulicControlRule *level_rule = ruleById(network, QStringLiteral("R_LEVEL"));
+    const HydraulicControlRule *flow_rule = ruleById(network, QStringLiteral("R_FLOW"));
+    const HydraulicControlRule *system_rule = ruleById(network, QStringLiteral("R_SYSTEM"));
+    context.expect(level_rule != nullptr, "R_LEVEL must be imported");
+    context.expect(flow_rule != nullptr, "R_FLOW must be imported");
+    context.expect(system_rule != nullptr, "R_SYSTEM must be imported");
+
+    if (level_rule != nullptr)
+    {
+        context.expectEqual(
+            static_cast<std::int64_t>(level_rule->premises.size()),
+            std::int64_t{2}, comparison("R_LEVEL.premise_count"));
+        context.expectEqual(
+            static_cast<std::int64_t>(level_rule->actions_then.size()),
+            std::int64_t{1}, comparison("R_LEVEL.then_count"));
+        context.expectEqual(
+            static_cast<std::int64_t>(level_rule->actions_else.size()),
+            std::int64_t{1}, comparison("R_LEVEL.else_count"));
+        context.expectNear(level_rule->priority, 3.5, numeric_tolerance, comparison("R_LEVEL.priority"));
+        if (level_rule->premises.size() == 2)
+        {
+            const HydraulicControlRulePremise &level = level_rule->premises.at(0);
+            const HydraulicControlRulePremise &time = level_rule->premises.at(1);
+            context.expect(level.logical_operator == HydraulicControlRuleLogicalOperator::If, "first R_LEVEL premise must use IF");
+            context.expect(level.object == HydraulicControlRuleObject::Node, "R_LEVEL level premise must target a node");
+            context.expect(level.variable == HydraulicControlRuleVariable::Level, "R_LEVEL first premise must use LEVEL");
+            context.expect(level.comparison == HydraulicControlRuleOperator::Less, "EPANET BELOW must canonicalize to less-than semantics");
+            context.expectEqual(nodeIdForUuid(network, level.object_uuid).toStdString(), std::string("T1"), comparison("R_LEVEL.node"));
+            context.expect(level.water_level_m.has_value(), "R_LEVEL must contain canonical water level");
+            if (level.water_level_m.has_value())
+                context.expectNear(level.water_level_m.value(), 8.0 * 0.3048, numeric_tolerance, comparison("R_LEVEL.level_m"));
+
+            context.expect(time.logical_operator == HydraulicControlRuleLogicalOperator::And, "second R_LEVEL premise must use AND");
+            context.expect(time.object == HydraulicControlRuleObject::System, "R_LEVEL time premise must target SYSTEM");
+            context.expect(time.variable == HydraulicControlRuleVariable::Time, "R_LEVEL second premise must use TIME");
+            context.expect(time.elapsed_time_s.has_value(), "R_LEVEL time premise must contain seconds");
+            if (time.elapsed_time_s.has_value())
+                context.expectEqual(static_cast<std::int64_t>(time.elapsed_time_s.value()), std::int64_t{3600}, comparison("R_LEVEL.time_s"));
+        }
+        if (!level_rule->actions_then.isEmpty())
+        {
+            const HydraulicControlRuleAction &action = level_rule->actions_then.first();
+            context.expect(action.setting.pump_speed_ratio.has_value(), "R_LEVEL THEN must set pump speed");
+            if (action.setting.pump_speed_ratio.has_value())
+                context.expectNear(action.setting.pump_speed_ratio.value(), 0.9, numeric_tolerance, comparison("R_LEVEL.then_speed"));
+        }
+        if (!level_rule->actions_else.isEmpty())
+        {
+            const HydraulicControlRuleAction &action = level_rule->actions_else.first();
+            context.expect(action.status.has_value(), "R_LEVEL ELSE must retain status action");
+            if (action.status.has_value())
+                context.expect(action.status.value() == HydraulicControlRuleStatus::Open, "R_LEVEL ELSE must OPEN the pump");
+        }
+    }
+
+    if (flow_rule != nullptr && flow_rule->premises.size() == 2)
+    {
+        const HydraulicControlRulePremise &flow = flow_rule->premises.at(0);
+        const HydraulicControlRulePremise &status = flow_rule->premises.at(1);
+        context.expect(flow.variable == HydraulicControlRuleVariable::Flow, "R_FLOW first premise must use FLOW");
+        context.expect(flow.flow_m3_per_h.has_value(), "R_FLOW must contain canonical flow threshold");
+        if (flow.flow_m3_per_h.has_value())
+        {
+            context.expectNear(
+                flow.flow_m3_per_h.value(),
+                2.271233493230191,
+                numeric_tolerance,
+                comparison("R_FLOW.flow_m3_per_h"));
+        }
+        context.expectEqual(linkIdForUuid(network, flow.object_uuid).toStdString(), std::string("L1"), comparison("R_FLOW.link"));
+        context.expect(status.logical_operator == HydraulicControlRuleLogicalOperator::Or, "R_FLOW second premise must use OR");
+        context.expect(status.variable == HydraulicControlRuleVariable::Status, "R_FLOW second premise must use STATUS");
+        context.expect(status.comparison == HydraulicControlRuleOperator::Equal, "EPANET IS must canonicalize to equality semantics");
+        context.expect(status.status.has_value(), "R_FLOW status premise must retain ACTIVE value");
+        if (status.status.has_value())
+            context.expect(status.status.value() == HydraulicControlRuleStatus::Active, "R_FLOW status premise must compare ACTIVE");
+
+        context.expectEqual(
+            static_cast<std::int64_t>(flow_rule->actions_then.size()),
+            std::int64_t{1}, comparison("R_FLOW.then_count"));
+        context.expectEqual(
+            static_cast<std::int64_t>(flow_rule->actions_else.size()),
+            std::int64_t{1}, comparison("R_FLOW.else_count"));
+        if (!flow_rule->actions_then.isEmpty())
+        {
+            const HydraulicControlRuleAction &action = flow_rule->actions_then.first();
+            context.expect(action.setting.valve_pressure_head_m.has_value(), "R_FLOW THEN must contain a PRV pressure setting");
+            if (action.setting.valve_pressure_head_m.has_value())
+            {
+                context.expectNear(
+                    action.setting.valve_pressure_head_m.value(),
+                    28.137549042234017,
+                    numeric_tolerance,
+                    comparison("R_FLOW.then_pressure_head_m"));
+            }
+        }
+        if (!flow_rule->actions_else.isEmpty())
+        {
+            const HydraulicControlRuleAction &action = flow_rule->actions_else.first();
+            context.expect(action.status.has_value(), "R_FLOW ELSE must retain status action");
+            if (action.status.has_value())
+                context.expect(action.status.value() == HydraulicControlRuleStatus::Open, "R_FLOW ELSE must OPEN the valve");
+        }
+    }
+
+    if (system_rule != nullptr)
+    {
+        context.expect(!system_rule->enabled, "R_SYSTEM must retain disabled state");
+        context.expectNear(system_rule->priority, 1.0, numeric_tolerance, comparison("R_SYSTEM.priority"));
+        context.expectEqual(
+            static_cast<std::int64_t>(system_rule->premises.size()),
+            std::int64_t{2}, comparison("R_SYSTEM.premise_count"));
+        if (system_rule->premises.size() == 2)
+        {
+            const HydraulicControlRulePremise &demand = system_rule->premises.at(0);
+            const HydraulicControlRulePremise &pressure = system_rule->premises.at(1);
+            context.expect(demand.object == HydraulicControlRuleObject::System, "R_SYSTEM first premise must target SYSTEM");
+            context.expect(demand.variable == HydraulicControlRuleVariable::Demand, "R_SYSTEM first premise must use DEMAND");
+            context.expect(demand.demand_m3_per_h.has_value(), "R_SYSTEM demand premise must contain canonical flow");
+            if (demand.demand_m3_per_h.has_value())
+            {
+                context.expectNear(
+                    demand.demand_m3_per_h.value(),
+                    1.1356167466150955,
+                    numeric_tolerance,
+                    comparison("R_SYSTEM.demand_m3_per_h"));
+            }
+            context.expect(pressure.logical_operator == HydraulicControlRuleLogicalOperator::And, "R_SYSTEM second premise must use AND");
+            context.expect(pressure.object == HydraulicControlRuleObject::Node, "R_SYSTEM pressure premise must target a node");
+            context.expect(pressure.variable == HydraulicControlRuleVariable::Pressure, "R_SYSTEM second premise must use PRESSURE");
+            context.expectEqual(nodeIdForUuid(network, pressure.object_uuid).toStdString(), std::string("J1"), comparison("R_SYSTEM.node"));
+            context.expect(pressure.pressure_head_m.has_value(), "R_SYSTEM pressure premise must contain canonical pressure head");
+            if (pressure.pressure_head_m.has_value())
+            {
+                context.expectNear(
+                    pressure.pressure_head_m.value(),
+                    14.068774521117009,
+                    numeric_tolerance,
+                    comparison("R_SYSTEM.pressure_head_m"));
+            }
+        }
+    }
+
+    AowisEpanetTests::NativeReferenceConfiguration native_configuration;
+    native_configuration.input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_CONTROLS_RULES_US_INP);
+    mapNativeControlIds(network, native_configuration);
+    const AowisEpanetTests::NativeHydraulicTimeline native_timeline =
+        AowisEpanetTests::runNativeEpanetReference(native_configuration);
+    const EpanetResultRun wrapper_run = EpanetRunner().run(result.request);
+    context.expect(native_timeline.success, "native controls/rules fixture must solve successfully");
+    context.expect(wrapper_run.status.success, "imported controls/rules fixture must solve successfully");
+    if (native_timeline.success && wrapper_run.status.success)
+        AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, network, context);
+}
+
 void scenarioImportOpenErrorDiagnostic(TestContext &context)
 {
     const EpanetResultImport result = EpanetRunner().importInp(
@@ -787,6 +1188,16 @@ void registerInpImportScenarios(ScenarioRegistry &registry)
         "Imports all seven EPANET valve families, canonical settings, statuses, and GPV/PCV curve references.",
         {"conformance", "import", "hydraulic"},
         &scenarioImportValvesCanonicalUnits});
+    registry.add(ScenarioDefinition{
+        "conformance-import-controls-net1-equivalence",
+        "Imports both Net1 simple controls and restores full native-vs-imported Net1 hydraulic equivalence with stable control-event identity.",
+        {"conformance", "import", "hydraulic"},
+        &scenarioImportControlsNet1Equivalence});
+    registry.add(ScenarioDefinition{
+        "conformance-import-structured-rules-canonical-units",
+        "Imports low/high/timer/time-of-day controls with junction/tank/reservoir triggers, exact GPV and pump action intent, plus structured IF/AND/OR rules, THEN/ELSE actions, priorities, enabled state, and canonical rule/control quantities.",
+        {"conformance", "import", "hydraulic"},
+        &scenarioImportStructuredRulesCanonicalUnits});
     registry.add(ScenarioDefinition{
         "conformance-import-open-error-diagnostic",
         "Rejects an unavailable INP path with native EPANET error details and a structured import diagnostic.",

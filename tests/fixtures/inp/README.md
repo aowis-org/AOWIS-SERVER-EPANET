@@ -10,3 +10,4 @@ Current purpose-built fixtures:
 - `import_core_topology_us.inp` exercises core junction/reservoir/tank/pipe import, endpoint reconstruction, emitter normalization, Darcy-Weisbach roughness, pipe state, and EPANET 2.3 leakage conversion.
 - `import_patterns_curves_pumps_us.inp` exercises typed curve normalization, time-pattern references, tank-volume curves, curve- and constant-power pumps, speed patterns, efficiency curves, and pump/global energy inputs.
 - `import_valves_us.inp` exercises PRV, PSV, PBV, FCV, TCV, GPV, and PCV import with canonical settings, explicit statuses, and GPV/PCV curve references.
+- `import_controls_rules_us.inp` exercises all four simple-control trigger types, junction/tank/reservoir trigger nodes, disabled controls, exact OPEN/CLOSED versus numeric-setting intent, GPV OPEN/CLOSED controls, structured IF/AND/OR rules, THEN/ELSE actions, priorities, and canonical unit normalization for control/rule thresholds and settings.

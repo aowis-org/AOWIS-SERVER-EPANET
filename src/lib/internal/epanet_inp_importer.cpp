@@ -6,11 +6,14 @@
 
 #include <aowis/epanet/epanet_api.h>
 
+#include <QFile>
 #include <QFileInfo>
 #include <QHash>
+#include <QStringList>
 
 #include <array>
 #include <cmath>
+#include <limits>
 #include <utility>
 
 namespace
@@ -25,6 +28,8 @@ struct ImportReferences
     QHash<int, QUuid> curve_uuids_by_index;
     QHash<int, int> curve_types_by_index;
     QHash<int, QUuid> node_uuids_by_index;
+    QHash<int, QUuid> link_uuids_by_index;
+    QHash<int, int> link_types_by_index;
 };
 
 HydraulicSimulationStatus readFailure(
@@ -43,6 +48,58 @@ HydraulicSimulationStatus readFailure(
         entity_type,
         QString(),
         message);
+}
+
+HydraulicSimulationStatus readSimpleControlActionTokens(
+    const QString &input_file_path, QList<QString> &action_tokens)
+{
+    QFile file(input_file_path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::ReadInput,
+            HydraulicSimulationStatusOperation::ReadInput,
+            HydraulicSimulationStatusEntityType::Control,
+            QString(),
+            QStringLiteral("Could not read the source INP [CONTROLS] section: %1")
+                .arg(file.errorString()));
+    }
+
+    bool in_controls = false;
+    const QString content = QString::fromUtf8(file.readAll());
+    const QStringList lines = content.split(QLatin1Char('\n'));
+    for (QString line : lines)
+    {
+        const qsizetype comment_index = line.indexOf(QLatin1Char(';'));
+        if (comment_index >= 0)
+            line.truncate(comment_index);
+        line = line.trimmed();
+        if (line.isEmpty())
+            continue;
+
+        if (line.startsWith(QLatin1Char('[')))
+        {
+            in_controls = line.compare(QStringLiteral("[CONTROLS]"), Qt::CaseInsensitive) == 0;
+            continue;
+        }
+        if (!in_controls)
+            continue;
+
+        const QStringList tokens = line.simplified().split(QLatin1Char(' '));
+        if (tokens.size() < 3
+            || tokens.at(0).compare(QStringLiteral("LINK"), Qt::CaseInsensitive) != 0)
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Control,
+                QString(),
+                QStringLiteral("Could not parse a source INP simple-control statement"));
+        }
+        action_tokens.append(tokens.at(2));
+    }
+
+    return makeEpanetSuccess();
 }
 
 bool flowUnitsAreSi(int flow_units)
@@ -309,6 +366,199 @@ bool resolveValveType(int backend_type, HydraulicLinkValveType &type)
         return true;
     case EN_PCV:
         type = HydraulicLinkValveType::PCV;
+        return true;
+    default:
+        return false;
+    }
+}
+
+constexpr int epanet_rule_if = 1;
+constexpr int epanet_rule_and = 2;
+constexpr int epanet_rule_or = 3;
+
+bool resolveSimpleControlType(int backend_type, HydraulicControlSimpleType &type)
+{
+    switch (backend_type)
+    {
+    case EN_LOWLEVEL:
+        type = HydraulicControlSimpleType::LowLevel;
+        return true;
+    case EN_HILEVEL:
+        type = HydraulicControlSimpleType::HighLevel;
+        return true;
+    case EN_TIMER:
+        type = HydraulicControlSimpleType::Timer;
+        return true;
+    case EN_TIMEOFDAY:
+        type = HydraulicControlSimpleType::TimeOfDay;
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool resolveRuleLogicalOperator(int backend_operator, HydraulicControlRuleLogicalOperator &logical_operator)
+{
+    switch (backend_operator)
+    {
+    case epanet_rule_if:
+        logical_operator = HydraulicControlRuleLogicalOperator::If;
+        return true;
+    case epanet_rule_and:
+        logical_operator = HydraulicControlRuleLogicalOperator::And;
+        return true;
+    case epanet_rule_or:
+        logical_operator = HydraulicControlRuleLogicalOperator::Or;
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool resolveRuleObject(int backend_object, HydraulicControlRuleObject &object)
+{
+    switch (backend_object)
+    {
+    case EN_R_NODE:
+        object = HydraulicControlRuleObject::Node;
+        return true;
+    case EN_R_LINK:
+        object = HydraulicControlRuleObject::Link;
+        return true;
+    case EN_R_SYSTEM:
+        object = HydraulicControlRuleObject::System;
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool resolveRuleVariable(int backend_variable, HydraulicControlRuleVariable &variable)
+{
+    switch (backend_variable)
+    {
+    case EN_R_DEMAND:
+        variable = HydraulicControlRuleVariable::Demand;
+        return true;
+    case EN_R_HEAD:
+        variable = HydraulicControlRuleVariable::Head;
+        return true;
+    case EN_R_GRADE:
+        variable = HydraulicControlRuleVariable::Grade;
+        return true;
+    case EN_R_LEVEL:
+        variable = HydraulicControlRuleVariable::Level;
+        return true;
+    case EN_R_PRESSURE:
+        variable = HydraulicControlRuleVariable::Pressure;
+        return true;
+    case EN_R_FLOW:
+        variable = HydraulicControlRuleVariable::Flow;
+        return true;
+    case EN_R_STATUS:
+        variable = HydraulicControlRuleVariable::Status;
+        return true;
+    case EN_R_SETTING:
+        variable = HydraulicControlRuleVariable::Setting;
+        return true;
+    case EN_R_POWER:
+        variable = HydraulicControlRuleVariable::Power;
+        return true;
+    case EN_R_TIME:
+        variable = HydraulicControlRuleVariable::Time;
+        return true;
+    case EN_R_CLOCKTIME:
+        variable = HydraulicControlRuleVariable::ClockTime;
+        return true;
+    case EN_R_FILLTIME:
+        variable = HydraulicControlRuleVariable::FillTime;
+        return true;
+    case EN_R_DRAINTIME:
+        variable = HydraulicControlRuleVariable::DrainTime;
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool resolveRuleOperator(int backend_operator, HydraulicControlRuleOperator &comparison)
+{
+    switch (backend_operator)
+    {
+    case EN_R_EQ:
+        comparison = HydraulicControlRuleOperator::Equal;
+        return true;
+    case EN_R_NE:
+        comparison = HydraulicControlRuleOperator::NotEqual;
+        return true;
+    case EN_R_LE:
+        comparison = HydraulicControlRuleOperator::LessOrEqual;
+        return true;
+    case EN_R_GE:
+        comparison = HydraulicControlRuleOperator::GreaterOrEqual;
+        return true;
+    case EN_R_LT:
+        comparison = HydraulicControlRuleOperator::Less;
+        return true;
+    case EN_R_GT:
+        comparison = HydraulicControlRuleOperator::Greater;
+        return true;
+    case EN_R_IS:
+        comparison = HydraulicControlRuleOperator::Is;
+        return true;
+    case EN_R_NOT:
+        comparison = HydraulicControlRuleOperator::IsNot;
+        return true;
+    case EN_R_BELOW:
+        comparison = HydraulicControlRuleOperator::Below;
+        return true;
+    case EN_R_ABOVE:
+        comparison = HydraulicControlRuleOperator::Above;
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool resolveRuleStatus(int backend_status, HydraulicControlRuleStatus &status)
+{
+    switch (backend_status)
+    {
+    case EN_R_IS_OPEN:
+        status = HydraulicControlRuleStatus::Open;
+        return true;
+    case EN_R_IS_CLOSED:
+        status = HydraulicControlRuleStatus::Closed;
+        return true;
+    case EN_R_IS_ACTIVE:
+        status = HydraulicControlRuleStatus::Active;
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool assignControlLinkSetting(
+    int backend_link_type, double value, HydraulicControlLinkSetting &setting)
+{
+    switch (backend_link_type)
+    {
+    case EN_PUMP:
+        setting.pump_speed_ratio = value;
+        return true;
+    case EN_PRV:
+    case EN_PSV:
+    case EN_PBV:
+        setting.valve_pressure_head_m = value;
+        return true;
+    case EN_FCV:
+        setting.valve_flow_m3_per_h = value;
+        return true;
+    case EN_TCV:
+        setting.valve_loss_coefficient = value;
+        return true;
+    case EN_PCV:
+        setting.valve_position_percent = value;
         return true;
     default:
         return false;
@@ -1937,6 +2187,8 @@ HydraulicSimulationStatus importCoreTopology(
         }
         const QString link_id = QString::fromUtf8(link_id_value);
         const QUuid link_uuid = QUuid::createUuid();
+        references.link_uuids_by_index.insert(link_index, link_uuid);
+        references.link_types_by_index.insert(link_index, link_type);
 
         if (link_type == EN_PIPE || link_type == EN_CVPIPE)
         {
@@ -1988,38 +2240,616 @@ HydraulicSimulationStatus importCoreTopology(
     return makeEpanetSuccess();
 }
 
-HydraulicSimulationStatus collectDeferredImportDiagnostics(
+HydraulicSimulationStatus importSimpleControls(
     EpanetProject &project,
-    EpanetResultImport &result)
+    NetworkHydraulic &network,
+    const ImportReferences &references,
+    const QString &input_file_path)
 {
-    struct CountCheck
+    int control_count = 0;
+    int error = EN_getcount(project.handle(), EN_CONTROLCOUNT, &control_count);
+    if (error != 0)
     {
-        int object_type;
-        const char *description;
-        HydraulicSimulationStatusEntityType entity_type;
-    };
+        return readFailure(
+            project,
+            error,
+            QStringLiteral("EN_getcount(EN_CONTROLCOUNT)"),
+            QStringLiteral("Failed to read EPANET simple-control count"),
+            HydraulicSimulationStatusEntityType::Control);
+    }
 
-    const std::array<CountCheck, 2> checks = {{
-        {EN_CONTROLCOUNT, "Simple controls are present but control import is not available.", HydraulicSimulationStatusEntityType::Control},
-        {EN_RULECOUNT, "Rules are present but rule import is not available.", HydraulicSimulationStatusEntityType::Rule}
-    }};
-
-    for (const CountCheck &check : checks)
+    QList<QString> source_action_tokens;
+    HydraulicSimulationStatus source_status = readSimpleControlActionTokens(
+        input_file_path, source_action_tokens);
+    if (!source_status.success)
+        return source_status;
+    if (source_action_tokens.size() != control_count)
     {
-        int count = 0;
-        const int error = EN_getcount(project.handle(), check.object_type, &count);
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::ReadInput,
+            HydraulicSimulationStatusOperation::ReadInput,
+            HydraulicSimulationStatusEntityType::Control,
+            QString(),
+            QStringLiteral("Source INP control count does not match native EPANET control count"));
+    }
+
+    for (int control_index = 1; control_index <= control_count; control_index++)
+    {
+        int backend_type = EN_LOWLEVEL;
+        int link_index = 0;
+        int trigger_node_index = 0;
+        double backend_setting = 0.0;
+        double backend_level = 0.0;
+        error = EN_getcontrol(
+            project.handle(),
+            control_index,
+            &backend_type,
+            &link_index,
+            &backend_setting,
+            &trigger_node_index,
+            &backend_level);
         if (error != 0)
         {
             return readFailure(
                 project,
                 error,
-                QStringLiteral("EN_getcount"),
-                QStringLiteral("Failed to inspect EPANET input content"));
+                QStringLiteral("EN_getcontrol"),
+                QStringLiteral("Failed to read EPANET simple control"),
+                HydraulicSimulationStatusEntityType::Control);
         }
-        if (count > 0)
-            appendImportWarning(result, QString::fromLatin1(check.description), check.entity_type);
+
+        if (!references.link_uuids_by_index.contains(link_index)
+            || !references.link_types_by_index.contains(link_index))
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ResolveEntity,
+                HydraulicSimulationStatusEntityType::Control,
+                QStringLiteral("CONTROL_%1").arg(control_index),
+                QStringLiteral("Could not resolve the imported simple-control link"));
+        }
+
+        const int backend_link_type = references.link_types_by_index.value(link_index);
+        const QString source_action = source_action_tokens.at(control_index - 1);
+
+        HydraulicControlSimple control;
+        control.id = QStringLiteral("CONTROL_%1").arg(control_index);
+        control.uuid = QUuid::createUuid();
+        control.link_uuid = references.link_uuids_by_index.value(link_index);
+        if (!resolveSimpleControlType(backend_type, control.type))
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Control,
+                control.id,
+                control.uuid,
+                QStringLiteral("EPANET returned an unsupported simple-control type"));
+        }
+
+        if (source_action.compare(QStringLiteral("OPEN"), Qt::CaseInsensitive) == 0)
+        {
+            control.action = HydraulicControlActionType::Open;
+        }
+        else if (source_action.compare(QStringLiteral("CLOSED"), Qt::CaseInsensitive) == 0)
+        {
+            control.action = HydraulicControlActionType::Close;
+        }
+        else
+        {
+            control.action = HydraulicControlActionType::Setting;
+            if (!assignControlLinkSetting(backend_link_type, backend_setting, control.setting))
+            {
+                return makeEpanetStatus(
+                    HydraulicSimulationStatusStage::ReadInput,
+                    HydraulicSimulationStatusOperation::ReadInput,
+                    HydraulicSimulationStatusEntityType::Control,
+                    control.id,
+                    control.uuid,
+                    QStringLiteral("EPANET returned a simple-control setting that cannot be represented by the controlled link type"));
+            }
+        }
+
+        if (control.type == HydraulicControlSimpleType::LowLevel
+            || control.type == HydraulicControlSimpleType::HighLevel)
+        {
+            if (!references.node_uuids_by_index.contains(trigger_node_index))
+            {
+                return makeEpanetStatus(
+                    HydraulicSimulationStatusStage::ReadInput,
+                    HydraulicSimulationStatusOperation::ResolveEntity,
+                    HydraulicSimulationStatusEntityType::Control,
+                    control.id,
+                    control.uuid,
+                    QStringLiteral("Could not resolve the imported simple-control trigger node"));
+            }
+
+            int trigger_node_type = EN_JUNCTION;
+            error = EN_getnodetype(project.handle(), trigger_node_index, &trigger_node_type);
+            if (error != 0)
+            {
+                return readFailure(
+                    project,
+                    error,
+                    QStringLiteral("EN_getnodetype"),
+                    QStringLiteral("Failed to read the simple-control trigger node type"),
+                    HydraulicSimulationStatusEntityType::Control);
+            }
+            control.trigger_node_uuid = references.node_uuids_by_index.value(trigger_node_index);
+            if (trigger_node_type == EN_JUNCTION)
+                control.trigger_pressure_head_m = backend_level;
+            else if (trigger_node_type == EN_RESERVOIR || trigger_node_type == EN_TANK)
+                control.trigger_water_level_m = backend_level;
+            else
+            {
+                return makeEpanetStatus(
+                    HydraulicSimulationStatusStage::ReadInput,
+                    HydraulicSimulationStatusOperation::ReadInput,
+                    HydraulicSimulationStatusEntityType::Control,
+                    control.id,
+                    control.uuid,
+                    QStringLiteral("EPANET returned an unsupported simple-control trigger node type"));
+            }
+        }
+        else
+        {
+            if (backend_level < 0.0
+                || backend_level > static_cast<double>(std::numeric_limits<quint64>::max()))
+            {
+                return makeEpanetStatus(
+                    HydraulicSimulationStatusStage::ReadInput,
+                    HydraulicSimulationStatusOperation::ReadInput,
+                    HydraulicSimulationStatusEntityType::Control,
+                    control.id,
+                    control.uuid,
+                    QStringLiteral("EPANET returned an invalid simple-control time value"));
+            }
+            const quint64 time_s = static_cast<quint64>(std::llround(backend_level));
+            if (control.type == HydraulicControlSimpleType::Timer)
+                control.trigger_elapsed_time_s = time_s;
+            else
+                control.trigger_time_of_day_s = time_s;
+        }
+
+        int enabled = EN_TRUE;
+        error = EN_getcontrolenabled(project.handle(), control_index, &enabled);
+        if (error != 0)
+        {
+            return readFailure(
+                project,
+                error,
+                QStringLiteral("EN_getcontrolenabled"),
+                QStringLiteral("Failed to read EPANET simple-control enabled state"),
+                HydraulicSimulationStatusEntityType::Control);
+        }
+        control.enabled = enabled == EN_TRUE;
+        network.controls_simple.append(control);
     }
 
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus assignRulePremiseValue(
+    EpanetResultImport &result,
+    HydraulicControlRulePremise &premise,
+    int backend_variable,
+    int backend_status,
+    double backend_value,
+    int backend_object_index,
+    const ImportReferences &references,
+    const QString &rule_id,
+    bool &representable)
+{
+    representable = true;
+    switch (backend_variable)
+    {
+    case EN_R_DEMAND:
+        premise.demand_m3_per_h = backend_value;
+        return makeEpanetSuccess();
+    case EN_R_HEAD:
+    case EN_R_GRADE:
+        premise.hydraulic_head_m = backend_value;
+        return makeEpanetSuccess();
+    case EN_R_LEVEL:
+        premise.water_level_m = backend_value;
+        return makeEpanetSuccess();
+    case EN_R_PRESSURE:
+        premise.pressure_head_m = backend_value;
+        return makeEpanetSuccess();
+    case EN_R_FLOW:
+        premise.flow_m3_per_h = backend_value;
+        return makeEpanetSuccess();
+    case EN_R_STATUS:
+    {
+        HydraulicControlRuleStatus status;
+        if (!resolveRuleStatus(backend_status, status))
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Rule,
+                rule_id,
+                QStringLiteral("EPANET returned an unsupported rule status premise"));
+        }
+        premise.status = status;
+        return makeEpanetSuccess();
+    }
+    case EN_R_SETTING:
+        if (!references.link_types_by_index.contains(backend_object_index)
+            || !assignControlLinkSetting(
+                references.link_types_by_index.value(backend_object_index),
+                backend_value,
+                premise.link_setting))
+        {
+            appendImportWarning(
+                result,
+                QStringLiteral("Rule %1 contains a SETTING premise for a link type the current AOWIS control-setting model cannot represent; the rule was not imported.").arg(rule_id),
+                HydraulicSimulationStatusEntityType::Rule);
+            representable = false;
+            return makeEpanetSuccess();
+        }
+        return makeEpanetSuccess();
+    case EN_R_POWER:
+        appendImportWarning(
+            result,
+            QStringLiteral("Rule %1 contains a POWER premise that the bundled EPANET 2.3 rule engine cannot execute through the AOWIS rule builder; the rule was not imported.").arg(rule_id),
+            HydraulicSimulationStatusEntityType::Rule);
+        representable = false;
+        return makeEpanetSuccess();
+    case EN_R_TIME:
+        if (backend_value < 0.0
+            || backend_value > static_cast<double>(std::numeric_limits<quint64>::max()))
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Rule,
+                rule_id,
+                QStringLiteral("EPANET returned an invalid rule time value"));
+        }
+        premise.elapsed_time_s = static_cast<quint64>(std::llround(backend_value));
+        return makeEpanetSuccess();
+    case EN_R_CLOCKTIME:
+        if (backend_value < 0.0
+            || backend_value > static_cast<double>(std::numeric_limits<quint64>::max()))
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Rule,
+                rule_id,
+                QStringLiteral("EPANET returned an invalid rule time value"));
+        }
+        premise.time_of_day_s = static_cast<quint64>(std::llround(backend_value));
+        return makeEpanetSuccess();
+    case EN_R_FILLTIME:
+        if (backend_value < 0.0
+            || backend_value > static_cast<double>(std::numeric_limits<quint64>::max()))
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Rule,
+                rule_id,
+                QStringLiteral("EPANET returned an invalid rule time value"));
+        }
+        premise.fill_time_s = static_cast<quint64>(std::llround(backend_value));
+        return makeEpanetSuccess();
+    case EN_R_DRAINTIME:
+        if (backend_value < 0.0
+            || backend_value > static_cast<double>(std::numeric_limits<quint64>::max()))
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Rule,
+                rule_id,
+                QStringLiteral("EPANET returned an invalid rule time value"));
+        }
+        premise.drain_time_s = static_cast<quint64>(std::llround(backend_value));
+        return makeEpanetSuccess();
+    default:
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::ReadInput,
+            HydraulicSimulationStatusOperation::ReadInput,
+            HydraulicSimulationStatusEntityType::Rule,
+            rule_id,
+            QStringLiteral("EPANET returned an unsupported rule premise variable"));
+    }
+}
+
+HydraulicSimulationStatus importRuleAction(
+    EpanetProject &project,
+    EpanetResultImport &result,
+    const ImportReferences &references,
+    const QString &rule_id,
+    int rule_index,
+    int action_index,
+    bool else_action,
+    HydraulicControlRuleAction &action,
+    bool &representable)
+{
+    representable = true;
+    int link_index = 0;
+    int backend_status = 0;
+    double backend_setting = EN_MISSING;
+    const int error = else_action
+        ? EN_getelseaction(
+            project.handle(), rule_index, action_index,
+            &link_index, &backend_status, &backend_setting)
+        : EN_getthenaction(
+            project.handle(), rule_index, action_index,
+            &link_index, &backend_status, &backend_setting);
+    if (error != 0)
+    {
+        return readFailure(
+            project,
+            error,
+            else_action ? QStringLiteral("EN_getelseaction") : QStringLiteral("EN_getthenaction"),
+            QStringLiteral("Failed to read EPANET rule action"),
+            HydraulicSimulationStatusEntityType::Rule);
+    }
+
+    if (!references.link_uuids_by_index.contains(link_index)
+        || !references.link_types_by_index.contains(link_index))
+    {
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::ReadInput,
+            HydraulicSimulationStatusOperation::ResolveEntity,
+            HydraulicSimulationStatusEntityType::Rule,
+            rule_id,
+            QStringLiteral("Could not resolve a link referenced by an imported rule action"));
+    }
+    action.link_uuid = references.link_uuids_by_index.value(link_index);
+
+    if (backend_setting == EN_MISSING)
+    {
+        HydraulicControlRuleStatus status;
+        if (!resolveRuleStatus(backend_status, status))
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Rule,
+                rule_id,
+                QStringLiteral("EPANET returned an unsupported rule action status"));
+        }
+        action.status = status;
+        return makeEpanetSuccess();
+    }
+
+    if (!assignControlLinkSetting(
+            references.link_types_by_index.value(link_index),
+            backend_setting,
+            action.setting))
+    {
+        appendImportWarning(
+            result,
+            QStringLiteral("Rule %1 contains a numeric action setting for a link type the current AOWIS control-setting model cannot represent; the rule was not imported.").arg(rule_id),
+            HydraulicSimulationStatusEntityType::Rule);
+        representable = false;
+        return makeEpanetSuccess();
+    }
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus importRules(
+    EpanetProject &project,
+    EpanetResultImport &result,
+    const ImportReferences &references)
+{
+    int rule_count = 0;
+    int error = EN_getcount(project.handle(), EN_RULECOUNT, &rule_count);
+    if (error != 0)
+    {
+        return readFailure(
+            project,
+            error,
+            QStringLiteral("EN_getcount(EN_RULECOUNT)"),
+            QStringLiteral("Failed to read EPANET rule count"),
+            HydraulicSimulationStatusEntityType::Rule);
+    }
+
+    for (int rule_index = 1; rule_index <= rule_count; rule_index++)
+    {
+        char rule_id_value[EN_MAXID + 1] = {};
+        error = EN_getruleID(project.handle(), rule_index, rule_id_value);
+        if (error != 0)
+        {
+            return readFailure(
+                project,
+                error,
+                QStringLiteral("EN_getruleID"),
+                QStringLiteral("Failed to read EPANET rule ID"),
+                HydraulicSimulationStatusEntityType::Rule);
+        }
+
+        HydraulicControlRule rule;
+        rule.id = QString::fromUtf8(rule_id_value);
+        rule.uuid = QUuid::createUuid();
+
+        int premise_count = 0;
+        int then_action_count = 0;
+        int else_action_count = 0;
+        error = EN_getrule(
+            project.handle(), rule_index,
+            &premise_count, &then_action_count, &else_action_count, &rule.priority);
+        if (error != 0)
+        {
+            return readFailure(
+                project,
+                error,
+                QStringLiteral("EN_getrule"),
+                QStringLiteral("Failed to read EPANET rule summary"),
+                HydraulicSimulationStatusEntityType::Rule);
+        }
+
+        bool skip_rule = false;
+        for (int premise_index = 1; premise_index <= premise_count; premise_index++)
+        {
+            int backend_logical_operator = 0;
+            int backend_object = 0;
+            int backend_object_index = 0;
+            int backend_variable = 0;
+            int backend_operator = 0;
+            int backend_status = 0;
+            double backend_value = EN_MISSING;
+            error = EN_getpremise(
+                project.handle(), rule_index, premise_index,
+                &backend_logical_operator, &backend_object, &backend_object_index,
+                &backend_variable, &backend_operator, &backend_status, &backend_value);
+            if (error != 0)
+            {
+                return readFailure(
+                    project,
+                    error,
+                    QStringLiteral("EN_getpremise"),
+                    QStringLiteral("Failed to read EPANET rule premise"),
+                    HydraulicSimulationStatusEntityType::Rule);
+            }
+
+            HydraulicControlRulePremise premise;
+            bool logical_operator_supported = true;
+            if (premise_index == 1)
+            {
+                // EPANET stores the leading IF premise internally with the same
+                // logical code it uses for AND. Premise position is therefore
+                // the authoritative way to reconstruct the leading IF.
+                premise.logical_operator = HydraulicControlRuleLogicalOperator::If;
+            }
+            else
+            {
+                logical_operator_supported = resolveRuleLogicalOperator(
+                    backend_logical_operator, premise.logical_operator);
+            }
+
+            if (!logical_operator_supported
+                || !resolveRuleObject(backend_object, premise.object)
+                || !resolveRuleVariable(backend_variable, premise.variable)
+                || !resolveRuleOperator(backend_operator, premise.comparison))
+            {
+                return makeEpanetStatus(
+                    HydraulicSimulationStatusStage::ReadInput,
+                    HydraulicSimulationStatusOperation::ReadInput,
+                    HydraulicSimulationStatusEntityType::Rule,
+                    rule.id,
+                    rule.uuid,
+                    QStringLiteral("EPANET returned an unsupported rule premise enum value"));
+            }
+
+            if (premise.object == HydraulicControlRuleObject::Node)
+            {
+                if (!references.node_uuids_by_index.contains(backend_object_index))
+                {
+                    return makeEpanetStatus(
+                        HydraulicSimulationStatusStage::ReadInput,
+                        HydraulicSimulationStatusOperation::ResolveEntity,
+                        HydraulicSimulationStatusEntityType::Rule,
+                        rule.id,
+                        rule.uuid,
+                        QStringLiteral("Could not resolve a node referenced by an imported rule premise"));
+                }
+                premise.object_uuid = references.node_uuids_by_index.value(backend_object_index);
+            }
+            else if (premise.object == HydraulicControlRuleObject::Link)
+            {
+                if (!references.link_uuids_by_index.contains(backend_object_index))
+                {
+                    return makeEpanetStatus(
+                        HydraulicSimulationStatusStage::ReadInput,
+                        HydraulicSimulationStatusOperation::ResolveEntity,
+                        HydraulicSimulationStatusEntityType::Rule,
+                        rule.id,
+                        rule.uuid,
+                        QStringLiteral("Could not resolve a link referenced by an imported rule premise"));
+                }
+                premise.object_uuid = references.link_uuids_by_index.value(backend_object_index);
+            }
+
+            bool premise_representable = true;
+            const HydraulicSimulationStatus premise_status = assignRulePremiseValue(
+                result,
+                premise,
+                backend_variable,
+                backend_status,
+                backend_value,
+                backend_object_index,
+                references,
+                rule.id,
+                premise_representable);
+            if (!premise_status.success)
+                return premise_status;
+            if (!premise_representable)
+            {
+                skip_rule = true;
+                break;
+            }
+            rule.premises.append(premise);
+        }
+
+        if (skip_rule)
+            continue;
+
+        for (int action_index = 1; action_index <= then_action_count; action_index++)
+        {
+            HydraulicControlRuleAction action;
+            bool action_representable = true;
+            const HydraulicSimulationStatus action_status = importRuleAction(
+                project, result, references, rule.id,
+                rule_index, action_index, false, action, action_representable);
+            if (!action_status.success)
+                return action_status;
+            if (!action_representable)
+            {
+                skip_rule = true;
+                break;
+            }
+            rule.actions_then.append(action);
+        }
+        if (skip_rule)
+            continue;
+
+        for (int action_index = 1; action_index <= else_action_count; action_index++)
+        {
+            HydraulicControlRuleAction action;
+            bool action_representable = true;
+            const HydraulicSimulationStatus action_status = importRuleAction(
+                project, result, references, rule.id,
+                rule_index, action_index, true, action, action_representable);
+            if (!action_status.success)
+                return action_status;
+            if (!action_representable)
+            {
+                skip_rule = true;
+                break;
+            }
+            rule.actions_else.append(action);
+        }
+        if (skip_rule)
+            continue;
+
+        int enabled = EN_TRUE;
+        error = EN_getruleenabled(project.handle(), rule_index, &enabled);
+        if (error != 0)
+        {
+            return readFailure(
+                project,
+                error,
+                QStringLiteral("EN_getruleenabled"),
+                QStringLiteral("Failed to read EPANET rule enabled state"),
+                HydraulicSimulationStatusEntityType::Rule);
+        }
+        rule.enabled = enabled == EN_TRUE;
+        result.request.network.controls_rules.append(rule);
+    }
+
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus collectDeferredImportDiagnostics(
+    EpanetProject &project,
+    EpanetResultImport &result)
+{
     int quality_type = EN_NONE;
     char chemical_name[EN_MAXID + 1] = {};
     char chemical_units[EN_MAXID + 1] = {};
@@ -2106,6 +2936,14 @@ EpanetResultImport importEpanetInp(const QString &input_file_path)
         return finishImport(std::move(result), status, project);
 
     status = importCoreTopology(project, result, references);
+    if (!status.success)
+        return finishImport(std::move(result), status, project);
+
+    status = importSimpleControls(project, network, references, input_file_path);
+    if (!status.success)
+        return finishImport(std::move(result), status, project);
+
+    status = importRules(project, result, references);
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
