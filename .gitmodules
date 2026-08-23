@@ -1,3 +1,4 @@
 [submodule "external/epanet"]
 	path = external/epanet
 	url = https://github.com/aowis-org/EPANET.git
+	branch = aowis-integration
