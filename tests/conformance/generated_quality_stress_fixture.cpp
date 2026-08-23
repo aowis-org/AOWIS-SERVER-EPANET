@@ -324,7 +324,8 @@ void applyQualityToModel(NetworkHydraulic &network, WaterQualitySolverOptions &o
         {
             if (reaction.id != pipe.id)
                 continue;
-            pipe.override_reactions = true;
+            pipe.override_bulk_reaction = true;
+            pipe.override_wall_reaction = true;
             pipe.bulk_reaction.coefficient = reaction.bulk_coefficient;
             pipe.bulk_reaction.order = quality.global_bulk_order;
             pipe.wall_reaction.coefficient = reaction.wall_coefficient;

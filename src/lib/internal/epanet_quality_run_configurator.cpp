@@ -118,7 +118,7 @@ double effectivePipeWallReactionCoefficient(
     const NetworkHydraulic &network,
     const HydraulicLinkPipe &pipe)
 {
-    if (pipe.override_reactions)
+    if (pipe.override_wall_reaction)
         return pipe.wall_reaction.coefficient;
 
     const double factor = network.options_reaction.roughness_reaction_factor;
@@ -344,7 +344,7 @@ HydraulicSimulationStatus configureQualityReactions(
     for (const HydraulicLinkPipe &pipe : network.links_pipes)
     {
         const int link_index = indices.links_pipes.value(pipe.uuid, 0);
-        const double bulk_coefficient = pipe.override_reactions
+        const double bulk_coefficient = pipe.override_bulk_reaction
             ? pipe.bulk_reaction.coefficient
             : network.options_reaction.global_pipe_bulk_reaction.coefficient;
 

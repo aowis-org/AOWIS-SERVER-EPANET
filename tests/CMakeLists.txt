@@ -138,6 +138,9 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-import-valves-canonical-units
     conformance-import-controls-net1-equivalence
     conformance-import-structured-rules-canonical-units
+    conformance-import-quality-chemical-canonical-units
+    conformance-import-quality-water-age
+    conformance-import-quality-source-trace
     conformance-import-open-error-diagnostic
     conformance-export-native-reopen
     conformance-export-titles-comments-tags
@@ -290,6 +293,9 @@ target_compile_definitions(aowis-server-epanet-conformance-tests
         AOWIS_EPANET_TEST_IMPORT_PUMPS_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_patterns_curves_pumps_us.inp"
         AOWIS_EPANET_TEST_IMPORT_VALVES_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_valves_us.inp"
         AOWIS_EPANET_TEST_IMPORT_CONTROLS_RULES_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_controls_rules_us.inp"
+        AOWIS_EPANET_TEST_IMPORT_QUALITY_CHEMICAL_UG_L_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_chemical_ug_l.inp"
+        AOWIS_EPANET_TEST_IMPORT_QUALITY_AGE_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_age.inp"
+        AOWIS_EPANET_TEST_IMPORT_QUALITY_TRACE_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_trace.inp"
 )
 
 foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_TEST_SCENARIOS)
@@ -321,7 +327,7 @@ endforeach()
 foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS)
     if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-multi-quality-")
         set(AOWIS_SERVER_EPANET_TEST_LABELS "conformance;hydraulic;quality")
-    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-quality-|^conformance-negative-invalid-quality-")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-quality-|^conformance-import-quality-|^conformance-negative-invalid-quality-")
         set(AOWIS_SERVER_EPANET_TEST_LABELS "conformance;quality")
     else()
         set(AOWIS_SERVER_EPANET_TEST_LABELS "conformance;hydraulic")

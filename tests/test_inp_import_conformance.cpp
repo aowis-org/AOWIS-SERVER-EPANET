@@ -4,6 +4,7 @@
 #include "conformance/inp_import_scenarios.h"
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
+#include "conformance/native_quality_reference_runner.h"
 
 #include <array>
 #include <cmath>
@@ -182,6 +183,134 @@ QString nodeIdForUuid(const NetworkHydraulic &network, const QUuid &uuid)
     return QString();
 }
 
+
+template<typename ResultType>
+double importedQualityValue(const ResultType &result, WaterQualityAnalysisType analysis)
+{
+    switch (analysis)
+    {
+    case WaterQualityAnalysisType::Chemical:
+        return result.chemical_concentration_mg_per_l;
+    case WaterQualityAnalysisType::WaterAge:
+        return result.water_age_h;
+    case WaterQualityAnalysisType::SourceTrace:
+        return result.source_trace_percent;
+    case WaterQualityAnalysisType::None:
+        return 0.0;
+    }
+    return 0.0;
+}
+
+ComparisonContext qualityComparison(
+    std::int64_t time_s,
+    const QString &entity_type,
+    const QString &entity_id)
+{
+    ComparisonContext value;
+    value.time_s = time_s;
+    value.entity_type = entity_type.toStdString();
+    value.entity_id = entity_id.toStdString();
+    value.field = "quality";
+    return value;
+}
+
+template<typename ResultType>
+void compareImportedQualityNodes(
+    TestContext &context,
+    const QList<ResultType> &actual,
+    const AowisEpanetTests::NativeQualityReferenceStep &expected,
+    WaterQualityAnalysisType analysis,
+    const QString &entity_type)
+{
+    constexpr NumericTolerance quality_tolerance{2.0e-6, 2.0e-6};
+    for (const ResultType &result : actual)
+    {
+        context.expect(
+            expected.node_quality.contains(result.id),
+            "native quality reference must contain every imported node");
+        if (!expected.node_quality.contains(result.id))
+            continue;
+        context.expectNear(
+            importedQualityValue(result, analysis),
+            expected.node_quality.value(result.id),
+            quality_tolerance,
+            qualityComparison(expected.time_s, entity_type, result.id));
+    }
+}
+
+template<typename ResultType>
+void compareImportedQualityLinks(
+    TestContext &context,
+    const QList<ResultType> &actual,
+    const AowisEpanetTests::NativeQualityReferenceStep &expected,
+    WaterQualityAnalysisType analysis,
+    const QString &entity_type)
+{
+    constexpr NumericTolerance quality_tolerance{2.0e-6, 2.0e-6};
+    for (const ResultType &result : actual)
+    {
+        context.expect(
+            expected.link_quality.contains(result.id),
+            "native quality reference must contain every imported link");
+        if (!expected.link_quality.contains(result.id))
+            continue;
+        context.expectNear(
+            importedQualityValue(result, analysis),
+            expected.link_quality.value(result.id),
+            quality_tolerance,
+            qualityComparison(expected.time_s, entity_type, result.id));
+    }
+}
+
+void compareImportedQualityTimeline(
+    TestContext &context,
+    const AowisEpanetTests::NativeQualityReferenceTimeline &native,
+    const EpanetResultRun &run,
+    WaterQualityAnalysisType analysis)
+{
+    context.expect(native.success, "native quality reference must solve successfully");
+    context.expect(run.status.success, "imported quality request must solve successfully");
+    context.expectEqual(
+        static_cast<std::int64_t>(run.quality_results.size()),
+        std::int64_t{1},
+        comparison("quality_results.size"));
+    if (!native.success || !run.status.success || run.quality_results.size() != 1)
+        return;
+
+    const WaterQualitySimulationResultTimeline &actual =
+        run.quality_results.constFirst().result_timeline;
+    context.expect(
+        actual.validity == WaterQualitySimulationResultValidity::Valid,
+        "imported quality request must produce a valid quality timeline");
+    context.expectEqual(
+        static_cast<std::int64_t>(actual.results.size()),
+        static_cast<std::int64_t>(native.results.size()),
+        comparison("quality_timeline.size"));
+
+    const int step_count = qMin(actual.results.size(), native.results.size());
+    for (int index = 0; index < step_count; index++)
+    {
+        const WaterQualitySimulationResult &actual_step = actual.results.at(index);
+        const AowisEpanetTests::NativeQualityReferenceStep &expected_step = native.results.at(index);
+        context.expectEqual(
+            static_cast<std::int64_t>(actual_step.time_elapsed_s),
+            expected_step.time_s,
+            comparison("quality_time_s"));
+        compareImportedQualityNodes(
+            context, actual_step.nodes_junctions, expected_step, analysis, QStringLiteral("Junction"));
+        compareImportedQualityNodes(
+            context, actual_step.nodes_reservoirs, expected_step, analysis, QStringLiteral("Reservoir"));
+        compareImportedQualityNodes(
+            context, actual_step.nodes_tanks, expected_step, analysis, QStringLiteral("Tank"));
+        compareImportedQualityLinks(
+            context, actual_step.links_pipes, expected_step, analysis, QStringLiteral("Pipe"));
+        compareImportedQualityLinks(
+            context, actual_step.links_pumps, expected_step, analysis, QStringLiteral("Pump"));
+        compareImportedQualityLinks(
+            context, actual_step.links_valves, expected_step, analysis, QStringLiteral("Valve"));
+    }
+}
+
 QString linkIdForUuid(const NetworkHydraulic &network, const QUuid &uuid)
 {
     for (const HydraulicLinkPipe &pipe : network.links_pipes)
@@ -277,7 +406,11 @@ void scenarioImportNet1ProjectGlobals(TestContext &context)
     context.expectEqual(static_cast<std::int64_t>(network.nodes_reservoirs.size()), std::int64_t{1}, comparison("reservoir_count"));
     context.expectEqual(static_cast<std::int64_t>(network.nodes_tanks.size()), std::int64_t{1}, comparison("tank_count"));
     context.expectEqual(static_cast<std::int64_t>(network.links_pipes.size()), std::int64_t{12}, comparison("pipe_count"));
-    context.expect(result.request.quality_runs.isEmpty(), "quality-run import is outside the current INP-import coverage");
+    context.expectEqual(
+        static_cast<std::int64_t>(result.request.quality_runs.size()),
+        std::int64_t{1},
+        comparison("quality_runs.size"),
+        "Net1 CHEMICAL configuration must be imported as one quality child");
     context.expect(!result.diagnostics.isEmpty(), "partial import must explain deferred source data through structured diagnostics");
 }
 
@@ -288,7 +421,7 @@ void scenarioImportCanonicalGlobalUnits(TestContext &context)
 
     context.expect(result.status.success, "custom global-options INP import must open successfully");
     context.expect(!result.complete, "global-options fixture still omits report directives and coordinate metadata");
-    context.expect(result.request.quality_runs.isEmpty(), "quality-run import is outside the current INP-import coverage");
+    context.expect(result.request.quality_runs.isEmpty(), "QUALITY NONE must import as a hydraulics-only request");
     const NetworkHydraulic &network = result.request.network;
 
     context.expectEqual(network.title_line_1.toStdString(), std::string("Import Global Options Fixture"), comparison("title_line_1"));
@@ -352,7 +485,7 @@ void scenarioImportCoreTopologyNet1(TestContext &context)
     const EpanetResultImport result = EpanetRunner().importInp(
         QStringLiteral(AOWIS_EPANET_TEST_NET1_INP));
     context.expect(result.status.success, "Net1 core topology import must succeed");
-    context.expect(!result.complete, "Net1 still contains deferred controls, quality, geometry metadata, and report directives");
+    context.expect(!result.complete, "Net1 still contains deferred quality sources/reactions, geometry metadata, and report directives");
 
     const NetworkHydraulic &network = result.request.network;
     const HydraulicNodeJunction *junction_11 = junctionById(network, QStringLiteral("11"));
@@ -1134,6 +1267,151 @@ void scenarioImportStructuredRulesCanonicalUnits(TestContext &context)
         AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, network, context);
 }
 
+
+void scenarioImportQualityChemicalCanonicalUnits(TestContext &context)
+{
+    const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_CHEMICAL_UG_L_INP);
+    const EpanetResultImport result = EpanetRunner().importInp(input_file);
+    context.expect(result.status.success, "chemical quality fixture must import successfully");
+    context.expectEqual(
+        static_cast<std::int64_t>(result.request.quality_runs.size()),
+        std::int64_t{1},
+        comparison("quality_runs.size"));
+    if (result.request.quality_runs.size() != 1)
+        return;
+
+    const NetworkHydraulic &network = result.request.network;
+    const WaterQualitySolverOptions &quality = result.request.quality_runs.constFirst();
+    context.expect(
+        quality.analysis == WaterQualityAnalysisType::Chemical,
+        "CHEMICAL quality mode must map to the chemical analysis type");
+    context.expectEqual(
+        quality.chemical_name.toStdString(),
+        std::string("Chlorine"),
+        comparison("chemical_name"));
+    context.expectNear(
+        quality.chemical_tolerance_mg_per_l,
+        0.005,
+        numeric_tolerance,
+        comparison("chemical_tolerance_mg_per_l"));
+    context.expectNear(
+        quality.relative_diffusivity,
+        1.2,
+        numeric_tolerance,
+        comparison("relative_diffusivity"));
+    context.expectEqual(
+        static_cast<std::int64_t>(network.timestep_quality_s),
+        std::int64_t{300},
+        comparison("timestep_quality_s"));
+
+    const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
+    const HydraulicNodeJunction *junction_1 = junctionById(network, QStringLiteral("J1"));
+    const HydraulicNodeJunction *junction_2 = junctionById(network, QStringLiteral("J2"));
+    const HydraulicNodeTank *tank = tankById(network, QStringLiteral("T1"));
+    context.expect(
+        reservoir != nullptr && junction_1 != nullptr && junction_2 != nullptr && tank != nullptr,
+        "chemical quality fixture nodes must be imported");
+    if (reservoir != nullptr)
+        context.expectNear(reservoir->initial_chemical_concentration_mg_per_l, 2.0, numeric_tolerance, comparison("R1.initial_chemical_concentration_mg_per_l"));
+    if (junction_1 != nullptr)
+        context.expectNear(junction_1->initial_chemical_concentration_mg_per_l, 1.0, numeric_tolerance, comparison("J1.initial_chemical_concentration_mg_per_l"));
+    if (junction_2 != nullptr)
+        context.expectNear(junction_2->initial_chemical_concentration_mg_per_l, 0.5, numeric_tolerance, comparison("J2.initial_chemical_concentration_mg_per_l"));
+    if (tank != nullptr)
+        context.expectNear(tank->initial_chemical_concentration_mg_per_l, 0.25, numeric_tolerance, comparison("T1.initial_chemical_concentration_mg_per_l"));
+
+    const AowisEpanetTests::NativeQualityReferenceTimeline native =
+        AowisEpanetTests::runNativeQualityReference(input_file, network);
+    const EpanetResultRun run = EpanetRunner().run(result.request);
+    compareImportedQualityTimeline(context, native, run, WaterQualityAnalysisType::Chemical);
+}
+
+void scenarioImportQualityWaterAge(TestContext &context)
+{
+    const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_AGE_INP);
+    const EpanetResultImport result = EpanetRunner().importInp(input_file);
+    context.expect(result.status.success, "water-age quality fixture must import successfully");
+    context.expectEqual(
+        static_cast<std::int64_t>(result.request.quality_runs.size()),
+        std::int64_t{1},
+        comparison("quality_runs.size"));
+    if (result.request.quality_runs.size() != 1)
+        return;
+
+    const NetworkHydraulic &network = result.request.network;
+    const WaterQualitySolverOptions &quality = result.request.quality_runs.constFirst();
+    context.expect(
+        quality.analysis == WaterQualityAnalysisType::WaterAge,
+        "AGE quality mode must map to the water-age analysis type");
+    context.expectNear(
+        quality.water_age_tolerance_h,
+        0.025,
+        numeric_tolerance,
+        comparison("water_age_tolerance_h"));
+    context.expectEqual(
+        static_cast<std::int64_t>(network.timestep_quality_s),
+        std::int64_t{300},
+        comparison("timestep_quality_s"));
+
+    const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
+    const HydraulicNodeJunction *junction_1 = junctionById(network, QStringLiteral("J1"));
+    const HydraulicNodeJunction *junction_2 = junctionById(network, QStringLiteral("J2"));
+    const HydraulicNodeTank *tank = tankById(network, QStringLiteral("T1"));
+    context.expect(
+        reservoir != nullptr && junction_1 != nullptr && junction_2 != nullptr && tank != nullptr,
+        "water-age quality fixture nodes must be imported");
+    if (reservoir != nullptr)
+        context.expectNear(reservoir->initial_water_age_h, 1.0, numeric_tolerance, comparison("R1.initial_water_age_h"));
+    if (junction_1 != nullptr)
+        context.expectNear(junction_1->initial_water_age_h, 2.0, numeric_tolerance, comparison("J1.initial_water_age_h"));
+    if (junction_2 != nullptr)
+        context.expectNear(junction_2->initial_water_age_h, 3.0, numeric_tolerance, comparison("J2.initial_water_age_h"));
+    if (tank != nullptr)
+        context.expectNear(tank->initial_water_age_h, 4.0, numeric_tolerance, comparison("T1.initial_water_age_h"));
+
+    const AowisEpanetTests::NativeQualityReferenceTimeline native =
+        AowisEpanetTests::runNativeQualityReference(input_file, network);
+    const EpanetResultRun run = EpanetRunner().run(result.request);
+    compareImportedQualityTimeline(context, native, run, WaterQualityAnalysisType::WaterAge);
+}
+
+void scenarioImportQualitySourceTrace(TestContext &context)
+{
+    const QString input_file = QStringLiteral(AOWIS_EPANET_TEST_IMPORT_QUALITY_TRACE_INP);
+    const EpanetResultImport result = EpanetRunner().importInp(input_file);
+    context.expect(result.status.success, "source-trace quality fixture must import successfully");
+    context.expectEqual(
+        static_cast<std::int64_t>(result.request.quality_runs.size()),
+        std::int64_t{1},
+        comparison("quality_runs.size"));
+    if (result.request.quality_runs.size() != 1)
+        return;
+
+    const NetworkHydraulic &network = result.request.network;
+    const WaterQualitySolverOptions &quality = result.request.quality_runs.constFirst();
+    context.expect(
+        quality.analysis == WaterQualityAnalysisType::SourceTrace,
+        "TRACE quality mode must map to the source-trace analysis type");
+    context.expectEqual(
+        nodeIdForUuid(network, quality.trace_node_uuid).toStdString(),
+        std::string("J1"),
+        comparison("trace_node"));
+    context.expectNear(
+        quality.source_trace_tolerance_percent,
+        0.05,
+        numeric_tolerance,
+        comparison("source_trace_tolerance_percent"));
+    context.expectEqual(
+        static_cast<std::int64_t>(network.timestep_quality_s),
+        std::int64_t{300},
+        comparison("timestep_quality_s"));
+
+    const AowisEpanetTests::NativeQualityReferenceTimeline native =
+        AowisEpanetTests::runNativeQualityReference(input_file, network);
+    const EpanetResultRun run = EpanetRunner().run(result.request);
+    compareImportedQualityTimeline(context, native, run, WaterQualityAnalysisType::SourceTrace);
+}
+
 void scenarioImportOpenErrorDiagnostic(TestContext &context)
 {
     const EpanetResultImport result = EpanetRunner().importInp(
@@ -1198,6 +1476,21 @@ void registerInpImportScenarios(ScenarioRegistry &registry)
         "Imports low/high/timer/time-of-day controls with junction/tank/reservoir triggers, exact GPV and pump action intent, plus structured IF/AND/OR rules, THEN/ELSE actions, priorities, enabled state, and canonical rule/control quantities.",
         {"conformance", "import", "hydraulic"},
         &scenarioImportStructuredRulesCanonicalUnits});
+    registry.add(ScenarioDefinition{
+        "conformance-import-quality-chemical-canonical-units",
+        "Imports CHEMICAL quality configuration and initial node quality, converting documented ug/L source values to canonical AOWIS mg/L, and proves native quality equivalence.",
+        {"conformance", "import", "quality"},
+        &scenarioImportQualityChemicalCanonicalUnits});
+    registry.add(ScenarioDefinition{
+        "conformance-import-quality-water-age",
+        "Imports AGE configuration, tolerance, quality timestep, and initial node water age, then proves native quality equivalence.",
+        {"conformance", "import", "quality"},
+        &scenarioImportQualityWaterAge});
+    registry.add(ScenarioDefinition{
+        "conformance-import-quality-source-trace",
+        "Imports TRACE configuration, UUID-resolved trace source node, tolerance, and quality timestep, then proves native quality equivalence.",
+        {"conformance", "import", "quality"},
+        &scenarioImportQualitySourceTrace});
     registry.add(ScenarioDefinition{
         "conformance-import-open-error-diagnostic",
         "Rejects an unavailable INP path with native EPANET error details and a structured import diagnostic.",

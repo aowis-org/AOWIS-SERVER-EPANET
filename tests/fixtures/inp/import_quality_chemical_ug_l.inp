@@ -1,0 +1,45 @@
+[TITLE]
+AOWIS quality import fixture - chemical ug/L
+
+[JUNCTIONS]
+;ID Elevation Demand
+ J1 0 1
+ J2 0 1
+
+[RESERVOIRS]
+;ID Head
+ R1 30
+
+[TANKS]
+;ID Elev Init Min Max Diam MinVol VolCurve Overflow
+ T1 0 5 0 100 100 0 * NO
+
+[PIPES]
+;ID Node1 Node2 Length Diameter Roughness MinorLoss Status
+ P1 R1 J1 300 200 100 0 OPEN
+ P2 J1 J2 300 200 100 0 OPEN
+ P3 J2 T1 300 200 100 0 OPEN
+
+[QUALITY]
+ R1 2000
+ J1 1000
+ J2 500
+ T1 250
+
+[OPTIONS]
+ UNITS LPS
+ HEADLOSS H-W
+ QUALITY Chlorine ug/L
+ TOLERANCE 5
+ DIFFUSIVITY 1.2
+
+[TIMES]
+ DURATION 2:00
+ HYDRAULIC TIMESTEP 1:00
+ QUALITY TIMESTEP 0:05
+ REPORT TIMESTEP 0:30
+
+[REPORT]
+ STATUS NO
+
+[END]

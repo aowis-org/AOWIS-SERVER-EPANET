@@ -78,12 +78,12 @@ The adapter maps:
 - complete-mix, two-compartment, FIFO, and LIFO tank mixing;
 - mode-specific tolerance, relative diffusivity, and quality timestep;
 - network reaction orders and coefficients;
-- per-pipe and per-tank reaction overrides;
+- independent per-pipe bulk and wall reaction overrides, plus per-tank bulk reaction overrides;
 - limiting concentration and roughness correlation.
 
 Chemical sources are applied only during chemical analyses. Source-trace analysis requires an enabled trace node.
 
-EPANET reaction orders are network-wide. Enabled entity overrides must therefore use the applicable network order, and wall reaction order must satisfy EPANET's supported values. Because the Toolkit does not provide setters for every INP-level global reaction directive, the adapter writes effective reaction coefficients to individual pipes and tanks. Per-entity overrides take precedence. Roughness-correlated coefficients use EPANET's formula for the selected headloss model.
+EPANET reaction orders are network-wide. Enabled entity overrides must therefore use the applicable network order, and wall reaction order must satisfy EPANET's supported values. Because the Toolkit does not provide setters for every INP-level global reaction directive, the adapter writes effective reaction coefficients to individual pipes and tanks. The applicable per-entity override takes precedence independently for each reaction family. Roughness-correlated coefficients use EPANET's formula for the selected headloss model.
 
 ## Execution and result timelines
 
@@ -103,9 +103,12 @@ Controls and rules remain in the snapshot so their membership is preserved; thei
 
 ## INP import
 
-`EpanetRunner::importInp()` opens a native EPANET input file and reconstructs supported source data into an `EpanetRunRequest`. The supported import surface includes project/global settings, time patterns, all native curve families, junctions, reservoirs, tanks, pipes, pumps, all EPANET valve families, simple controls, and structured rules. After `EN_open`, the importer normalizes the live native project with `EN_setflowunits(..., EN_CMH)` and `EN_setoption(..., EN_PRESS_UNITS, EN_METERS)`. Hydraulic inputs are then read back directly through the Toolkit in the canonical units encoded by AOWIS field names, while native pattern, curve, node, and link indices are resolved into AOWIS UUID references.
+`EpanetRunner::importInp()` opens a native EPANET input file and reconstructs supported source data into an `EpanetRunRequest`. The supported import surface includes project/global settings, time patterns, all native curve families, junctions, reservoirs, tanks, pipes, pumps, all EPANET valve families, simple controls, structured rules, and the active water-quality analysis configuration plus initial chemical/water-age node state. After `EN_open`, the importer normalizes the live native project with `EN_setflowunits(..., EN_CMH)` and `EN_setoption(..., EN_PRESS_UNITS, EN_METERS)`. Hydraulic inputs are then read back directly through the Toolkit in the canonical units encoded by AOWIS field names, while native pattern, curve, node, and link indices are resolved into AOWIS UUID references.
 
 Imported time patterns and typed curves receive AOWIS UUIDs before entity reconstruction. Constant-power pumps are canonicalized to kW; for US-source projects this uses EPANET's own hp-to-kW factor because the native live-project unit switch does not rewrite constant-power pump values. Junction demands, reservoir heads, tank volume curves, pump head/efficiency curves, pump speed/energy patterns, GPV head-loss curves, PCV characteristic curves, and global/default pattern options are resolved directly to those UUIDs. EPANET default demand-pattern semantics are made explicit on imported demand categories so rebuilding the network preserves the source behavior.
+
+
+Water-quality import maps `NONE` to no quality child and reconstructs `CHEMICAL`, `AGE`, and `TRACE` into one `WaterQualitySolverOptions` child. Chemical name, mode-specific tolerance, relative diffusivity, quality timestep, and UUID-resolved trace source are retained. Documented EPANET `mg/L` and `ug/L` chemical representations are accepted; `ug/L` initial concentrations and tolerance are converted to canonical AOWIS `mg/L`. Initial chemical concentration and water age are reconstructed for junctions, reservoirs, and tanks. Quality sources, tank mixing, and reaction inputs remain outside the current import surface.
 
 Simple controls are reconstructed from `EN_getcontrol()` / `EN_getcontrolenabled()` into quantity-specific AOWIS trigger/action fields and receive deterministic import-local IDs (`CONTROL_<native index>`). Structured rules are reconstructed through the native rule summary, premise, THEN/ELSE action, priority, and enabled-state APIs; referenced nodes and links are resolved to UUIDs. The importer canonicalizes EPANET's parser-level operator synonyms to their semantic comparison operators and reconstructs the leading rule premise as `IF` from premise position because EPANET stores that first premise internally with its AND logical code.
 

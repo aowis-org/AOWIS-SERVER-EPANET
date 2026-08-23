@@ -60,19 +60,19 @@ int linkIndex(EN_Project project, const QString &id)
 }
 
 template<typename NodeType>
-void collectNodes(EN_Project project, const QList<NodeType> &nodes, const NetworkHydraulic &network, NativeQualityReferenceStep &step)
+void collectNodes(EN_Project project, const QList<NodeType> &nodes, const NetworkHydraulic &network, double quality_scale, NativeQualityReferenceStep &step)
 {
     for (const NodeType &node : nodes)
     {
         const int index = nodeIndex(project, node.id);
         double value = 0.0;
         checkEpanet(EN_getnodevalue(project, index, EN_QUALITY, &value), "EN_getnodevalue(EN_QUALITY native generated quality)");
-        step.node_quality.insert(node.id, value);
+        step.node_quality.insert(node.id, value * quality_scale);
 
         if (nodeHasSource(network, node.id))
         {
             checkEpanet(EN_getnodevalue(project, index, EN_SOURCEMASS, &value), "EN_getnodevalue(EN_SOURCEMASS native generated quality)");
-            step.node_source_mass_mg_per_min.insert(node.id, value);
+            step.node_source_mass_mg_per_min.insert(node.id, value * quality_scale);
         }
         else
         {
@@ -82,14 +82,14 @@ void collectNodes(EN_Project project, const QList<NodeType> &nodes, const Networ
 }
 
 template<typename LinkType>
-void collectLinks(EN_Project project, const QList<LinkType> &links, NativeQualityReferenceStep &step)
+void collectLinks(EN_Project project, const QList<LinkType> &links, double quality_scale, NativeQualityReferenceStep &step)
 {
     for (const LinkType &link : links)
     {
         const int index = linkIndex(project, link.id);
         double value = 0.0;
         checkEpanet(EN_getlinkvalue(project, index, EN_LINKQUAL, &value), "EN_getlinkvalue(EN_LINKQUAL native generated quality)");
-        step.link_quality.insert(link.id, value);
+        step.link_quality.insert(link.id, value * quality_scale);
     }
 }
 }
@@ -115,6 +115,20 @@ NativeQualityReferenceTimeline runNativeQualityReference(const QString &input_fi
         checkEpanet(EN_open(project, input_utf8.constData(), report_utf8.constData(), ""), "EN_open(native generated quality)");
         project_open = true;
 
+        int quality_type = EN_NONE;
+        char chemical_name[EN_MAXID + 1] = {};
+        char chemical_units[EN_MAXID + 1] = {};
+        int trace_node = 0;
+        checkEpanet(
+            EN_getqualinfo(project, &quality_type, chemical_name, chemical_units, &trace_node),
+            "EN_getqualinfo(native generated quality)");
+        double quality_scale = 1.0;
+        if (quality_type == EN_CHEM
+            && QString::fromUtf8(chemical_units).compare(QStringLiteral("ug/L"), Qt::CaseInsensitive) == 0)
+        {
+            quality_scale = 0.001;
+        }
+
         checkEpanet(EN_solveH(project), "EN_solveH(native generated quality)");
         checkEpanet(EN_openQ(project), "EN_openQ(native generated quality)");
         quality_open = true;
@@ -128,12 +142,12 @@ NativeQualityReferenceTimeline runNativeQualityReference(const QString &input_fi
 
             NativeQualityReferenceStep step;
             step.time_s = current_time_s;
-            collectNodes(project, network.nodes_junctions, network, step);
-            collectNodes(project, network.nodes_reservoirs, network, step);
-            collectNodes(project, network.nodes_tanks, network, step);
-            collectLinks(project, network.links_pipes, step);
-            collectLinks(project, network.links_pumps, step);
-            collectLinks(project, network.links_valves, step);
+            collectNodes(project, network.nodes_junctions, network, quality_scale, step);
+            collectNodes(project, network.nodes_reservoirs, network, quality_scale, step);
+            collectNodes(project, network.nodes_tanks, network, quality_scale, step);
+            collectLinks(project, network.links_pipes, quality_scale, step);
+            collectLinks(project, network.links_pumps, quality_scale, step);
+            collectLinks(project, network.links_valves, quality_scale, step);
             checkEpanet(EN_getstatistic(project, EN_MASSBALANCE, &step.mass_balance_ratio), "EN_getstatistic(EN_MASSBALANCE native generated quality)");
             timeline.results.append(step);
 

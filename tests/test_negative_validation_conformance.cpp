@@ -781,7 +781,7 @@ void scenarioInvalidQualityConfiguration(TestContext &context)
         if (network.links_pipes.isEmpty())
             return;
         HydraulicLinkPipe &pipe = network.links_pipes.first();
-        pipe.override_reactions = true;
+        pipe.override_bulk_reaction = true;
         pipe.bulk_reaction.order = network.options_reaction.global_pipe_bulk_reaction.order + 0.5;
         expectRejected(context, network, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("network-wide EPANET bulk reaction order"));
     }

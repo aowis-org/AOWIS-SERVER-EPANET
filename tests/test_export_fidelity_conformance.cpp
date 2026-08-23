@@ -799,7 +799,8 @@ void scenarioQualityReactionMapping(TestContext &context)
         network.options_reaction.global_tank_bulk_reaction.coefficient = -0.33;
 
         HydraulicLinkPipe &pipe = network.links_pipes.first();
-        pipe.override_reactions = false;
+        pipe.override_bulk_reaction = false;
+        pipe.override_wall_reaction = false;
         pipe.roughness_hazen_williams = roughness_case.roughness_hazen_williams;
         pipe.roughness_darcy_weisbach_mm = roughness_case.roughness_darcy_weisbach_mm;
         pipe.roughness_chezy_manning = roughness_case.roughness_chezy_manning;
@@ -847,8 +848,8 @@ void scenarioQualityInputChemical(TestContext &context)
     context.expect(network.nodes_junctions.size() >= 3, "Net1 fixture should expose at least three junctions for quality-source mapping");
     context.expect(!network.nodes_reservoirs.isEmpty(), "Net1 fixture should expose a reservoir for quality-source mapping");
     context.expect(!network.nodes_tanks.isEmpty(), "Net1 fixture should expose a tank for quality mapping");
-    context.expect(network.links_pipes.size() >= 2, "Net1 fixture should expose at least two pipes for reaction mapping");
-    if (network.nodes_junctions.size() < 3 || network.nodes_reservoirs.isEmpty() || network.nodes_tanks.isEmpty() || network.links_pipes.size() < 2)
+    context.expect(network.links_pipes.size() >= 3, "Net1 fixture should expose at least three pipes for independent reaction override mapping");
+    if (network.nodes_junctions.size() < 3 || network.nodes_reservoirs.isEmpty() || network.nodes_tanks.isEmpty() || network.links_pipes.size() < 3)
         return;
 
     HydraulicNodeReservoir &reservoir = network.nodes_reservoirs.first();
@@ -879,13 +880,20 @@ void scenarioQualityInputChemical(TestContext &context)
     tank.bulk_reaction.order = network.options_reaction.global_tank_bulk_reaction.order;
 
     HydraulicLinkPipe &global_pipe = network.links_pipes[0];
-    global_pipe.override_reactions = false;
-    HydraulicLinkPipe &override_pipe = network.links_pipes[1];
-    override_pipe.override_reactions = true;
-    override_pipe.bulk_reaction.coefficient = -0.7;
-    override_pipe.bulk_reaction.order = network.options_reaction.global_pipe_bulk_reaction.order;
-    override_pipe.wall_reaction.coefficient = -0.4;
-    override_pipe.wall_reaction.order = network.options_reaction.global_pipe_wall_reaction.order;
+    global_pipe.override_bulk_reaction = false;
+    global_pipe.override_wall_reaction = false;
+
+    HydraulicLinkPipe &bulk_override_pipe = network.links_pipes[1];
+    bulk_override_pipe.override_bulk_reaction = true;
+    bulk_override_pipe.override_wall_reaction = false;
+    bulk_override_pipe.bulk_reaction.coefficient = -0.7;
+    bulk_override_pipe.bulk_reaction.order = network.options_reaction.global_pipe_bulk_reaction.order;
+
+    HydraulicLinkPipe &wall_override_pipe = network.links_pipes[2];
+    wall_override_pipe.override_bulk_reaction = false;
+    wall_override_pipe.override_wall_reaction = true;
+    wall_override_pipe.wall_reaction.coefficient = -0.4;
+    wall_override_pipe.wall_reaction.order = network.options_reaction.global_pipe_wall_reaction.order;
 
     NativeSavedProject native(network, quality_options);
     int quality_type = -1;
@@ -951,11 +959,17 @@ void scenarioQualityInputChemical(TestContext &context)
     checkEpanet(EN_getlinkvalue(native.handle(), global_pipe_index, EN_KWALL, &value), "EN_getlinkvalue(EN_KWALL roughness)");
     context.expectNear(value, -2.6 / global_pipe.roughness_hazen_williams, NumericTolerance{1.0e-10, 1.0e-8}, comparison("pipe.wall_reaction.roughness_correlated", "Pipe", global_pipe.id.toStdString()));
 
-    const int override_pipe_index = linkIndex(native.handle(), override_pipe.id);
-    checkEpanet(EN_getlinkvalue(native.handle(), override_pipe_index, EN_KBULK, &value), "EN_getlinkvalue(EN_KBULK override)");
-    context.expectNear(value, -0.7, NumericTolerance{1.0e-12, 1.0e-9}, comparison("pipe.bulk_reaction.override", "Pipe", override_pipe.id.toStdString()));
-    checkEpanet(EN_getlinkvalue(native.handle(), override_pipe_index, EN_KWALL, &value), "EN_getlinkvalue(EN_KWALL override)");
-    context.expectNear(value, -0.4, NumericTolerance{1.0e-12, 1.0e-9}, comparison("pipe.wall_reaction.override", "Pipe", override_pipe.id.toStdString()));
+    const int bulk_override_pipe_index = linkIndex(native.handle(), bulk_override_pipe.id);
+    checkEpanet(EN_getlinkvalue(native.handle(), bulk_override_pipe_index, EN_KBULK, &value), "EN_getlinkvalue(EN_KBULK bulk-only override)");
+    context.expectNear(value, -0.7, NumericTolerance{1.0e-12, 1.0e-9}, comparison("pipe.bulk_reaction.override", "Pipe", bulk_override_pipe.id.toStdString()));
+    checkEpanet(EN_getlinkvalue(native.handle(), bulk_override_pipe_index, EN_KWALL, &value), "EN_getlinkvalue(EN_KWALL bulk-only fallback)");
+    context.expectNear(value, -2.6 / bulk_override_pipe.roughness_hazen_williams, NumericTolerance{1.0e-10, 1.0e-8}, comparison("pipe.wall_reaction.bulk_only_fallback", "Pipe", bulk_override_pipe.id.toStdString()));
+
+    const int wall_override_pipe_index = linkIndex(native.handle(), wall_override_pipe.id);
+    checkEpanet(EN_getlinkvalue(native.handle(), wall_override_pipe_index, EN_KBULK, &value), "EN_getlinkvalue(EN_KBULK wall-only fallback)");
+    context.expectNear(value, -0.2, NumericTolerance{1.0e-12, 1.0e-9}, comparison("pipe.bulk_reaction.wall_only_fallback", "Pipe", wall_override_pipe.id.toStdString()));
+    checkEpanet(EN_getlinkvalue(native.handle(), wall_override_pipe_index, EN_KWALL, &value), "EN_getlinkvalue(EN_KWALL wall-only override)");
+    context.expectNear(value, -0.4, NumericTolerance{1.0e-12, 1.0e-9}, comparison("pipe.wall_reaction.override", "Pipe", wall_override_pipe.id.toStdString()));
 }
 
 void scenarioQualityInputWaterAge(TestContext &context)

@@ -11,7 +11,7 @@ The matrix covers:
 - chemical, water-age, and source-trace execution on saved hydraulics;
 - junction, reservoir, tank, pipe, pump, valve, control, statistic, energy, flow-balance, and quality results;
 - diagnostics, cancellation, partial results, invalid input, and enabled-state handling;
-- INP import of project/global settings, patterns, typed curves, junction/reservoir/tank/pipe topology, pumps, and all valve families with canonical native normalization, UUID-resolved references, explicit completeness diagnostics, and native open-error provenance;
+- INP import of project/global settings, patterns, typed curves, junction/reservoir/tank/pipe topology, pumps, all valve families, controls/rules, and active water-quality analysis configuration with canonical native normalization, UUID-resolved references, explicit completeness diagnostics, and native open-error provenance;
 - INP export and native reopen fidelity;
 - deterministic generated-network hydraulic and quality differentials;
 - machine-checked model-field evidence and the vendored upstream-test inventory.
@@ -142,9 +142,12 @@ INP import uses native-open/readback scenarios and keeps import success separate
 | `conformance-import-valves-canonical-units` | PRV, PSV, PBV, FCV, TCV, GPV, and PCV settings/statuses plus GPV/PCV curve references are reconstructed in canonical units and native-compared |
 | `conformance-import-controls-net1-equivalence` | Both native Net1 tank-level pump controls are reconstructed with UUID references and canonical thresholds, restoring full native-vs-imported Net1 hydraulic timeline equivalence |
 | `conformance-import-structured-rules-canonical-units` | Low/high/timer/time-of-day simple controls plus structured IF/AND/OR rules, THEN/ELSE actions, priorities, enabled state, and canonical control/rule quantities are reconstructed and native-compared |
+| `conformance-import-quality-chemical-canonical-units` | CHEMICAL mode, chemical name, tolerance, relative diffusivity, quality timestep, and initial junction/reservoir/tank concentrations are reconstructed; documented `ug/L` input is canonicalized to `mg/L` and the imported quality timeline is native-compared |
+| `conformance-import-quality-water-age` | AGE mode, tolerance, quality timestep, and initial junction/reservoir/tank water age are reconstructed and the imported quality timeline is native-compared |
+| `conformance-import-quality-source-trace` | TRACE mode, percent tolerance, quality timestep, and the trace source node are reconstructed with UUID resolution and native quality equivalence |
 | `conformance-import-open-error-diagnostic` | Native `EN_open` failures retain the input-open stage/operation, backend call, native error code/message, and a structured diagnostic |
 
-The current importer does not yet claim water-quality configuration, coordinates/vertices/map metadata, node/link comments/tags, or full report-directive fidelity. Simple controls and structured rules are imported when their semantics are representable by the current public/model boundary. GPV OPEN/CLOSED controls, reservoir-triggered level controls, and the distinction between explicit OPEN/CLOSED and numeric pump settings are reconstructed explicitly. Toolkit enum combinations that the EPANET INP parser/runtime itself cannot execute remain outside the import contract rather than being treated as supported source syntax. Imported pattern, typed-curve, control, and rule references are resolved to AOWIS UUIDs rather than retained as backend indices.
+The current importer reconstructs `NONE`/CHEMICAL/AGE/TRACE analysis configuration and initial chemical/water-age node state, but does not yet claim water-quality sources, tank mixing, reactions, coordinates/vertices/map metadata, node/link comments/tags, or full report-directive fidelity. Simple controls and structured rules are imported when their semantics are representable by the current public/model boundary. GPV OPEN/CLOSED controls, reservoir-triggered level controls, and the distinction between explicit OPEN/CLOSED and numeric pump settings are reconstructed explicitly. Toolkit enum combinations that the EPANET INP parser/runtime itself cannot execute remain outside the import contract rather than being treated as supported source syntax. Imported pattern, typed-curve, control, and rule references are resolved to AOWIS UUIDs rather than retained as backend indices.
 
 Export fidelity uses dedicated native-reopen scenarios:
 
@@ -301,7 +304,7 @@ These rows cover the water-quality configuration translated from the AOWIS model
 | QI-ANALYSIS | Analysis selection | none, chemical (`mg/L`), water age (`h`), source trace (`%`), trace node, mode-specific tolerance, relative diffusivity, quality timestep | `EN_setqualtype`, `EN_setoption`, `EN_settimeparam` | `conformance-quality-input-none`, `-chemical`, `-water-age`, `-source-trace` | Complete |
 | QI-NODE | Initial quality and sources | typed initial quality; concentration, mass, flow-paced, setpoint sources; optional source pattern | `EN_INITQUAL`, `EN_SOURCETYPE`, `EN_SOURCEQUAL`, `EN_SOURCEPAT` | `conformance-quality-input-chemical` plus invalid-quality validation | Complete |
 | QI-TANK | Tank quality configuration | all four mixing models, two-compartment fraction, tank bulk reaction override/default | `EN_MIXMODEL`, `EN_MIXFRACTION`, `EN_TANK_KBULK` | `conformance-quality-input-tank-mixing-models`, `-chemical`, `-reactions` | Complete |
-| QI-REACTION | Reaction configuration | pipe/tank global effective coefficients, per-entity overrides, bulk/wall/tank orders, limiting concentration, roughness correlation for H-W/D-W/C-M | `EN_BULKORDER`, `EN_WALLORDER`, `EN_TANKORDER`, `EN_CONCENLIMIT`, `EN_KBULK`, `EN_KWALL`, `EN_TANK_KBULK` | `conformance-quality-input-chemical`, `-reactions`, invalid-quality validation | Complete |
+| QI-REACTION | Reaction configuration | pipe/tank global effective coefficients, independent per-pipe bulk/wall overrides, per-tank bulk overrides, bulk/wall/tank orders, limiting concentration, roughness correlation for H-W/D-W/C-M | `EN_BULKORDER`, `EN_WALLORDER`, `EN_TANKORDER`, `EN_CONCENLIMIT`, `EN_KBULK`, `EN_KWALL`, `EN_TANK_KBULK` | `conformance-quality-input-chemical`, `-reactions`, invalid-quality validation | Complete |
 
 ## Water-quality execution and results
 
@@ -315,7 +318,7 @@ Quality execution uses its own timestep/result timeline. Saved hydraulics are ex
 | QE-CANCEL | Cancellation | preserves completed hydraulics and already-produced quality samples | stepwise quality lifecycle | `conformance-quality-execution-cancellation-partial` | Complete |
 | QE-SOURCES | Runtime source families | concentration, mass booster, flow-paced booster, setpoint booster, and patterned dosing | source properties + quality stepping | `conformance-quality-runtime-source-*` | Complete |
 | QE-MIXING | Runtime tank mixing | complete-mix, two-compartment, FIFO, and LIFO behavior | tank mixing model + quality stepping | `conformance-quality-runtime-tank-mixing-models` | Complete |
-| QE-REACTIONS | Runtime reactions | pipe bulk/wall, tank bulk, per-entity overrides, limiting concentration, roughness correlation under H-W/D-W/C-M | reaction configuration + quality stepping | `conformance-quality-runtime-reactions` | Complete |
+| QE-REACTIONS | Runtime reactions | pipe bulk/wall, tank bulk, independent per-pipe bulk/wall overrides, per-tank bulk overrides, limiting concentration, roughness correlation under H-W/D-W/C-M | reaction configuration + quality stepping | `conformance-quality-runtime-reactions` | Complete |
 | QE-LONG-RUN | Long multi-step result contract | 12-hour 300-second quality timeline, per-step success status, finite positive mass balance, hydraulic-result isolation | `EN_runQ`, `EN_stepQ`, `EN_MASSBALANCE` | `conformance-quality-runtime-long-multistep-contract` | Complete |
 
 ## Water-quality deterministic stress coverage

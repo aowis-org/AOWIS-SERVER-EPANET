@@ -392,9 +392,9 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &networ
         EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);
         if (!std::isfinite(pipe.wall_reaction.order) || (pipe.wall_reaction.order != 0.0 && pipe.wall_reaction.order != 1.0))
             failures.append(EpanetNetworkValidatorSupport::invalidNumeric(HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("wall_reaction.order"), QStringLiteral("must be either 0 or 1 for EPANET")));
-        if (pipe.override_reactions && std::isfinite(pipe.bulk_reaction.order) && std::abs(pipe.bulk_reaction.order - reactions.global_pipe_bulk_reaction.order) > 1.0e-12)
+        if (pipe.override_bulk_reaction && std::isfinite(pipe.bulk_reaction.order) && std::abs(pipe.bulk_reaction.order - reactions.global_pipe_bulk_reaction.order) > 1.0e-12)
             failures.append(EpanetNetworkValidatorSupport::validationStatus(HydraulicSimulationStatusOperation::ConfigureQuality, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Pipe bulk reaction order must match the network-wide EPANET bulk reaction order")));
-        if (pipe.override_reactions && std::isfinite(pipe.wall_reaction.order) && std::abs(pipe.wall_reaction.order - reactions.global_pipe_wall_reaction.order) > 1.0e-12)
+        if (pipe.override_wall_reaction && std::isfinite(pipe.wall_reaction.order) && std::abs(pipe.wall_reaction.order - reactions.global_pipe_wall_reaction.order) > 1.0e-12)
             failures.append(EpanetNetworkValidatorSupport::validationStatus(HydraulicSimulationStatusOperation::ConfigureQuality, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("Pipe wall reaction order must match the network-wide EPANET wall reaction order")));
         const double length_m = pipe.length_measured_m.value_or(pipe.length_calculated_m);
         status = EpanetNetworkValidatorSupport::validateFinitePositive(length_m, HydraulicSimulationStatusEntityType::Pipe, pipe.id, pipe.uuid, QStringLiteral("length_m"));

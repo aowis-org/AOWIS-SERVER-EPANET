@@ -219,12 +219,18 @@ NetworkHydraulic reactionNetwork(HydraulicHeadlossFormula formula)
 
     if (!network.links_pipes.isEmpty())
     {
-        HydraulicLinkPipe &override_pipe = network.links_pipes.first();
-        override_pipe.override_reactions = true;
-        override_pipe.bulk_reaction.coefficient = -0.55;
-        override_pipe.bulk_reaction.order = 1.0;
-        override_pipe.wall_reaction.coefficient = -0.22;
-        override_pipe.wall_reaction.order = 1.0;
+        HydraulicLinkPipe &bulk_override_pipe = network.links_pipes.first();
+        bulk_override_pipe.override_bulk_reaction = true;
+        bulk_override_pipe.bulk_reaction.coefficient = -0.55;
+        bulk_override_pipe.bulk_reaction.order = 1.0;
+    }
+
+    if (network.links_pipes.size() >= 2)
+    {
+        HydraulicLinkPipe &wall_override_pipe = network.links_pipes[1];
+        wall_override_pipe.override_wall_reaction = true;
+        wall_override_pipe.wall_reaction.coefficient = -0.22;
+        wall_override_pipe.wall_reaction.order = 1.0;
     }
 
     if (!network.nodes_tanks.isEmpty())

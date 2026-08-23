@@ -832,7 +832,8 @@ NetworkHydraulic DummyNetworks::networkFull()
     loop_pipe_1.roughness_darcy_weisbach_mm = 0.26;
     loop_pipe_1.roughness_chezy_manning = 0.014;
     loop_pipe_1.minor_loss_coefficient = 0.4;
-    loop_pipe_1.override_reactions = true;
+    loop_pipe_1.override_bulk_reaction = true;
+    loop_pipe_1.override_wall_reaction = true;
     loop_pipe_1.bulk_reaction.coefficient = -0.15;
     loop_pipe_1.bulk_reaction.order = 1.0;
     loop_pipe_1.wall_reaction.coefficient = -0.05;

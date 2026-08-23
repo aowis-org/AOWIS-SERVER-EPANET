@@ -2846,6 +2846,210 @@ HydraulicSimulationStatus importRules(
     return makeEpanetSuccess();
 }
 
+
+double qualityConcentrationScaleToCanonicalMgPerL(const QString &units, bool &supported)
+{
+    if (units.compare(QStringLiteral("mg/L"), Qt::CaseInsensitive) == 0)
+    {
+        supported = true;
+        return 1.0;
+    }
+    if (units.compare(QStringLiteral("ug/L"), Qt::CaseInsensitive) == 0)
+    {
+        supported = true;
+        return 0.001;
+    }
+
+    supported = false;
+    return 1.0;
+}
+
+template<typename NodeType>
+HydraulicSimulationStatus importInitialQualityForNodes(
+    EpanetProject &project,
+    QList<NodeType> &nodes,
+    WaterQualityAnalysisType analysis,
+    double chemical_concentration_scale,
+    HydraulicSimulationStatusEntityType entity_type)
+{
+    for (NodeType &node : nodes)
+    {
+        const QByteArray node_id_utf8 = node.id.toUtf8();
+        int node_index = 0;
+        int error = EN_getnodeindex(project.handle(), node_id_utf8.constData(), &node_index);
+        if (error != 0)
+        {
+            return readFailure(
+                project,
+                error,
+                QStringLiteral("EN_getnodeindex"),
+                QStringLiteral("Failed to resolve node while importing initial water quality"),
+                entity_type);
+        }
+
+        double initial_quality = 0.0;
+        HydraulicSimulationStatus status = readNodeValue(
+            project,
+            node_index,
+            EN_INITQUAL,
+            initial_quality,
+            entity_type,
+            QStringLiteral("EN_INITQUAL"));
+        if (!status.success)
+            return status;
+
+        if (analysis == WaterQualityAnalysisType::Chemical)
+            node.initial_chemical_concentration_mg_per_l = initial_quality * chemical_concentration_scale;
+        else if (analysis == WaterQualityAnalysisType::WaterAge)
+            node.initial_water_age_h = initial_quality;
+    }
+
+    return makeEpanetSuccess();
+}
+
+HydraulicSimulationStatus importWaterQualityConfiguration(
+    EpanetProject &project,
+    EpanetResultImport &result,
+    const ImportReferences &references)
+{
+    int quality_type = EN_NONE;
+    char chemical_name[EN_MAXID + 1] = {};
+    char chemical_units[EN_MAXID + 1] = {};
+    int trace_node_index = 0;
+    const int quality_error = EN_getqualinfo(
+        project.handle(), &quality_type, chemical_name, chemical_units, &trace_node_index);
+    if (quality_error != 0)
+    {
+        return readFailure(
+            project,
+            quality_error,
+            QStringLiteral("EN_getqualinfo"),
+            QStringLiteral("Failed to read EPANET water-quality analysis configuration"),
+            HydraulicSimulationStatusEntityType::QualitySolver);
+    }
+
+    if (quality_type == EN_NONE)
+        return makeEpanetSuccess();
+
+    WaterQualitySolverOptions options;
+    double chemical_concentration_scale = 1.0;
+    switch (quality_type)
+    {
+    case EN_CHEM:
+    {
+        options.analysis = WaterQualityAnalysisType::Chemical;
+        options.chemical_name = QString::fromUtf8(chemical_name);
+        bool units_supported = false;
+        const QString units = QString::fromUtf8(chemical_units);
+        chemical_concentration_scale = qualityConcentrationScaleToCanonicalMgPerL(
+            units, units_supported);
+        if (!units_supported)
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::QualitySolver,
+                QString(),
+                QStringLiteral("Unsupported EPANET chemical concentration units: %1").arg(units));
+        }
+        break;
+    }
+    case EN_AGE:
+        options.analysis = WaterQualityAnalysisType::WaterAge;
+        break;
+    case EN_TRACE:
+        options.analysis = WaterQualityAnalysisType::SourceTrace;
+        if (!references.node_uuids_by_index.contains(trace_node_index))
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ResolveEntity,
+                HydraulicSimulationStatusEntityType::QualitySolver,
+                QString(),
+                QStringLiteral("Could not resolve EPANET source-trace node"));
+        }
+        options.trace_node_uuid = references.node_uuids_by_index.value(trace_node_index);
+        break;
+    default:
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::ReadInput,
+            HydraulicSimulationStatusOperation::ReadInput,
+            HydraulicSimulationStatusEntityType::QualitySolver,
+            QString(),
+            QStringLiteral("EPANET returned an unsupported water-quality analysis type"));
+    }
+
+    double tolerance = 0.0;
+    HydraulicSimulationStatus status = readOption(
+        project,
+        EN_TOLERANCE,
+        tolerance,
+        QStringLiteral("EN_TOLERANCE"),
+        HydraulicSimulationStatusEntityType::QualitySolver);
+    if (!status.success)
+        return status;
+
+    switch (options.analysis)
+    {
+    case WaterQualityAnalysisType::Chemical:
+        options.chemical_tolerance_mg_per_l = tolerance * chemical_concentration_scale;
+        break;
+    case WaterQualityAnalysisType::WaterAge:
+        options.water_age_tolerance_h = tolerance;
+        break;
+    case WaterQualityAnalysisType::SourceTrace:
+        options.source_trace_tolerance_percent = tolerance;
+        break;
+    case WaterQualityAnalysisType::None:
+        break;
+    }
+
+    if (options.analysis == WaterQualityAnalysisType::Chemical)
+    {
+        status = readOption(
+            project,
+            EN_SP_DIFFUS,
+            options.relative_diffusivity,
+            QStringLiteral("EN_SP_DIFFUS"),
+            HydraulicSimulationStatusEntityType::QualitySolver);
+        if (!status.success)
+            return status;
+    }
+
+    if (options.analysis == WaterQualityAnalysisType::Chemical
+        || options.analysis == WaterQualityAnalysisType::WaterAge)
+    {
+        NetworkHydraulic &network = result.request.network;
+        status = importInitialQualityForNodes(
+            project,
+            network.nodes_junctions,
+            options.analysis,
+            chemical_concentration_scale,
+            HydraulicSimulationStatusEntityType::Junction);
+        if (!status.success)
+            return status;
+        status = importInitialQualityForNodes(
+            project,
+            network.nodes_reservoirs,
+            options.analysis,
+            chemical_concentration_scale,
+            HydraulicSimulationStatusEntityType::Reservoir);
+        if (!status.success)
+            return status;
+        status = importInitialQualityForNodes(
+            project,
+            network.nodes_tanks,
+            options.analysis,
+            chemical_concentration_scale,
+            HydraulicSimulationStatusEntityType::Tank);
+        if (!status.success)
+            return status;
+    }
+
+    result.request.quality_runs.append(options);
+    return makeEpanetSuccess();
+}
+
 HydraulicSimulationStatus collectDeferredImportDiagnostics(
     EpanetProject &project,
     EpanetResultImport &result)
@@ -2869,7 +3073,7 @@ HydraulicSimulationStatus collectDeferredImportDiagnostics(
     {
         appendImportWarning(
             result,
-            QStringLiteral("Water-quality analysis configuration is present but quality-run import is not available."),
+            QStringLiteral("Water-quality sources, tank mixing, and reactions are outside the current import surface."),
             HydraulicSimulationStatusEntityType::QualitySolver);
     }
 
@@ -2936,6 +3140,10 @@ EpanetResultImport importEpanetInp(const QString &input_file_path)
         return finishImport(std::move(result), status, project);
 
     status = importCoreTopology(project, result, references);
+    if (!status.success)
+        return finishImport(std::move(result), status, project);
+
+    status = importWaterQualityConfiguration(project, result, references);
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
