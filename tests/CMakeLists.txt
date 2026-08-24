@@ -145,6 +145,8 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-import-quality-mixing-reactions-canonical-units
     conformance-import-quality-net1-equivalence
     conformance-import-geometry-degrees-wgs84
+    conformance-import-geometry-epsg3089-wgs84
+    conformance-import-geometry-unknown-epsg-null-island
     conformance-import-geometry-meters-null-island
     conformance-import-geometry-feet-null-island
     conformance-import-geometry-arbitrary-null-island
@@ -328,6 +330,8 @@ target_compile_definitions(aowis-server-epanet-conformance-tests
         AOWIS_EPANET_TEST_IMPORT_QUALITY_AGE_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_age.inp"
         AOWIS_EPANET_TEST_IMPORT_QUALITY_TRACE_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_trace.inp"
         AOWIS_EPANET_TEST_IMPORT_GEOMETRY_DEGREES_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_geometry_degrees.inp"
+        AOWIS_EPANET_TEST_IMPORT_GEOMETRY_EPSG3089_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_geometry_epsg3089.inp"
+        AOWIS_EPANET_TEST_IMPORT_GEOMETRY_UNKNOWN_EPSG_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_geometry_unknown_epsg.inp"
         AOWIS_EPANET_TEST_IMPORT_GEOMETRY_METERS_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_geometry_meters.inp"
         AOWIS_EPANET_TEST_IMPORT_GEOMETRY_FEET_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_geometry_feet.inp"
         AOWIS_EPANET_TEST_IMPORT_GEOMETRY_ARBITRARY_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_geometry_arbitrary.inp"
@@ -373,7 +377,8 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
     endif()
 
     if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-negative-|^conformance-multi-quality-failure-isolation$"
-       OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-import-open-error-diagnostic")
+       OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-import-open-error-diagnostic"
+       OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-import-geometry-unknown-epsg-null-island")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "negative")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-export-")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "export")

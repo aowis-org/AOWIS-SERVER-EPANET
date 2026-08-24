@@ -8,6 +8,7 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/utility/hydraulic_simulation_status_printer.cpp
     src/lib/internal/epanet_multi_quality_run_executor.cpp
     src/lib/internal/epanet_diagnostic_helpers.cpp
+    src/lib/internal/epanet_coordinate_reference_transform.cpp
     src/lib/internal/epanet_hydraulic_run_configurator.cpp
     src/lib/internal/epanet_hydraulic_solver.cpp
     src/lib/internal/epanet_inp_exporter.cpp
@@ -60,6 +61,7 @@ set(AOWIS_SERVER_EPANET_PUBLIC_HEADERS
 set(AOWIS_SERVER_EPANET_INTERNAL_HEADERS
     src/lib/internal/epanet_multi_quality_run_executor.h
     src/lib/internal/epanet_diagnostic_helpers.h
+    src/lib/internal/epanet_coordinate_reference_transform.h
     src/lib/internal/epanet_hydraulic_run_configurator.h
     src/lib/internal/epanet_hydraulic_solver.h
     src/lib/internal/epanet_inp_exporter.h

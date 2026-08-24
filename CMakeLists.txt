@@ -95,7 +95,8 @@ else()
     endif()
 
     # GeographicLib 2.7 unconditionally registers its own large CTest suite
-    # from its top-level CMakeLists.txt. The adapter only needs LocalCartesian,
+    # from its top-level CMakeLists.txt. The adapter only needs the coordinate
+    # conversion primitives used by INP geometry import,
     # so build that dependency directly instead of polluting the AOWIS test
     # registry with GeographicLib tests and tools.
     include(TestBigEndian)
@@ -127,6 +128,7 @@ else()
         "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/src/Math.cpp"
         "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/src/Geocentric.cpp"
         "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/src/LocalCartesian.cpp"
+        "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/src/LambertConformalConic.cpp"
     )
     target_include_directories(aowis-server-epanet-geographiclib
         PUBLIC

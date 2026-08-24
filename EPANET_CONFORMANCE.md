@@ -11,7 +11,7 @@ The conformance target is the public `EpanetRunner` contract:
 - execute zero or more chemical, water-age, or source-trace analyses against the saved hydraulic solution;
 - return all modeled hydraulic and quality results, statuses, diagnostics, and partial-result states;
 - preserve supported INP data during export;
-- import supported INP project/global settings, hydraulic/quality topology, and map geometry into canonical AOWIS request fields with explicit completeness diagnostics; EPANET map geometry is normalized to WGS84 using direct degree interpretation or GeographicLib-backed synthetic placement around 0°,0°.
+- import supported INP project/global settings, hydraulic/quality topology, and map geometry into canonical AOWIS request fields with explicit completeness diagnostics; explicit supported EPSG map geometry is transformed to its real WGS84 location, degree geometry without a CRS is interpreted geographically, and unreferenced local geometry retains the Null Island fallback without projection guessing.
 
 Native project CRUD beyond the import/export adapter, direct project-handle access, and public binary Output API access are outside this target because they are not operations exposed by `EpanetRunner`.
 

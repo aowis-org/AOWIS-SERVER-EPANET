@@ -148,8 +148,10 @@ INP import uses native-open/readback scenarios and keeps import success separate
 | `conformance-import-quality-net1-equivalence` | Upstream Net1 is imported with no deferred quality diagnostics and its full CHEMICAL timeline is compared against a direct native EPANET run |
 | `conformance-import-quality-water-age` | AGE mode, tolerance, quality timestep, and initial junction/reservoir/tank water age are reconstructed and the imported quality timeline is native-compared |
 | `conformance-import-quality-source-trace` | TRACE mode, percent tolerance, quality timestep, and the trace source node are reconstructed with UUID resolution and native quality equivalence |
-| `conformance-import-geometry-degrees-wgs84` | Degree map coordinates are interpreted as WGS84; node positions, ordered link vertices, labels/anchors, backdrop bounds/file, and degree offsets are reconstructed |
-| `conformance-import-geometry-meters-null-island` | Metric drawing coordinates retain metre scale and layout through GeographicLib `LocalCartesian` while the source geometry is centered at WGS84 0°,0° |
+| `conformance-import-geometry-degrees-wgs84` | Degree map coordinates without an explicit CRS are treated as geographic coordinates and interpreted as WGS84 while retaining that the source datum was unspecified |
+| `conformance-import-geometry-epsg3089-wgs84` | Explicit EPSG:3089 projected coordinates, vertices, labels, and backdrop geometry are transformed to their real Kentucky WGS84 location while original source coordinates and CRS metadata are retained |
+| `conformance-import-geometry-unknown-epsg-null-island` | Unsupported explicit EPSG metadata is retained, the import is marked incomplete, no projection is guessed, and source geometry uses the Null Island fallback |
+| `conformance-import-geometry-meters-null-island` | Metric drawing coordinates without an explicit CRS retain metre scale and layout through GeographicLib `LocalCartesian` while the source geometry is centered at WGS84 0°,0° |
 | `conformance-import-geometry-feet-null-island` | Foot-based drawing coordinates are converted to metres, then projected to synthetic WGS84 around 0°,0° |
 | `conformance-import-geometry-arbitrary-null-island` | `NONE`/arbitrary map geometry uses the explicit one-map-unit-equals-one-metre convention and synthetic WGS84 placement |
 | `conformance-import-geometry-missing-layout` | Networks without node coordinates receive deterministic generated WGS84 positions near 0°,0° instead of collapsing all nodes onto one point |

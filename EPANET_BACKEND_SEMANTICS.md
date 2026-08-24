@@ -40,6 +40,7 @@ The adapter initializes every native EPANET project with `EN_CMH` and explicitly
 - Typed tank, pump, and valve curves use the canonical units encoded by their point fields.
 - Hydraulic node coordinates and link vertices are exported as canonical WGS84 longitude/latitude in degrees. EPANET permits geographic coordinates, so generated `[COORDINATES]` and `[VERTICES]` use this WGS84 map space directly.
 - Map labels use the same WGS84 coordinate representation as nodes and vertices. Enabled backdrop metadata stores WGS84 lower-left/upper-right bounds and longitude/latitude offsets in degrees; generated `[BACKDROP]` therefore declares `UNITS DEGREES`. GUI/map-space `x`/`y` position fields are not part of the hydraulic model.
+- INP import recognizes an optional positive third token on `[BACKDROP] UNITS` as an EPSG coordinate-reference identifier. Supported EPSG coordinates are transformed to WGS84; unsupported codes are preserved in import source metadata and never guessed. Unreferenced metre/foot/arbitrary geometry retains the established Null Island visualization fallback.
 - `HydraulicCurveGeneric` is an opaque EPANET-compatible preservation type. Its `x` and `y` coordinates are backend-defined numeric data, not AOWIS measurement quantities, and therefore do not carry canonical UCUM units. AOWIS hydraulic entities reference typed curves instead; generic curves are retained for complete backend data/export fidelity.
 - PRV, PSV, and PBV settings: pressure head in `m`.
 - FCV settings: `m3_per_h`.

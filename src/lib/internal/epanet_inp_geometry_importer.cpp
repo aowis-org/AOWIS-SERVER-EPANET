@@ -1,5 +1,6 @@
 #include "epanet_inp_geometry_importer.h"
 
+#include "epanet_coordinate_reference_transform.h"
 #include "epanet_diagnostic_helpers.h"
 #include "epanet_project.h"
 #include "epanet_status_helpers.h"
@@ -22,19 +23,8 @@ namespace
 constexpr double meters_per_foot = 0.3048;
 constexpr int missing_coordinate_error = 254;
 
-struct SourcePoint
-{
-    double x = 0.0;
-    double y = 0.0;
-};
-
-enum class SourceMapUnits
-{
-    None,
-    Meters,
-    Feet,
-    Degrees
-};
+using SourcePoint = EpanetImportSourcePoint;
+using SourceMapUnits = EpanetImportMapUnits;
 
 struct SourceMapLabel
 {
@@ -55,7 +45,10 @@ struct SourceBackdrop
 struct SourceMapMetadata
 {
     SourceMapUnits units = SourceMapUnits::None;
+    QString units_text;
     bool units_declared = false;
+    bool epsg_code_declared = false;
+    int epsg_code = 0;
     QList<SourceMapLabel> labels;
     SourceBackdrop backdrop;
 };
@@ -223,6 +216,7 @@ HydraulicSimulationStatus parseSourceMapMetadata(
         if (command == QStringLiteral("UNITS") && tokens.size() >= 2)
         {
             metadata.units_declared = true;
+            metadata.units_text = tokens.at(1);
             const QString value = tokens.at(1).toUpper();
             if (value == QStringLiteral("METERS"))
                 metadata.units = SourceMapUnits::Meters;
@@ -234,13 +228,33 @@ HydraulicSimulationStatus parseSourceMapMetadata(
                 metadata.units = SourceMapUnits::None;
             else
             {
-                metadata.units = SourceMapUnits::None;
+                metadata.units = SourceMapUnits::Unknown;
                 appendGeometryDiagnostic(
                     result,
                     HydraulicSimulationDiagnosticSeverity::Warning,
                     QStringLiteral("Unknown EPANET backdrop units were treated as arbitrary map units."),
                     {tokens.at(1)},
                     true);
+            }
+
+            if (tokens.size() >= 3)
+            {
+                bool epsg_ok = false;
+                const int epsg_code = tokens.at(2).toInt(&epsg_ok);
+                if (epsg_ok && epsg_code > 0)
+                {
+                    metadata.epsg_code_declared = true;
+                    metadata.epsg_code = epsg_code;
+                }
+                else if (!(epsg_ok && epsg_code == 0))
+                {
+                    appendGeometryDiagnostic(
+                        result,
+                        HydraulicSimulationDiagnosticSeverity::Warning,
+                        QStringLiteral("The EPANET backdrop coordinate-reference token is not a valid positive EPSG code and was ignored."),
+                        {tokens.at(2)},
+                        true);
+                }
             }
         }
         else if (command == QStringLiteral("DIMENSIONS") && tokens.size() >= 5)
@@ -302,9 +316,17 @@ CoordinateWGS84 directWgs84(const SourcePoint &point)
     return coordinate;
 }
 
+enum class GeometryTransformMode
+{
+    LocalNullIsland,
+    DirectDegrees,
+    Epsg
+};
+
 struct GeometryTransform
 {
-    bool direct_degrees = false;
+    GeometryTransformMode mode = GeometryTransformMode::LocalNullIsland;
+    int epsg_code = 0;
     double scale_to_m = 1.0;
     double center_x = 0.0;
     double center_y = 0.0;
@@ -312,8 +334,16 @@ struct GeometryTransform
 
     CoordinateWGS84 transform(const SourcePoint &point) const
     {
-        if (this->direct_degrees)
+        if (this->mode == GeometryTransformMode::DirectDegrees)
             return directWgs84(point);
+
+        if (this->mode == GeometryTransformMode::Epsg)
+        {
+            CoordinateWGS84 coordinate;
+            if (transformEpanetEpsgToWgs84(this->epsg_code, point.x, point.y, coordinate))
+                return coordinate;
+            return CoordinateWGS84();
+        }
 
         double latitude = 0.0;
         double longitude = 0.0;
@@ -334,8 +364,20 @@ struct GeometryTransform
 
     CoordinateWGS84 transformOffset(const SourcePoint &point) const
     {
-        if (this->direct_degrees)
+        if (this->mode == GeometryTransformMode::DirectDegrees)
             return directWgs84(point);
+
+        if (this->mode == GeometryTransformMode::Epsg)
+        {
+            const SourcePoint reference{this->center_x, this->center_y};
+            const SourcePoint shifted{this->center_x + point.x, this->center_y + point.y};
+            const CoordinateWGS84 reference_wgs84 = this->transform(reference);
+            const CoordinateWGS84 shifted_wgs84 = this->transform(shifted);
+            CoordinateWGS84 offset;
+            offset.longitude_deg = shifted_wgs84.longitude_deg - reference_wgs84.longitude_deg;
+            offset.latitude_deg = shifted_wgs84.latitude_deg - reference_wgs84.latitude_deg;
+            return offset;
+        }
 
         double latitude = 0.0;
         double longitude = 0.0;
@@ -376,6 +418,17 @@ void includePointBounds(
     maximum_y = std::max(maximum_y, point.y);
 }
 
+bool sourceUnitsMatchCoordinateReference(
+    SourceMapUnits units,
+    EpanetCoordinateReferenceUnit reference_unit)
+{
+    if (reference_unit == EpanetCoordinateReferenceUnit::Degrees)
+        return units == SourceMapUnits::Degrees;
+    if (reference_unit == EpanetCoordinateReferenceUnit::Meters)
+        return units == SourceMapUnits::Meters;
+    return units == SourceMapUnits::Feet;
+}
+
 GeometryTransform makeGeometryTransform(
     SourceMapUnits units,
     const QList<ImportedNodeCoordinate> &nodes,
@@ -404,36 +457,6 @@ GeometryTransform makeGeometryTransform(
         all_points.append(metadata.backdrop.upper_right.value());
 
     GeometryTransform transform;
-    if (units == SourceMapUnits::Degrees)
-    {
-        bool all_valid = true;
-        for (const SourcePoint &point : all_points)
-            all_valid = all_valid && validWgs84Point(point);
-
-        if (all_valid)
-        {
-            transform.direct_degrees = true;
-            appendGeometryDiagnostic(
-                result,
-                HydraulicSimulationDiagnosticSeverity::Information,
-                QStringLiteral("EPANET map coordinates declared as degrees were interpreted as WGS84 longitude/latitude."));
-            return transform;
-        }
-
-        appendGeometryDiagnostic(
-            result,
-            HydraulicSimulationDiagnosticSeverity::Warning,
-            QStringLiteral("EPANET map coordinates were declared as degrees but fall outside valid longitude/latitude ranges; they were imported as synthetic local geometry instead."),
-            QStringList(),
-            true);
-        units = SourceMapUnits::None;
-    }
-
-    if (units == SourceMapUnits::Feet)
-        transform.scale_to_m = meters_per_foot;
-    else
-        transform.scale_to_m = 1.0;
-
     bool has_bounds = false;
     double minimum_x = 0.0;
     double minimum_y = 0.0;
@@ -448,26 +471,135 @@ GeometryTransform makeGeometryTransform(
         transform.center_y = (minimum_y + maximum_y) / 2.0;
     }
 
+    if (metadata.epsg_code_declared)
+    {
+        EpanetCoordinateReferenceDefinition definition;
+        if (epanetCoordinateReferenceDefinition(metadata.epsg_code, definition))
+        {
+            bool all_transformable = true;
+            for (const SourcePoint &point : all_points)
+            {
+                CoordinateWGS84 coordinate;
+                if (!transformEpanetEpsgToWgs84(metadata.epsg_code, point.x, point.y, coordinate))
+                {
+                    all_transformable = false;
+                    break;
+                }
+            }
+
+            if (all_transformable)
+            {
+                transform.mode = GeometryTransformMode::Epsg;
+                transform.epsg_code = metadata.epsg_code;
+                result.source_geometry.coordinate_reference_name = QString::fromLatin1(definition.name);
+                result.source_geometry.georeferenced = true;
+                result.source_geometry.transformed_to_wgs84 = true;
+
+                if (metadata.units_declared
+                    && !sourceUnitsMatchCoordinateReference(metadata.units, definition.unit))
+                {
+                    appendGeometryDiagnostic(
+                        result,
+                        HydraulicSimulationDiagnosticSeverity::Warning,
+                        QStringLiteral("The EPANET backdrop units disagree with the declared EPSG coordinate reference; the EPSG definition took precedence."),
+                        {
+                            QStringLiteral("EPSG:%1 (%2)").arg(metadata.epsg_code).arg(QString::fromLatin1(definition.name)),
+                            QStringLiteral("Declared backdrop units: %1").arg(metadata.units_text)
+                        },
+                        true);
+                }
+
+                appendGeometryDiagnostic(
+                    result,
+                    HydraulicSimulationDiagnosticSeverity::Information,
+                    QStringLiteral("EPANET map geometry with an explicit EPSG coordinate reference was transformed to WGS84."),
+                    {QStringLiteral("EPSG:%1 (%2)").arg(metadata.epsg_code).arg(QString::fromLatin1(definition.name))});
+
+                if (definition.datum_approximated_as_wgs84)
+                {
+                    appendGeometryDiagnostic(
+                        result,
+                        HydraulicSimulationDiagnosticSeverity::Information,
+                        QStringLiteral("The source CRS uses NAD83; AOWIS uses the WGS84-equivalent geodetic position without a high-accuracy datum grid shift."),
+                        {QStringLiteral("EPSG:%1").arg(metadata.epsg_code)});
+                }
+                return transform;
+            }
+
+            appendGeometryDiagnostic(
+                result,
+                HydraulicSimulationDiagnosticSeverity::Warning,
+                QStringLiteral("The declared EPSG coordinate reference is supported, but one or more source coordinates could not be transformed; Null Island fallback geometry was used instead."),
+                {QStringLiteral("EPSG:%1 (%2)").arg(metadata.epsg_code).arg(QString::fromLatin1(definition.name))},
+                true);
+        }
+        else
+        {
+            result.source_geometry.coordinate_reference_name = QStringLiteral("EPSG:%1").arg(metadata.epsg_code);
+            appendGeometryDiagnostic(
+                result,
+                HydraulicSimulationDiagnosticSeverity::Warning,
+                QStringLiteral("The INP file declares an EPSG coordinate reference that this build does not support; the source CRS was preserved and the geometry was placed around Null Island without guessing a projection."),
+                {QStringLiteral("EPSG:%1").arg(metadata.epsg_code)},
+                true);
+        }
+
+        units = metadata.units == SourceMapUnits::Degrees
+            ? SourceMapUnits::None : metadata.units;
+    }
+    else if (units == SourceMapUnits::Degrees)
+    {
+        bool all_valid = true;
+        for (const SourcePoint &point : all_points)
+            all_valid = all_valid && validWgs84Point(point);
+
+        if (all_valid)
+        {
+            transform.mode = GeometryTransformMode::DirectDegrees;
+            result.source_geometry.coordinate_reference_name = QStringLiteral("Geographic degrees (datum unspecified; interpreted as WGS84)");
+            result.source_geometry.georeferenced = true;
+            result.source_geometry.transformed_to_wgs84 = false;
+            appendGeometryDiagnostic(
+                result,
+                HydraulicSimulationDiagnosticSeverity::Information,
+                QStringLiteral("EPANET map coordinates declared as degrees without an explicit CRS were interpreted as WGS84 longitude/latitude; the source datum remains unspecified."));
+            return transform;
+        }
+
+        appendGeometryDiagnostic(
+            result,
+            HydraulicSimulationDiagnosticSeverity::Warning,
+            QStringLiteral("EPANET map coordinates were declared as degrees but fall outside valid longitude/latitude ranges; they were imported as Null Island fallback geometry instead."),
+            QStringList(),
+            true);
+        units = SourceMapUnits::None;
+    }
+
+    if (units == SourceMapUnits::Feet)
+        transform.scale_to_m = meters_per_foot;
+    else
+        transform.scale_to_m = 1.0;
+
     if (units == SourceMapUnits::Meters)
     {
         appendGeometryDiagnostic(
             result,
             HydraulicSimulationDiagnosticSeverity::Information,
-            QStringLiteral("EPANET metric map geometry was centered at WGS84 0°,0° while preserving metric offsets."));
+            QStringLiteral("EPANET metric map geometry has no explicit CRS; it was centered at WGS84 0°,0° while preserving metric offsets."));
     }
     else if (units == SourceMapUnits::Feet)
     {
         appendGeometryDiagnostic(
             result,
             HydraulicSimulationDiagnosticSeverity::Information,
-            QStringLiteral("EPANET map geometry in feet was converted to metres and centered at WGS84 0°,0°."));
+            QStringLiteral("EPANET map geometry in feet was converted to metres and, because it has no explicit CRS, centered at WGS84 0°,0°."));
     }
     else
     {
         appendGeometryDiagnostic(
             result,
             HydraulicSimulationDiagnosticSeverity::Warning,
-            QStringLiteral("EPANET map geometry has no usable coordinate units; AOWIS interpreted one map unit as one metre and centered the network at WGS84 0°,0°."));
+            QStringLiteral("EPANET map geometry has no usable coordinate reference; AOWIS interpreted one map unit as one metre and centered the network at WGS84 0°,0°."));
     }
     return transform;
 }
@@ -647,6 +779,51 @@ HydraulicSimulationStatus readNativeGeometry(
     return makeEpanetSuccess();
 }
 
+void retainSourceGeometry(
+    const SourceMapMetadata &metadata,
+    const QList<ImportedNodeCoordinate> &nodes,
+    const QList<ImportedLinkVertices> &links,
+    EpanetResultImport &result)
+{
+    EpanetImportSourceGeometry &source = result.source_geometry;
+    source.units = metadata.units;
+    source.units_text = metadata.units_text;
+    source.units_declared = metadata.units_declared;
+    source.epsg_code_declared = metadata.epsg_code_declared;
+    source.epsg_code = metadata.epsg_code;
+
+    for (const ImportedNodeCoordinate &node : nodes)
+    {
+        if (node.point.has_value())
+            source.node_coordinates.insert(node.id, node.point.value());
+    }
+    for (const ImportedLinkVertices &link : links)
+        source.link_vertices.insert(link.id, link.points);
+
+    for (const SourceMapLabel &label : metadata.labels)
+    {
+        EpanetImportSourceMapLabel source_label;
+        source_label.point = label.point;
+        source_label.text = label.text;
+        source_label.anchor_node_id = label.anchor_node_id;
+        source.labels.append(source_label);
+    }
+
+    source.backdrop.present = metadata.backdrop.present;
+    source.backdrop.file = metadata.backdrop.file;
+    source.backdrop.offset = metadata.backdrop.offset;
+    if (metadata.backdrop.lower_left.has_value())
+    {
+        source.backdrop.has_lower_left = true;
+        source.backdrop.lower_left = metadata.backdrop.lower_left.value();
+    }
+    if (metadata.backdrop.upper_right.has_value())
+    {
+        source.backdrop.has_upper_right = true;
+        source.backdrop.upper_right = metadata.backdrop.upper_right.value();
+    }
+}
+
 void generateMissingNodeCoordinates(
     NetworkHydraulic &network,
     const QList<ImportedNodeCoordinate> &nodes,
@@ -742,6 +919,8 @@ HydraulicSimulationStatus importEpanetInpGeometry(
     status = readNativeGeometry(project, nodes, links);
     if (!status.success)
         return status;
+
+    retainSourceGeometry(metadata, nodes, links, result);
 
     GeometryTransform transform = makeGeometryTransform(
         metadata.units, nodes, links, metadata, result);

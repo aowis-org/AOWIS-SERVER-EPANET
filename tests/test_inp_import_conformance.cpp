@@ -1811,6 +1811,14 @@ void scenarioImportGeometryDegrees(TestContext &context)
     const EpanetResultImport result = EpanetRunner().importInp(
         QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GEOMETRY_DEGREES_INP));
     context.expect(result.status.success, "degree geometry fixture must import successfully");
+    context.expect(result.source_geometry.units == EpanetImportMapUnits::Degrees,
+        "degree geometry source units must be retained");
+    context.expect(!result.source_geometry.epsg_code_declared,
+        "degree fixture must remain explicitly CRS-unspecified");
+    context.expect(result.source_geometry.georeferenced,
+        "valid degree geometry must be usable on the geographic map");
+    context.expect(!result.source_geometry.transformed_to_wgs84,
+        "CRS-unspecified degree geometry is interpreted directly rather than projected");
 
     const NetworkHydraulic &network = result.request.network;
     const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
@@ -1859,11 +1867,129 @@ void scenarioImportGeometryDegrees(TestContext &context)
         "degree import must document its WGS84 interpretation");
 }
 
+void scenarioImportGeometryEpsg3089(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GEOMETRY_EPSG3089_INP));
+    context.expect(result.status.success, "EPSG:3089 geometry fixture must import successfully");
+    context.expect(result.complete, "supported EPSG:3089 geometry must import completely");
+
+    const EpanetImportSourceGeometry &source = result.source_geometry;
+    context.expect(source.units == EpanetImportMapUnits::Feet,
+        "EPSG:3089 source map units must remain recorded as feet");
+    context.expect(source.epsg_code_declared, "EPSG:3089 source must retain its explicit CRS marker");
+    context.expectEqual(static_cast<std::int64_t>(source.epsg_code), std::int64_t{3089},
+        comparison("source_geometry.epsg_code"));
+    context.expect(source.georeferenced, "supported EPSG geometry must be marked georeferenced");
+    context.expect(source.transformed_to_wgs84, "projected EPSG geometry must be marked as transformed to WGS84");
+    context.expect(source.coordinate_reference_name.contains(QStringLiteral("Kentucky")),
+        "EPSG:3089 source CRS name must be retained");
+    context.expect(source.node_coordinates.contains(QStringLiteral("R1")),
+        "original EPSG:3089 reservoir coordinate must be retained");
+    if (source.node_coordinates.contains(QStringLiteral("R1")))
+    {
+        const EpanetImportSourcePoint point = source.node_coordinates.value(QStringLiteral("R1"));
+        context.expectNear(point.x, 4971350.0, numeric_tolerance, comparison("source.R1.x"));
+        context.expectNear(point.y, 3905604.0, numeric_tolerance, comparison("source.R1.y"));
+    }
+    context.expect(source.link_vertices.contains(QStringLiteral("P1")),
+        "original EPSG:3089 link vertices must be retained");
+
+    const NetworkHydraulic &network = result.request.network;
+    const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
+    const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
+    const HydraulicLinkPipe *pipe = pipeById(network, QStringLiteral("P1"));
+    context.expect(reservoir != nullptr && junction != nullptr && pipe != nullptr,
+        "EPSG:3089 geometry fixture entities must be imported");
+    if (reservoir == nullptr || junction == nullptr || pipe == nullptr)
+        return;
+
+    context.expectNear(reservoir->coordinate_wgs84.longitude_deg, -85.576008643001,
+        numeric_tolerance, comparison("R1.longitude_deg"));
+    context.expectNear(reservoir->coordinate_wgs84.latitude_deg, 38.049062826866,
+        numeric_tolerance, comparison("R1.latitude_deg"));
+    context.expectNear(junction->coordinate_wgs84.longitude_deg, -85.6445120695213,
+        numeric_tolerance, comparison("J1.longitude_deg"));
+    context.expectNear(junction->coordinate_wgs84.latitude_deg, 38.0193468587353,
+        numeric_tolerance, comparison("J1.latitude_deg"));
+    context.expectEqual(static_cast<std::int64_t>(pipe->vertices.size()), std::int64_t{1},
+        comparison("P1.vertices.size"));
+    if (!pipe->vertices.isEmpty())
+    {
+        context.expectNear(pipe->vertices.first().coordinate_wgs84.longitude_deg, -85.6102672510135,
+            numeric_tolerance, comparison("P1.vertex.longitude_deg"));
+        context.expectNear(pipe->vertices.first().coordinate_wgs84.latitude_deg, 38.0342098384877,
+            numeric_tolerance, comparison("P1.vertex.latitude_deg"));
+    }
+
+    context.expectEqual(static_cast<std::int64_t>(network.map_labels.size()), std::int64_t{1},
+        comparison("map_labels.size"));
+    if (!network.map_labels.isEmpty())
+    {
+        const HydraulicMapLabel &label = network.map_labels.first();
+        context.expectNear(label.coordinate_wgs84.longitude_deg, -85.5108617949970,
+            numeric_tolerance, comparison("label.longitude_deg"));
+        context.expectNear(label.coordinate_wgs84.latitude_deg, 38.0565065341553,
+            numeric_tolerance, comparison("label.latitude_deg"));
+    }
+    context.expect(network.map_backdrop.enabled, "EPSG:3089 backdrop must be imported");
+    context.expectNear(network.map_backdrop.lower_left_wgs84.longitude_deg, -85.7173919677734,
+        numeric_tolerance, comparison("backdrop.lower_left.longitude_deg"));
+    context.expectNear(network.map_backdrop.lower_left_wgs84.latitude_deg, 37.9274092226777,
+        numeric_tolerance, comparison("backdrop.lower_left.latitude_deg"));
+    context.expectNear(network.map_backdrop.upper_right_wgs84.longitude_deg, -85.4585266113278,
+        numeric_tolerance, comparison("backdrop.upper_right.longitude_deg"));
+    context.expectNear(network.map_backdrop.upper_right_wgs84.latitude_deg, 38.1561569699247,
+        numeric_tolerance, comparison("backdrop.upper_right.latitude_deg"));
+    context.expect(hasDiagnosticContaining(result, QStringLiteral("explicit EPSG")),
+        "EPSG:3089 import must document its CRS transformation");
+}
+
+void scenarioImportGeometryUnknownEpsg(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GEOMETRY_UNKNOWN_EPSG_INP));
+    context.expect(result.status.success, "unsupported-EPSG geometry fixture must remain importable");
+    context.expect(!result.complete, "unsupported EPSG geometry must mark the import incomplete");
+    context.expect(result.source_geometry.epsg_code_declared,
+        "unsupported EPSG code must still be retained");
+    context.expectEqual(static_cast<std::int64_t>(result.source_geometry.epsg_code),
+        std::int64_t{999999}, comparison("source_geometry.epsg_code"));
+    context.expect(!result.source_geometry.georeferenced,
+        "unsupported EPSG geometry must not be claimed as georeferenced");
+
+    const NetworkHydraulic &network = result.request.network;
+    const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
+    const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
+    context.expect(reservoir != nullptr && junction != nullptr,
+        "unsupported-EPSG fixture nodes must be imported");
+    if (reservoir == nullptr || junction == nullptr)
+        return;
+
+    context.expectNear(
+        greatCircleDistanceM(reservoir->coordinate_wgs84, junction->coordinate_wgs84),
+        1000.0,
+        NumericTolerance{0.05, 0.0},
+        comparison("null-island-distance"));
+    context.expect(std::abs((reservoir->coordinate_wgs84.longitude_deg + junction->coordinate_wgs84.longitude_deg) / 2.0) < 1.0e-8,
+        "unsupported EPSG fallback must remain centered on Null Island longitude");
+    context.expect(std::abs((reservoir->coordinate_wgs84.latitude_deg + junction->coordinate_wgs84.latitude_deg) / 2.0) < 1.0e-8,
+        "unsupported EPSG fallback must remain centered on Null Island latitude");
+    context.expect(hasDiagnosticContaining(result, QStringLiteral("does not support")),
+        "unsupported EPSG import must explain that no projection was guessed");
+}
+
 void scenarioImportGeometryMeters(TestContext &context)
 {
     const EpanetResultImport result = EpanetRunner().importInp(
         QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GEOMETRY_METERS_INP));
     context.expect(result.status.success, "metric geometry fixture must import successfully");
+    context.expect(result.source_geometry.units == EpanetImportMapUnits::Meters,
+        "metric source units must be retained");
+    context.expect(!result.source_geometry.georeferenced,
+        "metric geometry without a CRS must remain explicitly unreferenced");
+    context.expect(result.source_geometry.node_coordinates.contains(QStringLiteral("R1")),
+        "original metric coordinates must be retained alongside Null Island geometry");
 
     const NetworkHydraulic &network = result.request.network;
     const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
@@ -2298,6 +2424,16 @@ void registerInpImportScenarios(ScenarioRegistry &registry)
         "Imports EPANET degree coordinates, link vertices, labels, and backdrop geometry directly as WGS84.",
         {"conformance", "import", "coordinate"},
         &scenarioImportGeometryDegrees});
+    registry.add(ScenarioDefinition{
+        "conformance-import-geometry-epsg3089-wgs84",
+        "Imports explicit EPSG:3089 Kentucky projected coordinates, vertices, labels, and backdrop geometry into their real WGS84 location while retaining original source geometry.",
+        {"conformance", "import", "coordinate"},
+        &scenarioImportGeometryEpsg3089});
+    registry.add(ScenarioDefinition{
+        "conformance-import-geometry-unknown-epsg-null-island",
+        "Retains an unsupported explicit EPSG code, refuses to guess its projection, marks import incomplete, and uses Null Island fallback geometry.",
+        {"conformance", "import", "coordinate", "negative"},
+        &scenarioImportGeometryUnknownEpsg});
     registry.add(ScenarioDefinition{
         "conformance-import-geometry-meters-null-island",
         "Imports metric EPANET map coordinates through GeographicLib and centers the preserved metric layout at WGS84 0°,0°.",
