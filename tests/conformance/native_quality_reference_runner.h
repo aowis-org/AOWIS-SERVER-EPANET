@@ -27,7 +27,10 @@ struct NativeQualityReferenceTimeline
     QList<NativeQualityReferenceStep> results;
 };
 
-NativeQualityReferenceTimeline runNativeQualityReference(const QString &input_file, const NetworkHydraulic &network);
+NativeQualityReferenceTimeline runNativeQualityReference(
+    const QString &input_file,
+    const NetworkHydraulic &network,
+    bool canonical_metric_units = false);
 }
 
 #endif // AOWIS_EPANET_NATIVE_QUALITY_REFERENCE_RUNNER_H

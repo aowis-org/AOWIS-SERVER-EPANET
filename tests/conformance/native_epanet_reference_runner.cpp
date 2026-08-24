@@ -1270,6 +1270,8 @@ NativeHydraulicTimeline runNativeEpanetReference(const NativeReferenceConfigurat
         checkEpanet(EN_open(project.handle(), input_file.constData(), report_file.constData(), ""), "EN_open");
         project.markProjectOpen();
         applyReferenceVariant(project.handle(), configuration.variant);
+        if (configuration.canonical_metric_units)
+            configureCanonicalMetricUnits(project.handle());
 
         const NativeUnitSystem units = readUnitSystem(project.handle());
 

@@ -101,9 +101,8 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
         QByteArray first_pattern_id;
         if (first_demand.pattern_mode == HydraulicTimePatternMode::Constant)
         {
-            if (this->constant_demand_pattern_id.isEmpty())
-                return makeEpanetStatus(HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Internal constant-demand pattern is unavailable"));
-            first_pattern_id = this->constant_demand_pattern_id.toUtf8();
+            if (!this->constant_demand_pattern_id.isEmpty())
+                first_pattern_id = this->constant_demand_pattern_id.toUtf8();
         }
         else if (!EpanetNetworkBuilderSupport::resolveBackendId(this->pattern_ids_by_uuid, first_demand.pattern_uuid, first_pattern_id))
         {
@@ -118,13 +117,16 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
                 return epanet_status;
         }
 
-        const QByteArray first_demand_name = first_demand.category_name.isEmpty() ? QByteArrayLiteral("Demand 1") : first_demand.category_name.toUtf8();
-        error = EN_setdemandname(this->project.handle(), junction_index, 1, first_demand_name.constData());
-        if (error != 0)
+        if (!first_demand.category_name.isEmpty())
         {
-            const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddDemand, QStringLiteral("EN_setdemandname"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to name primary junction demand"));
-            if (!epanet_status.success)
-                return epanet_status;
+            const QByteArray first_demand_name = first_demand.category_name.toUtf8();
+            error = EN_setdemandname(this->project.handle(), junction_index, 1, first_demand_name.constData());
+            if (error != 0)
+            {
+                const HydraulicSimulationStatus epanet_status = processEpanetReturnCode(this->project, error, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::AddDemand, QStringLiteral("EN_setdemandname"), HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Failed to name primary junction demand"));
+                if (!epanet_status.success)
+                    return epanet_status;
+            }
         }
 
         for (int index = 1; index < junction.demands.length(); index++)
@@ -133,16 +135,15 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
             QByteArray pattern_id;
             if (demand.pattern_mode == HydraulicTimePatternMode::Constant)
             {
-                if (this->constant_demand_pattern_id.isEmpty())
-                    return makeEpanetStatus(HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Internal constant-demand pattern is unavailable"));
-                pattern_id = this->constant_demand_pattern_id.toUtf8();
+                if (!this->constant_demand_pattern_id.isEmpty())
+                    pattern_id = this->constant_demand_pattern_id.toUtf8();
             }
             else if (!EpanetNetworkBuilderSupport::resolveBackendId(this->pattern_ids_by_uuid, demand.pattern_uuid, pattern_id))
             {
                 return makeEpanetStatus(HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusOperation::ResolveEntity, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid, QStringLiteral("Could not resolve demand pattern UUID"));
             }
 
-            const QByteArray demand_name = demand.category_name.isEmpty() ? QStringLiteral("Demand %1").arg(index + 1).toUtf8() : demand.category_name.toUtf8();
+            const QByteArray demand_name = demand.category_name.toUtf8();
             error = EN_adddemand(this->project.handle(), junction_index, demand.base_demand_m3_per_h, pattern_id.constData(), demand_name.constData());
             if (error != 0)
             {

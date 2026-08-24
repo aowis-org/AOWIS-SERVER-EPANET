@@ -92,6 +92,116 @@ QString mapNumber(double value)
     return QString::number(value, 'g', 15);
 }
 
+QString internalConstantDemandPatternId(const NetworkHydraulic &network)
+{
+    if (network.options_hydraulic.default_demand_pattern_uuid.isNull())
+        return QString();
+
+    bool has_constant_demand = false;
+    for (const HydraulicNodeJunction &junction : network.nodes_junctions)
+    {
+        for (const HydraulicNodeJunctionDemand &demand : junction.demands)
+        {
+            if (demand.pattern_mode == HydraulicTimePatternMode::Constant)
+            {
+                has_constant_demand = true;
+                break;
+            }
+        }
+        if (has_constant_demand)
+            break;
+    }
+    if (!has_constant_demand)
+        return QString();
+
+    QString pattern_id = QStringLiteral("__AOWIS_CONSTANT");
+    int suffix = 1;
+    while (true)
+    {
+        bool id_in_use = false;
+        for (const HydraulicPatternTime &pattern : network.patterns_time)
+        {
+            if (pattern.id == pattern_id)
+            {
+                id_in_use = true;
+                break;
+            }
+        }
+        if (!id_in_use)
+            return pattern_id;
+        pattern_id = QStringLiteral("__AOWIS_CONSTANT_%1").arg(suffix++);
+    }
+}
+
+QHash<QUuid, QString> demandPatternIdsByUuid(const NetworkHydraulic &network)
+{
+    QHash<QUuid, QString> pattern_ids;
+    for (const HydraulicPatternTime &pattern : network.patterns_time)
+        pattern_ids.insert(pattern.uuid, pattern.id);
+    return pattern_ids;
+}
+
+QString preserveDemandCategories(QString inp_text, const NetworkHydraulic &network)
+{
+    QStringList lines = inp_text.split(QChar('\n'));
+    int demands_section_index = -1;
+    int next_section_index = lines.size();
+    for (int index = 0; index < lines.size(); index++)
+    {
+        const QString trimmed = lines.at(index).trimmed();
+        if (trimmed.compare(QStringLiteral("[DEMANDS]"), Qt::CaseInsensitive) == 0)
+        {
+            demands_section_index = index;
+            continue;
+        }
+        if (demands_section_index >= 0
+            && index > demands_section_index
+            && trimmed.startsWith(QChar('[')))
+        {
+            next_section_index = index;
+            break;
+        }
+    }
+    if (demands_section_index < 0)
+        return inp_text;
+
+    while (next_section_index > demands_section_index + 1)
+    {
+        lines.removeAt(demands_section_index + 1);
+        next_section_index--;
+    }
+
+    const QHash<QUuid, QString> pattern_ids = demandPatternIdsByUuid(network);
+    const QString constant_pattern_id = internalConstantDemandPatternId(network);
+    QStringList demand_lines;
+    demand_lines.append(QStringLiteral(";;Junction\tDemand\tPattern\tCategory"));
+    for (const HydraulicNodeJunction &junction : network.nodes_junctions)
+    {
+        for (const HydraulicNodeJunctionDemand &demand : junction.demands)
+        {
+            QString pattern_id;
+            if (demand.pattern_mode == HydraulicTimePatternMode::TimePattern)
+                pattern_id = pattern_ids.value(demand.pattern_uuid);
+            else
+                pattern_id = constant_pattern_id;
+
+            QString line = QStringLiteral(" %1\t%2\t%3")
+                .arg(junction.id,
+                    QString::number(demand.base_demand_m3_per_h, 'g', 17),
+                    pattern_id);
+            if (!demand.category_name.isEmpty())
+                line += QStringLiteral("\t;%1").arg(demand.category_name);
+            demand_lines.append(line);
+        }
+    }
+    demand_lines.append(QString());
+
+    for (int index = 0; index < demand_lines.size(); index++)
+        lines.insert(demands_section_index + 1 + index, demand_lines.at(index));
+
+    return lines.join(QChar('\n'));
+}
+
 QString preserveMapLayoutSections(QString inp_text, const NetworkHydraulic &network)
 {
     QStringList lines = inp_text.split(QChar('\n'));
@@ -418,6 +528,13 @@ HydraulicSimulationStatus retrieveEpanetInpText(
         return makeEpanetStatus(HydraulicSimulationStatusStage::GenerateReport, HydraulicSimulationStatusOperation::GenerateReport, HydraulicSimulationStatusEntityType::Project, QString(), QStringLiteral("Failed while reading the EPANET INP export: %1").arg(inp_file.errorString()));
 
     inp_text = normalizeSavedRuleFillDrainTimes(QString::fromUtf8(inp_data));
+
+    // EPANET's native writer rounds demand values and assigns generated names
+    // to otherwise unnamed categories. Rebuild [DEMANDS] from the canonical
+    // model so numerical precision and explicit empty category names survive
+    // AOWIS export/re-import.
+    inp_text = preserveDemandCategories(inp_text, request);
+
     if (default_demand_pattern_index == 0.0)
     {
         QString unused_pattern_id = QStringLiteral("__AOWIS_NO_DEFAULT");

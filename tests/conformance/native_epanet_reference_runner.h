@@ -228,6 +228,7 @@ struct NativeReferenceConfiguration
     QString input_file;
     QHash<int, QString> control_ids_by_index;
     NativeReferenceVariant variant = NativeReferenceVariant::None;
+    bool canonical_metric_units = false;
 };
 
 NativeHydraulicTimeline runNativeEpanetReference(const NativeReferenceConfiguration &configuration);

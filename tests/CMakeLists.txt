@@ -153,6 +153,13 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-import-report-setting-threshold-canonical
     conformance-import-report-setting-threshold-diagnostic
     conformance-import-open-error-diagnostic
+    conformance-import-quality-roundtrip-official-net1
+    conformance-import-quality-roundtrip-official-net2
+    conformance-import-quality-roundtrip-official-net3
+    conformance-import-quality-roundtrip-upstream-demand-categories
+    conformance-import-quality-roundtrip-upstream-tank-overflow
+    conformance-import-roundtrip-upstream-network-builder
+    conformance-import-roundtrip-upstream-network-builder-small
     conformance-export-native-reopen
     conformance-export-titles-comments-tags
     conformance-export-patterns-curves
@@ -259,6 +266,9 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/hydraulic_behavior_scenarios.h
     conformance/input_mapping_scenarios.h
     conformance/inp_import_scenarios.h
+    conformance/inp_roundtrip_proof.cpp
+    conformance/inp_roundtrip_proof.h
+    conformance/inp_roundtrip_proof_scenarios.h
     conformance/pump_scenarios.h
     conformance/valve_scenarios.h
     conformance/controls_options_operations_scenarios.h
@@ -274,6 +284,7 @@ add_executable(aowis-server-epanet-conformance-tests
     test_hydraulic_behavior_conformance.cpp
     test_input_mapping_conformance.cpp
     test_inp_import_conformance.cpp
+    test_inp_roundtrip_proof.cpp
     test_pump_conformance.cpp
     test_valve_conformance.cpp
     test_controls_options_operations_conformance.cpp
@@ -299,6 +310,12 @@ target_compile_features(aowis-server-epanet-conformance-tests PRIVATE cxx_std_20
 target_compile_definitions(aowis-server-epanet-conformance-tests
     PRIVATE
         AOWIS_EPANET_TEST_NET1_INP="${PROJECT_SOURCE_DIR}/external/epanet/example-networks/Net1.inp"
+        AOWIS_EPANET_TEST_NET2_INP="${PROJECT_SOURCE_DIR}/external/epanet/example-networks/Net2.inp"
+        AOWIS_EPANET_TEST_NET3_INP="${PROJECT_SOURCE_DIR}/external/epanet/example-networks/Net3.inp"
+        AOWIS_EPANET_TEST_UPSTREAM_DEMAND_CATEGORIES_INP="${PROJECT_SOURCE_DIR}/external/epanet/tests/data/net1_dem_cat.inp"
+        AOWIS_EPANET_TEST_UPSTREAM_TANK_OVERFLOW_INP="${PROJECT_SOURCE_DIR}/external/epanet/tests/data/test_overflow.inp"
+        AOWIS_EPANET_TEST_UPSTREAM_NETWORK_BUILDER_INP="${PROJECT_SOURCE_DIR}/external/epanet/tests/data/net_builder.inp"
+        AOWIS_EPANET_TEST_UPSTREAM_NETWORK_BUILDER_SMALL_INP="${PROJECT_SOURCE_DIR}/external/epanet/tests/data/netbuilder_test2.inp"
         AOWIS_EPANET_TEST_IMPORT_GLOBAL_OPTIONS_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_global_options_us.inp"
         AOWIS_EPANET_TEST_IMPORT_CORE_TOPOLOGY_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_core_topology_us.inp"
         AOWIS_EPANET_TEST_IMPORT_PUMPS_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_patterns_curves_pumps_us.inp"
@@ -376,7 +393,8 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "proof")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-reentrancy-independent-runners")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "quality" "proof")
-    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-import-quality-net1-equivalence")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-import-quality-net1-equivalence"
+           OR AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-import-(quality-)?roundtrip-")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "proof")
     endif()
 

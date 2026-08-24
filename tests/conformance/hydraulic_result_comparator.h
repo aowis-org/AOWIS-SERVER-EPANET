@@ -13,6 +13,12 @@ void compareHydraulicTimelines(const NativeHydraulicTimeline &expected,
     const EpanetResultRun &actual,
     const NetworkHydraulic &network,
     TestContext &context);
+
+void compareHydraulicTimelines(const NativeHydraulicTimeline &expected,
+    const EpanetResultRun &actual,
+    const NetworkHydraulic &network,
+    TestContext &context,
+    double tolerance_scale);
 }
 
 #endif // AOWIS_EPANET_HYDRAULIC_RESULT_COMPARATOR_H

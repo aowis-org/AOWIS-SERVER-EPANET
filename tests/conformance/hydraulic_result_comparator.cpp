@@ -11,6 +11,17 @@ namespace
 {
 constexpr NumericTolerance kSolverRelativeErrorTolerance{5.0e-8, 1.0e-7};
 
+NumericTolerance scaledTolerance(HydraulicQuantity quantity, double tolerance_scale)
+{
+    const NumericTolerance tolerance = toleranceFor(quantity);
+    return {tolerance.absolute * tolerance_scale, tolerance.relative * tolerance_scale};
+}
+
+NumericTolerance scaledTolerance(NumericTolerance tolerance, double tolerance_scale)
+{
+    return {tolerance.absolute * tolerance_scale, tolerance.relative * tolerance_scale};
+}
+
 ComparisonContext comparison(std::string field, std::int64_t time_s = -1, std::string entity_type = {}, std::string entity_id = {})
 {
     ComparisonContext value;
@@ -202,7 +213,7 @@ HydraulicSimulationTimestepEventType modelEventType(NativeTimestepEventType type
     return HydraulicSimulationTimestepEventType::HydraulicStep;
 }
 
-void compareJunctions(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context)
+void compareJunctions(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.nodes_junctions.size()),
         static_cast<std::int64_t>(expected.nodes_junctions.size()),
@@ -225,27 +236,27 @@ void compareJunctions(const NativeHydraulicResult &expected, const HydraulicSimu
         context.expectEqual(actual_junction->id.toStdString(), id,
             comparison("id", expected.time_elapsed_s, "Junction", id));
         context.expectNear(actual_junction->demand_requested_m3_per_h, expected_junction.demand_requested_m3_per_h,
-            HydraulicQuantity::FlowM3PerHour, comparison("demand_requested_m3_per_h", expected.time_elapsed_s, "Junction", id));
+            scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("demand_requested_m3_per_h", expected.time_elapsed_s, "Junction", id));
         context.expectNear(actual_junction->demand_delivered_m3_per_h, expected_junction.demand_delivered_m3_per_h,
-            HydraulicQuantity::FlowM3PerHour, comparison("demand_delivered_m3_per_h", expected.time_elapsed_s, "Junction", id));
+            scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("demand_delivered_m3_per_h", expected.time_elapsed_s, "Junction", id));
         context.expectNear(actual_junction->demand_deficit_m3_per_h, expected_junction.demand_deficit_m3_per_h,
-            HydraulicQuantity::FlowM3PerHour, comparison("demand_deficit_m3_per_h", expected.time_elapsed_s, "Junction", id));
+            scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("demand_deficit_m3_per_h", expected.time_elapsed_s, "Junction", id));
         context.expectNear(actual_junction->total_demand_m3_per_h, expected_junction.total_demand_m3_per_h,
-            HydraulicQuantity::FlowM3PerHour, comparison("total_demand_m3_per_h", expected.time_elapsed_s, "Junction", id));
+            scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("total_demand_m3_per_h", expected.time_elapsed_s, "Junction", id));
         context.expectNear(actual_junction->emitter_flow_m3_per_h, expected_junction.emitter_flow_m3_per_h,
-            HydraulicQuantity::FlowM3PerHour, comparison("emitter_flow_m3_per_h", expected.time_elapsed_s, "Junction", id));
+            scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("emitter_flow_m3_per_h", expected.time_elapsed_s, "Junction", id));
         context.expectNear(actual_junction->leakage_flow_m3_per_h, expected_junction.leakage_flow_m3_per_h,
-            HydraulicQuantity::FlowM3PerHour, comparison("leakage_flow_m3_per_h", expected.time_elapsed_s, "Junction", id));
+            scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("leakage_flow_m3_per_h", expected.time_elapsed_s, "Junction", id));
         context.expectNear(actual_junction->hydraulic_head_m, expected_junction.hydraulic_head_m,
-            HydraulicQuantity::HeadMetres, comparison("hydraulic_head_m", expected.time_elapsed_s, "Junction", id));
+            scaledTolerance(HydraulicQuantity::HeadMetres, tolerance_scale), comparison("hydraulic_head_m", expected.time_elapsed_s, "Junction", id));
         context.expectNear(actual_junction->pressure_head_m, expected_junction.pressure_head_m,
-            HydraulicQuantity::PressureHeadMetres, comparison("pressure_head_m", expected.time_elapsed_s, "Junction", id));
+            scaledTolerance(HydraulicQuantity::PressureHeadMetres, tolerance_scale), comparison("pressure_head_m", expected.time_elapsed_s, "Junction", id));
         context.expectEqual(actual_junction->appears_in_control, expected_junction.appears_in_control,
             comparison("appears_in_control", expected.time_elapsed_s, "Junction", id));
     }
 }
 
-void compareReservoirs(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context)
+void compareReservoirs(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.nodes_reservoirs.size()),
         static_cast<std::int64_t>(expected.nodes_reservoirs.size()),
@@ -268,17 +279,17 @@ void compareReservoirs(const NativeHydraulicResult &expected, const HydraulicSim
         context.expectEqual(actual_reservoir->id.toStdString(), id,
             comparison("id", expected.time_elapsed_s, "Reservoir", id));
         context.expectNear(actual_reservoir->net_demand_m3_per_h, expected_reservoir.net_demand_m3_per_h,
-            HydraulicQuantity::FlowM3PerHour, comparison("net_demand_m3_per_h", expected.time_elapsed_s, "Reservoir", id));
+            scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("net_demand_m3_per_h", expected.time_elapsed_s, "Reservoir", id));
         context.expectNear(actual_reservoir->hydraulic_head_m, expected_reservoir.hydraulic_head_m,
-            HydraulicQuantity::HeadMetres, comparison("hydraulic_head_m", expected.time_elapsed_s, "Reservoir", id));
+            scaledTolerance(HydraulicQuantity::HeadMetres, tolerance_scale), comparison("hydraulic_head_m", expected.time_elapsed_s, "Reservoir", id));
         context.expectNear(actual_reservoir->pressure_head_m, expected_reservoir.pressure_head_m,
-            HydraulicQuantity::PressureHeadMetres, comparison("pressure_head_m", expected.time_elapsed_s, "Reservoir", id));
+            scaledTolerance(HydraulicQuantity::PressureHeadMetres, tolerance_scale), comparison("pressure_head_m", expected.time_elapsed_s, "Reservoir", id));
         context.expectEqual(actual_reservoir->appears_in_control, expected_reservoir.appears_in_control,
             comparison("appears_in_control", expected.time_elapsed_s, "Reservoir", id));
     }
 }
 
-void compareTanks(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context)
+void compareTanks(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.nodes_tanks.size()),
         static_cast<std::int64_t>(expected.nodes_tanks.size()),
@@ -301,23 +312,23 @@ void compareTanks(const NativeHydraulicResult &expected, const HydraulicSimulati
         context.expectEqual(actual_tank->id.toStdString(), id,
             comparison("id", expected.time_elapsed_s, "Tank", id));
         context.expectNear(actual_tank->net_demand_m3_per_h, expected_tank.net_demand_m3_per_h,
-            HydraulicQuantity::FlowM3PerHour, comparison("net_demand_m3_per_h", expected.time_elapsed_s, "Tank", id));
+            scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("net_demand_m3_per_h", expected.time_elapsed_s, "Tank", id));
         context.expectNear(actual_tank->hydraulic_head_m, expected_tank.hydraulic_head_m,
-            HydraulicQuantity::HeadMetres, comparison("hydraulic_head_m", expected.time_elapsed_s, "Tank", id));
+            scaledTolerance(HydraulicQuantity::HeadMetres, tolerance_scale), comparison("hydraulic_head_m", expected.time_elapsed_s, "Tank", id));
         context.expectNear(actual_tank->pressure_head_m, expected_tank.pressure_head_m,
-            HydraulicQuantity::PressureHeadMetres, comparison("pressure_head_m", expected.time_elapsed_s, "Tank", id));
+            scaledTolerance(HydraulicQuantity::PressureHeadMetres, tolerance_scale), comparison("pressure_head_m", expected.time_elapsed_s, "Tank", id));
         context.expectNear(actual_tank->water_level_m, expected_tank.water_level_m,
-            HydraulicQuantity::LengthMetres, comparison("water_level_m", expected.time_elapsed_s, "Tank", id));
+            scaledTolerance(HydraulicQuantity::LengthMetres, tolerance_scale), comparison("water_level_m", expected.time_elapsed_s, "Tank", id));
         context.expectNear(actual_tank->volume_m3, expected_tank.volume_m3,
-            HydraulicQuantity::VolumeM3, comparison("volume_m3", expected.time_elapsed_s, "Tank", id));
+            scaledTolerance(HydraulicQuantity::VolumeM3, tolerance_scale), comparison("volume_m3", expected.time_elapsed_s, "Tank", id));
         context.expectNear(actual_tank->mixing_zone_volume_m3, expected_tank.mixing_zone_volume_m3,
-            HydraulicQuantity::VolumeM3, comparison("mixing_zone_volume_m3", expected.time_elapsed_s, "Tank", id));
+            scaledTolerance(HydraulicQuantity::VolumeM3, tolerance_scale), comparison("mixing_zone_volume_m3", expected.time_elapsed_s, "Tank", id));
         context.expectEqual(actual_tank->appears_in_control, expected_tank.appears_in_control,
             comparison("appears_in_control", expected.time_elapsed_s, "Tank", id));
     }
 }
 
-void comparePipeRoughness(const NativePipeResult &expected, const HydraulicSimulationResultLinkPipe &actual, HydraulicHeadlossFormula formula, std::int64_t time_s, TestContext &context)
+void comparePipeRoughness(const NativePipeResult &expected, const HydraulicSimulationResultLinkPipe &actual, HydraulicHeadlossFormula formula, std::int64_t time_s, TestContext &context, double tolerance_scale)
 {
     const std::string id = expected.id.toStdString();
     switch (formula)
@@ -326,27 +337,27 @@ void comparePipeRoughness(const NativePipeResult &expected, const HydraulicSimul
         context.expect(actual.roughness_hazen_williams.has_value(), "Hazen-Williams pipe result is missing roughness");
         context.expect(!actual.roughness_darcy_weisbach_mm.has_value() && !actual.roughness_chezy_manning.has_value(), "Hazen-Williams pipe result populated the wrong roughness fields");
         if (actual.roughness_hazen_williams.has_value())
-            context.expectNear(actual.roughness_hazen_williams.value(), expected.roughness, HydraulicQuantity::Setting,
+            context.expectNear(actual.roughness_hazen_williams.value(), expected.roughness, scaledTolerance(HydraulicQuantity::Setting, tolerance_scale),
                 comparison("roughness_hazen_williams", time_s, "Pipe", id));
         break;
     case HydraulicHeadlossFormula::DarcyWeisbach:
         context.expect(actual.roughness_darcy_weisbach_mm.has_value(), "Darcy-Weisbach pipe result is missing roughness");
         context.expect(!actual.roughness_hazen_williams.has_value() && !actual.roughness_chezy_manning.has_value(), "Darcy-Weisbach pipe result populated the wrong roughness fields");
         if (actual.roughness_darcy_weisbach_mm.has_value())
-            context.expectNear(actual.roughness_darcy_weisbach_mm.value(), expected.roughness, HydraulicQuantity::Setting,
+            context.expectNear(actual.roughness_darcy_weisbach_mm.value(), expected.roughness, scaledTolerance(HydraulicQuantity::Setting, tolerance_scale),
                 comparison("roughness_darcy_weisbach_mm", time_s, "Pipe", id));
         break;
     case HydraulicHeadlossFormula::ChezyManning:
         context.expect(actual.roughness_chezy_manning.has_value(), "Chezy-Manning pipe result is missing roughness");
         context.expect(!actual.roughness_hazen_williams.has_value() && !actual.roughness_darcy_weisbach_mm.has_value(), "Chezy-Manning pipe result populated the wrong roughness fields");
         if (actual.roughness_chezy_manning.has_value())
-            context.expectNear(actual.roughness_chezy_manning.value(), expected.roughness, HydraulicQuantity::Setting,
+            context.expectNear(actual.roughness_chezy_manning.value(), expected.roughness, scaledTolerance(HydraulicQuantity::Setting, tolerance_scale),
                 comparison("roughness_chezy_manning", time_s, "Pipe", id));
         break;
     }
 }
 
-void comparePipes(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context)
+void comparePipes(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.links_pipes.size()),
         static_cast<std::int64_t>(expected.links_pipes.size()),
@@ -369,15 +380,15 @@ void comparePipes(const NativeHydraulicResult &expected, const HydraulicSimulati
         context.expectEqual(actual_pipe->id.toStdString(), id,
             comparison("id", expected.time_elapsed_s, "Pipe", id));
         context.expectNear(actual_pipe->flow_m3_per_h, expected_pipe.flow_m3_per_h,
-            HydraulicQuantity::FlowM3PerHour, comparison("flow_m3_per_h", expected.time_elapsed_s, "Pipe", id));
+            scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("flow_m3_per_h", expected.time_elapsed_s, "Pipe", id));
         context.expectNear(actual_pipe->leakage_flow_m3_per_h, expected_pipe.leakage_flow_m3_per_h,
-            HydraulicQuantity::FlowM3PerHour, comparison("leakage_flow_m3_per_h", expected.time_elapsed_s, "Pipe", id));
+            scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("leakage_flow_m3_per_h", expected.time_elapsed_s, "Pipe", id));
         context.expectNear(actual_pipe->velocity_m_per_s, expected_pipe.velocity_m_per_s,
-            HydraulicQuantity::VelocityMetresPerSecond, comparison("velocity_m_per_s", expected.time_elapsed_s, "Pipe", id));
+            scaledTolerance(HydraulicQuantity::VelocityMetresPerSecond, tolerance_scale), comparison("velocity_m_per_s", expected.time_elapsed_s, "Pipe", id));
         context.expectNear(actual_pipe->head_loss_m, expected_pipe.head_loss_m,
-            HydraulicQuantity::HeadMetres, comparison("head_loss_m", expected.time_elapsed_s, "Pipe", id));
+            scaledTolerance(HydraulicQuantity::HeadMetres, tolerance_scale), comparison("head_loss_m", expected.time_elapsed_s, "Pipe", id));
         context.expectNear(actual_pipe->head_loss_gradient_m_per_km, expected_pipe.head_loss_gradient_m_per_km,
-            HydraulicQuantity::HeadMetres, comparison("head_loss_gradient_m_per_km", expected.time_elapsed_s, "Pipe", id));
+            scaledTolerance(HydraulicQuantity::HeadMetres, tolerance_scale), comparison("head_loss_gradient_m_per_km", expected.time_elapsed_s, "Pipe", id));
 
         // EPANET reports an equivalent friction factor reconstructed from head loss / flow^2.
         // Near a stagnant state both quantities are solver residuals, so changing only the
@@ -385,13 +396,13 @@ void comparePipes(const NativeHydraulicResult &expected, const HydraulicSimulati
         // round-off into a visibly different friction factor even when the hydraulic state
         // itself agrees. Only compare the derived value when head loss is resolvable at the
         // same absolute scale used by the primary head-loss conformance check.
-        const NumericTolerance head_loss_tolerance = toleranceFor(HydraulicQuantity::HeadMetres);
+        const NumericTolerance head_loss_tolerance = scaledTolerance(HydraulicQuantity::HeadMetres, tolerance_scale);
         const bool friction_factor_resolvable =
             std::max(std::abs(actual_pipe->head_loss_m), std::abs(expected_pipe.head_loss_m)) > head_loss_tolerance.absolute;
         if (friction_factor_resolvable)
         {
             context.expectNear(actual_pipe->friction_factor, expected_pipe.friction_factor,
-                HydraulicQuantity::FrictionFactor, comparison("friction_factor", expected.time_elapsed_s, "Pipe", id));
+                scaledTolerance(HydraulicQuantity::FrictionFactor, tolerance_scale), comparison("friction_factor", expected.time_elapsed_s, "Pipe", id));
         }
 
         context.expectEqual(actual_pipe->open, expected_pipe.open,
@@ -399,11 +410,11 @@ void comparePipes(const NativeHydraulicResult &expected, const HydraulicSimulati
         context.expectEqual(actual_pipe->appears_in_control, expected_pipe.appears_in_control,
             comparison("appears_in_control", expected.time_elapsed_s, "Pipe", id));
         comparePipeRoughness(expected_pipe, *actual_pipe, network.options_hydraulic.headloss_formula,
-            expected.time_elapsed_s, context);
+            expected.time_elapsed_s, context, tolerance_scale);
     }
 }
 
-void comparePumps(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context)
+void comparePumps(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.links_pumps.size()),
         static_cast<std::int64_t>(expected.links_pumps.size()),
@@ -426,28 +437,28 @@ void comparePumps(const NativeHydraulicResult &expected, const HydraulicSimulati
         context.expectEqual(actual_pump->id.toStdString(), id,
             comparison("id", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_pump->flow_m3_per_h, expected_pump.flow_m3_per_h,
-            HydraulicQuantity::FlowM3PerHour, comparison("flow_m3_per_h", expected.time_elapsed_s, "Pump", id));
+            scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("flow_m3_per_h", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_pump->velocity_m_per_s, expected_pump.velocity_m_per_s,
-            HydraulicQuantity::VelocityMetresPerSecond, comparison("velocity_m_per_s", expected.time_elapsed_s, "Pump", id));
+            scaledTolerance(HydraulicQuantity::VelocityMetresPerSecond, tolerance_scale), comparison("velocity_m_per_s", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_pump->head_gain_m, expected_pump.head_gain_m,
-            HydraulicQuantity::HeadMetres, comparison("head_gain_m", expected.time_elapsed_s, "Pump", id));
+            scaledTolerance(HydraulicQuantity::HeadMetres, tolerance_scale), comparison("head_gain_m", expected.time_elapsed_s, "Pump", id));
         context.expectEqual(actual_pump->open, expected_pump.open,
             comparison("open", expected.time_elapsed_s, "Pump", id));
         context.expectEqual(static_cast<std::int64_t>(actual_pump->state),
             static_cast<std::int64_t>(modelPumpState(expected_pump.state)),
             comparison("state", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_pump->speed_ratio, expected_pump.speed_ratio,
-            HydraulicQuantity::Setting, comparison("speed", expected.time_elapsed_s, "Pump", id));
+            scaledTolerance(HydraulicQuantity::Setting, tolerance_scale), comparison("speed", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_pump->efficiency_percent, expected_pump.efficiency_percent,
-            HydraulicQuantity::Percent, comparison("efficiency_percent", expected.time_elapsed_s, "Pump", id));
+            scaledTolerance(HydraulicQuantity::Percent, tolerance_scale), comparison("efficiency_percent", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_pump->power_kw, expected_pump.power_kw,
-            HydraulicQuantity::PowerKw, comparison("power_kw", expected.time_elapsed_s, "Pump", id));
+            scaledTolerance(HydraulicQuantity::PowerKw, tolerance_scale), comparison("power_kw", expected.time_elapsed_s, "Pump", id));
         context.expectEqual(actual_pump->appears_in_control, expected_pump.appears_in_control,
             comparison("appears_in_control", expected.time_elapsed_s, "Pump", id));
     }
 }
 
-void compareValves(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context)
+void compareValves(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.links_valves.size()),
         static_cast<std::int64_t>(expected.links_valves.size()),
@@ -470,11 +481,11 @@ void compareValves(const NativeHydraulicResult &expected, const HydraulicSimulat
         context.expectEqual(actual_valve->id.toStdString(), id,
             comparison("id", expected.time_elapsed_s, "Valve", id));
         context.expectNear(actual_valve->flow_m3_per_h, expected_valve.flow_m3_per_h,
-            HydraulicQuantity::FlowM3PerHour, comparison("flow_m3_per_h", expected.time_elapsed_s, "Valve", id));
+            scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("flow_m3_per_h", expected.time_elapsed_s, "Valve", id));
         context.expectNear(actual_valve->velocity_m_per_s, expected_valve.velocity_m_per_s,
-            HydraulicQuantity::VelocityMetresPerSecond, comparison("velocity_m_per_s", expected.time_elapsed_s, "Valve", id));
+            scaledTolerance(HydraulicQuantity::VelocityMetresPerSecond, tolerance_scale), comparison("velocity_m_per_s", expected.time_elapsed_s, "Valve", id));
         context.expectNear(actual_valve->head_loss_m, expected_valve.head_loss_m,
-            HydraulicQuantity::HeadMetres, comparison("head_loss_m", expected.time_elapsed_s, "Valve", id));
+            scaledTolerance(HydraulicQuantity::HeadMetres, tolerance_scale), comparison("head_loss_m", expected.time_elapsed_s, "Valve", id));
         context.expectEqual(actual_valve->open, expected_valve.open,
             comparison("open", expected.time_elapsed_s, "Valve", id));
         context.expectEqual(actual_valve->active, expected_valve.active,
@@ -490,19 +501,19 @@ void compareValves(const NativeHydraulicResult &expected, const HydraulicSimulat
             case HydraulicLinkValveType::PSV:
             case HydraulicLinkValveType::PBV:
                 context.expectNear(actual_valve->setting_pressure_head_m, expected_valve.setting,
-                    HydraulicQuantity::HeadMetres, comparison("setting_pressure_head_m", expected.time_elapsed_s, "Valve", id));
+                    scaledTolerance(HydraulicQuantity::HeadMetres, tolerance_scale), comparison("setting_pressure_head_m", expected.time_elapsed_s, "Valve", id));
                 break;
             case HydraulicLinkValveType::FCV:
                 context.expectNear(actual_valve->setting_flow_m3_per_h, expected_valve.setting,
-                    HydraulicQuantity::FlowM3PerHour, comparison("setting_flow_m3_per_h", expected.time_elapsed_s, "Valve", id));
+                    scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("setting_flow_m3_per_h", expected.time_elapsed_s, "Valve", id));
                 break;
             case HydraulicLinkValveType::TCV:
                 context.expectNear(actual_valve->setting_loss_coefficient, expected_valve.setting,
-                    HydraulicQuantity::Setting, comparison("setting_loss_coefficient", expected.time_elapsed_s, "Valve", id));
+                    scaledTolerance(HydraulicQuantity::Setting, tolerance_scale), comparison("setting_loss_coefficient", expected.time_elapsed_s, "Valve", id));
                 break;
             case HydraulicLinkValveType::PCV:
                 context.expectNear(actual_valve->setting_position_percent, expected_valve.setting,
-                    HydraulicQuantity::Setting, comparison("setting_position_percent", expected.time_elapsed_s, "Valve", id));
+                    scaledTolerance(HydraulicQuantity::Setting, tolerance_scale), comparison("setting_position_percent", expected.time_elapsed_s, "Valve", id));
                 break;
             case HydraulicLinkValveType::GPV:
                 break;
@@ -513,7 +524,7 @@ void compareValves(const NativeHydraulicResult &expected, const HydraulicSimulat
     }
 }
 
-void compareStatistics(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, TestContext &context)
+void compareStatistics(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(actual.statistics.hydraulic_iterations, expected.statistics.hydraulic_iterations,
         comparison("statistics.hydraulic_iterations", expected.time_elapsed_s));
@@ -521,17 +532,17 @@ void compareStatistics(const NativeHydraulicResult &expected, const HydraulicSim
     // Equivalent networks expressed in different EPANET unit systems can follow slightly
     // different floating-point convergence paths while producing the same hydraulic state.
     context.expectNear(actual.statistics.relative_error, expected.statistics.relative_error,
-        kSolverRelativeErrorTolerance, comparison("statistics.relative_error", expected.time_elapsed_s));
+        scaledTolerance(kSolverRelativeErrorTolerance, tolerance_scale), comparison("statistics.relative_error", expected.time_elapsed_s));
     context.expectNear(actual.statistics.maximum_head_error_m, expected.statistics.maximum_head_error_m,
-        HydraulicQuantity::HeadMetres, comparison("statistics.maximum_head_error_m", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::HeadMetres, tolerance_scale), comparison("statistics.maximum_head_error_m", expected.time_elapsed_s));
     context.expectNear(actual.statistics.maximum_flow_change_m3_per_h, expected.statistics.maximum_flow_change_m3_per_h,
-        HydraulicQuantity::FlowM3PerHour, comparison("statistics.maximum_flow_change_m3_per_h", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("statistics.maximum_flow_change_m3_per_h", expected.time_elapsed_s));
     context.expectEqual(actual.statistics.deficient_nodes, expected.statistics.deficient_nodes,
         comparison("statistics.deficient_nodes", expected.time_elapsed_s));
     context.expectNear(actual.statistics.demand_reduction_percent, expected.statistics.demand_reduction_percent,
-        HydraulicQuantity::Percent, comparison("statistics.demand_reduction_percent", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::Percent, tolerance_scale), comparison("statistics.demand_reduction_percent", expected.time_elapsed_s));
     context.expectNear(actual.statistics.leakage_loss_percent, expected.statistics.leakage_loss_percent,
-        HydraulicQuantity::Percent, comparison("statistics.leakage_loss_percent", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::Percent, tolerance_scale), comparison("statistics.leakage_loss_percent", expected.time_elapsed_s));
 }
 
 void compareEvent(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context)
@@ -570,7 +581,7 @@ void compareEvent(const NativeHydraulicResult &expected, const HydraulicSimulati
     }
 }
 
-void comparePumpEnergy(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context)
+void comparePumpEnergy(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.links_pump_energy_usage.size()),
         static_cast<std::int64_t>(expected.links_pump_energy_usage.size()),
@@ -593,50 +604,50 @@ void comparePumpEnergy(const NativeHydraulicResult &expected, const HydraulicSim
         context.expectEqual(actual_usage->currency_iso4217.toStdString(), network.options_energy.currency_iso4217.toStdString(),
             comparison("currency_iso4217", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_usage->time_online_percent, expected_usage.time_online_percent,
-            HydraulicQuantity::Percent, comparison("time_online_percent", expected.time_elapsed_s, "Pump", id));
+            scaledTolerance(HydraulicQuantity::Percent, tolerance_scale), comparison("time_online_percent", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_usage->average_efficiency_percent, expected_usage.average_efficiency_percent,
-            HydraulicQuantity::Percent, comparison("average_efficiency_percent", expected.time_elapsed_s, "Pump", id));
+            scaledTolerance(HydraulicQuantity::Percent, tolerance_scale), comparison("average_efficiency_percent", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_usage->average_energy_intensity_kw_h_per_m3, expected_usage.average_energy_intensity_kw_h_per_m3,
-            NumericTolerance{1.0e-9, 1.0e-6}, comparison("average_energy_intensity_kw_h_per_m3", expected.time_elapsed_s, "Pump", id));
+            scaledTolerance(NumericTolerance{1.0e-9, 1.0e-6}, tolerance_scale), comparison("average_energy_intensity_kw_h_per_m3", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_usage->average_power_kw, expected_usage.average_power_kw,
-            HydraulicQuantity::PowerKw, comparison("average_power_kw", expected.time_elapsed_s, "Pump", id));
+            scaledTolerance(HydraulicQuantity::PowerKw, tolerance_scale), comparison("average_power_kw", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_usage->peak_power_kw, expected_usage.peak_power_kw,
-            HydraulicQuantity::PowerKw, comparison("peak_power_kw", expected.time_elapsed_s, "Pump", id));
+            scaledTolerance(HydraulicQuantity::PowerKw, tolerance_scale), comparison("peak_power_kw", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_usage->average_cost_per_day, expected_usage.average_cost_per_day,
-            HydraulicQuantity::Cost, comparison("average_cost_per_day", expected.time_elapsed_s, "Pump", id));
+            scaledTolerance(HydraulicQuantity::Cost, tolerance_scale), comparison("average_cost_per_day", expected.time_elapsed_s, "Pump", id));
     }
 }
 
-void compareSummaries(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context)
+void compareSummaries(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
 {
     context.expectNear(actual.flow_balance.total_inflow_m3_per_h, expected.flow_balance.total_inflow_m3_per_h,
-        HydraulicQuantity::FlowM3PerHour, comparison("flow_balance.total_inflow_m3_per_h", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("flow_balance.total_inflow_m3_per_h", expected.time_elapsed_s));
     context.expectNear(actual.flow_balance.total_outflow_m3_per_h, expected.flow_balance.total_outflow_m3_per_h,
-        HydraulicQuantity::FlowM3PerHour, comparison("flow_balance.total_outflow_m3_per_h", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("flow_balance.total_outflow_m3_per_h", expected.time_elapsed_s));
     context.expectNear(actual.flow_balance.consumer_demand_m3_per_h, expected.flow_balance.consumer_demand_m3_per_h,
-        HydraulicQuantity::FlowM3PerHour, comparison("flow_balance.consumer_demand_m3_per_h", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("flow_balance.consumer_demand_m3_per_h", expected.time_elapsed_s));
     context.expectNear(actual.flow_balance.demand_deficit_m3_per_h, expected.flow_balance.demand_deficit_m3_per_h,
-        HydraulicQuantity::FlowM3PerHour, comparison("flow_balance.demand_deficit_m3_per_h", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("flow_balance.demand_deficit_m3_per_h", expected.time_elapsed_s));
     context.expectNear(actual.flow_balance.emitter_flow_m3_per_h, expected.flow_balance.emitter_flow_m3_per_h,
-        HydraulicQuantity::FlowM3PerHour, comparison("flow_balance.emitter_flow_m3_per_h", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("flow_balance.emitter_flow_m3_per_h", expected.time_elapsed_s));
     context.expectNear(actual.flow_balance.leakage_flow_m3_per_h, expected.flow_balance.leakage_flow_m3_per_h,
-        HydraulicQuantity::FlowM3PerHour, comparison("flow_balance.leakage_flow_m3_per_h", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("flow_balance.leakage_flow_m3_per_h", expected.time_elapsed_s));
     context.expectNear(actual.flow_balance.storage_flow_m3_per_h, expected.flow_balance.storage_flow_m3_per_h,
-        HydraulicQuantity::FlowM3PerHour, comparison("flow_balance.storage_flow_m3_per_h", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("flow_balance.storage_flow_m3_per_h", expected.time_elapsed_s));
     context.expectNear(actual.flow_balance.flow_balance_ratio, expected.flow_balance.flow_balance_ratio,
-        HydraulicQuantity::Dimensionless, comparison("flow_balance.flow_balance_ratio", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::Dimensionless, tolerance_scale), comparison("flow_balance.flow_balance_ratio", expected.time_elapsed_s));
 
     context.expectEqual(actual.energy_usage.currency_iso4217.toStdString(), network.options_energy.currency_iso4217.toStdString(),
         comparison("energy_usage.currency_iso4217", expected.time_elapsed_s));
 
     context.expectNear(actual.energy_usage.peak_power_kw, expected.energy_usage.peak_power_kw,
-        HydraulicQuantity::PowerKw, comparison("energy_usage.peak_power_kw", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::PowerKw, tolerance_scale), comparison("energy_usage.peak_power_kw", expected.time_elapsed_s));
     context.expectNear(actual.energy_usage.energy_cost_per_day, expected.energy_usage.energy_cost_per_day,
-        HydraulicQuantity::Cost, comparison("energy_usage.energy_cost_per_day", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::Cost, tolerance_scale), comparison("energy_usage.energy_cost_per_day", expected.time_elapsed_s));
     context.expectNear(actual.energy_usage.demand_charge_per_day, expected.energy_usage.demand_charge_per_day,
-        HydraulicQuantity::Cost, comparison("energy_usage.demand_charge_per_day", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::Cost, tolerance_scale), comparison("energy_usage.demand_charge_per_day", expected.time_elapsed_s));
     context.expectNear(actual.energy_usage.total_cost_per_day, expected.energy_usage.total_cost_per_day,
-        HydraulicQuantity::Cost, comparison("energy_usage.total_cost_per_day", expected.time_elapsed_s));
+        scaledTolerance(HydraulicQuantity::Cost, tolerance_scale), comparison("energy_usage.total_cost_per_day", expected.time_elapsed_s));
 }
 }
 
@@ -644,6 +655,15 @@ void compareHydraulicTimelines(const NativeHydraulicTimeline &expected,
     const EpanetResultRun &actual,
     const NetworkHydraulic &network,
     TestContext &context)
+{
+    compareHydraulicTimelines(expected, actual, network, context, 1.0);
+}
+
+void compareHydraulicTimelines(const NativeHydraulicTimeline &expected,
+    const EpanetResultRun &actual,
+    const NetworkHydraulic &network,
+    TestContext &context,
+    double tolerance_scale)
 {
     context.expect(expected.success, expected.error.toStdString());
     context.expect(!actual.cancelled, "wrapper run must not be cancelled");
@@ -665,16 +685,16 @@ void compareHydraulicTimelines(const NativeHydraulicTimeline &expected,
         context.expect(actual_result.status.success,
             "wrapper timestep status failed at " + std::to_string(expected_result.time_elapsed_s) + " seconds");
 
-        compareJunctions(expected_result, actual_result, network, context);
-        compareReservoirs(expected_result, actual_result, network, context);
-        compareTanks(expected_result, actual_result, network, context);
-        comparePipes(expected_result, actual_result, network, context);
-        comparePumps(expected_result, actual_result, network, context);
-        compareValves(expected_result, actual_result, network, context);
-        compareStatistics(expected_result, actual_result, context);
+        compareJunctions(expected_result, actual_result, network, context, tolerance_scale);
+        compareReservoirs(expected_result, actual_result, network, context, tolerance_scale);
+        compareTanks(expected_result, actual_result, network, context, tolerance_scale);
+        comparePipes(expected_result, actual_result, network, context, tolerance_scale);
+        comparePumps(expected_result, actual_result, network, context, tolerance_scale);
+        compareValves(expected_result, actual_result, network, context, tolerance_scale);
+        compareStatistics(expected_result, actual_result, context, tolerance_scale);
         compareEvent(expected_result, actual_result, network, context);
-        comparePumpEnergy(expected_result, actual_result, network, context);
-        compareSummaries(expected_result, actual_result, network, context);
+        comparePumpEnergy(expected_result, actual_result, network, context, tolerance_scale);
+        compareSummaries(expected_result, actual_result, network, context, tolerance_scale);
     }
 }
 }

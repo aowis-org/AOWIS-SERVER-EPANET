@@ -94,7 +94,10 @@ void collectLinks(EN_Project project, const QList<LinkType> &links, double quali
 }
 }
 
-NativeQualityReferenceTimeline runNativeQualityReference(const QString &input_file, const NetworkHydraulic &network)
+NativeQualityReferenceTimeline runNativeQualityReference(
+    const QString &input_file,
+    const NetworkHydraulic &network,
+    bool canonical_metric_units)
 {
     NativeQualityReferenceTimeline timeline;
     EN_Project project = nullptr;
@@ -114,6 +117,11 @@ NativeQualityReferenceTimeline runNativeQualityReference(const QString &input_fi
         const QByteArray report_utf8 = temporary_directory.filePath(QStringLiteral("native-quality.rpt")).toUtf8();
         checkEpanet(EN_open(project, input_utf8.constData(), report_utf8.constData(), ""), "EN_open(native generated quality)");
         project_open = true;
+        if (canonical_metric_units)
+        {
+            checkEpanet(EN_setflowunits(project, EN_CMH), "EN_setflowunits(EN_CMH native generated quality)");
+            checkEpanet(EN_setoption(project, EN_PRESS_UNITS, EN_METERS), "EN_setoption(EN_PRESS_UNITS native generated quality)");
+        }
 
         int quality_type = EN_NONE;
         char chemical_name[EN_MAXID + 1] = {};

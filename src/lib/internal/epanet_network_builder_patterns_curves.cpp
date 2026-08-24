@@ -63,6 +63,13 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addPatternTime(const HydraulicPa
 
 HydraulicSimulationStatus EpanetNetworkBuilder::configureConstantDemandPattern(const NetworkHydraulic &request)
 {
+    // A demand with no explicit pattern is already constant when the project has
+    // no default demand pattern. Only create the private factor-1 pattern when
+    // it is required to shield an explicitly constant AOWIS demand from an
+    // otherwise active project default pattern.
+    if (request.options_hydraulic.default_demand_pattern_uuid.isNull())
+        return makeEpanetSuccess();
+
     bool needs_constant_pattern = false;
     for (const HydraulicNodeJunction &junction : request.nodes_junctions)
     {
