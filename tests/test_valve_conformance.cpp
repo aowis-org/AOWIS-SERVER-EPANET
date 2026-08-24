@@ -297,6 +297,46 @@ double interpolateGpvHeadLoss(double flow_m3_per_h)
     return 2.0 + (flow - 40.0) / 40.0 * 6.0;
 }
 
+void testAdjacentTcvValvesAllowed(TestContext &context)
+{
+    Net1Fixture fixture = valveFixture(QStringLiteral("10"), HydraulicLinkValveType::TCV,
+        250.0, 0.0, 1.5, HydraulicLinkValveInitialStatus::Active);
+
+    QUuid node_from;
+    QUuid node_to;
+    for (int index = 0; index < fixture.network.links_pipes.size(); index++)
+    {
+        if (fixture.network.links_pipes.at(index).id != QStringLiteral("11"))
+            continue;
+        node_from = fixture.network.links_pipes.at(index).node_uuid_from;
+        node_to = fixture.network.links_pipes.at(index).node_uuid_to;
+        fixture.network.links_pipes.removeAt(index);
+        break;
+    }
+
+    context.expect(!node_from.isNull() && !node_to.isNull(), "adjacent-valve fixture requires Net1 pipe 11");
+    if (node_from.isNull() || node_to.isNull())
+        return;
+
+    HydraulicLinkValve second_valve;
+    second_valve.id = QStringLiteral("11");
+    second_valve.uuid = QUuid::createUuid();
+    second_valve.node_uuid_from = node_from;
+    second_valve.node_uuid_to = node_to;
+    second_valve.type = HydraulicLinkValveType::TCV;
+    second_valve.diameter_mm = 250.0;
+    second_valve.minor_loss_coefficient = 0.0;
+    second_valve.setting_loss_coefficient = 2.0;
+    second_valve.initial_status = HydraulicLinkValveInitialStatus::Active;
+    fixture.network.links_valves.append(second_valve);
+
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(fixture.network));
+    context.expect(run.result_timeline.status.success, "two adjacent TCVs at the same junction must remain a legal EPANET topology");
+    context.expect(run.result_timeline.status.backend_error_code != 220, "legal adjacent valves must never be rejected with EPANET Error 220");
+    context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "legal adjacent valves must produce valid hydraulic results");
+    context.expect(!run.result_timeline.results.isEmpty(), "legal adjacent valves must produce at least one hydraulic result");
+}
+
 void testValveGpv(TestContext &context)
 {
     constexpr double diameter_mm = 220.0;
@@ -348,6 +388,9 @@ void registerValveScenarios(ScenarioRegistry &registry)
     registry.add(ScenarioDefinition{"conformance-upstream-valve-tcv",
         "Exercises TCV diameter, minor loss, Active status, throttle setting, and complete valve results.",
         {"conformance", "hydraulic", "upstream", "valve", "tcv"}, &testValveTcv});
+    registry.add(ScenarioDefinition{"conformance-valve-adjacent-tcv-allowed",
+        "Proves that adjacency alone is legal: two TCVs may share a junction and must not be rejected by Error-220 topology validation.",
+        {"conformance", "hydraulic", "valve"}, &testAdjacentTcvValvesAllowed});
     registry.add(ScenarioDefinition{"conformance-upstream-valve-gpv",
         "Exercises GPV diameter, minor loss, explicit Open status, non-linear head-loss curve, returned curve setting, and complete valve results.",
         {"conformance", "hydraulic", "upstream", "valve", "gpv", "curve"}, &testValveGpv});

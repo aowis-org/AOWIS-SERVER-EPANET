@@ -108,6 +108,7 @@ HydraulicSimulationStatus validateNetwork(
 {
     QList<HydraulicSimulationStatus> failures = EpanetNetworkValidatorParts::validateIdentities(network);
     EpanetNetworkValidatorSupport::appendValidationFailures(failures, EpanetNetworkValidatorParts::validateReferences(network));
+    EpanetNetworkValidatorSupport::appendValidationFailures(failures, EpanetNetworkValidatorParts::validateTopology(network));
     EpanetNetworkValidatorSupport::appendValidationFailures(failures, EpanetNetworkValidatorParts::validateNumerics(network));
 
     if (validation_failures != nullptr)

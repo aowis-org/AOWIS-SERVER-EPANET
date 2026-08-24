@@ -10,6 +10,7 @@ namespace EpanetNetworkValidatorParts
 {
 QList<HydraulicSimulationStatus> validateIdentities(const NetworkHydraulic &network);
 QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulic &network);
+QList<HydraulicSimulationStatus> validateTopology(const NetworkHydraulic &network);
 QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &network);
 }
 

@@ -43,6 +43,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-upstream-valve-fcv
     conformance-upstream-valve-tcv
     conformance-upstream-valve-gpv
+    conformance-valve-adjacent-tcv-allowed
     conformance-controls-simple-low-level
     conformance-controls-simple-high-level
     conformance-controls-simple-timer
@@ -225,6 +226,13 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-negative-invalid-map-numeric
     conformance-negative-missing-map-label-anchor
     conformance-negative-invalid-pump-numeric
+    conformance-negative-valve-prv-shared-downstream
+    conformance-negative-valve-prv-series
+    conformance-negative-valve-psv-shared-upstream
+    conformance-negative-valve-psv-series
+    conformance-negative-valve-prv-to-psv
+    conformance-negative-valve-prv-to-fcv
+    conformance-negative-valve-fcv-to-psv
     conformance-negative-invalid-valve-numeric
     conformance-negative-invalid-control-numeric
     conformance-negative-invalid-solver-numeric

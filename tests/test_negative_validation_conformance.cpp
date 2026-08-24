@@ -43,6 +43,57 @@ HydraulicLinkPump *firstPump(NetworkHydraulic &network)
     return &network.links_pumps.first();
 }
 
+HydraulicLinkValve replacePipeWithValve(
+    NetworkHydraulic &network,
+    const QString &pipe_id,
+    const QString &valve_id,
+    HydraulicLinkValveType type,
+    bool reverse_direction = false)
+{
+    HydraulicLinkValve valve;
+    valve.id = valve_id;
+    valve.uuid = QUuid::createUuid();
+    valve.type = type;
+    valve.diameter_mm = 250.0;
+    valve.minor_loss_coefficient = 0.0;
+    valve.initial_status = HydraulicLinkValveInitialStatus::Active;
+
+    for (int index = 0; index < network.links_pipes.size(); index++)
+    {
+        if (network.links_pipes.at(index).id != pipe_id)
+            continue;
+
+        const HydraulicLinkPipe pipe = network.links_pipes.at(index);
+        network.links_pipes.removeAt(index);
+        valve.node_uuid_from = reverse_direction ? pipe.node_uuid_to : pipe.node_uuid_from;
+        valve.node_uuid_to = reverse_direction ? pipe.node_uuid_from : pipe.node_uuid_to;
+        break;
+    }
+
+    switch (type)
+    {
+    case HydraulicLinkValveType::PRV:
+    case HydraulicLinkValveType::PSV:
+    case HydraulicLinkValveType::PBV:
+        valve.setting_pressure_head_m = 30.0;
+        break;
+    case HydraulicLinkValveType::FCV:
+        valve.setting_flow_m3_per_h = 100.0;
+        break;
+    case HydraulicLinkValveType::TCV:
+        valve.setting_loss_coefficient = 2.0;
+        break;
+    case HydraulicLinkValveType::PCV:
+        valve.setting_position_percent = 50.0;
+        break;
+    case HydraulicLinkValveType::GPV:
+        break;
+    }
+
+    network.links_valves.append(valve);
+    return valve;
+}
+
 bool inpSectionContainsId(const QString &inp_text, const QString &section_name, const QString &id)
 {
     bool in_section = false;
@@ -97,6 +148,35 @@ void expectRejected(
     context.expect(diagnostic.entity.id == expected_entity_id, "diagnostic must retain entity ID");
     context.expect(diagnostic.entity.uuid == expected_entity_uuid, "diagnostic must retain entity UUID");
     context.expect(diagnostic.message == run.result_timeline.status.message, "diagnostic must retain the actionable status message");
+}
+
+void expectValveTopologyRejected(
+    TestContext &context,
+    const NetworkHydraulic &network,
+    const HydraulicLinkValve &first,
+    const HydraulicLinkValve &second,
+    const QString &junction_id,
+    const QString &reason_fragment)
+{
+    const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
+
+    context.expect(!run.result_timeline.status.success, "EPANET-incompatible valve topology must be rejected before backend construction");
+    context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Invalid, "illegal valve topology must produce invalid results");
+    context.expect(run.result_timeline.results.isEmpty(), "illegal valve topology must not produce hydraulic timesteps");
+    context.expect(run.result_timeline.status.stage == HydraulicSimulationStatusStage::BuildNetwork, "illegal valve topology must fail during network validation");
+    context.expect(run.result_timeline.status.operation == HydraulicSimulationStatusOperation::SetEntityMetadata, "illegal valve topology must identify valve topology/metadata validation");
+    context.expect(run.result_timeline.status.entity.type == HydraulicSimulationStatusEntityType::Valve, "illegal valve topology must identify a valve entity");
+    context.expect(run.result_timeline.status.entity.id == second.id, "illegal valve topology must identify the second conflicting valve");
+    context.expect(run.result_timeline.status.entity.uuid == second.uuid, "illegal valve topology must retain the second conflicting valve UUID");
+    context.expect(run.result_timeline.status.message.contains(first.id), "illegal valve topology message must name the first valve");
+    context.expect(run.result_timeline.status.message.contains(second.id), "illegal valve topology message must name the second valve");
+    context.expect(run.result_timeline.status.message.contains(junction_id), "illegal valve topology message must name the conflicting junction");
+    context.expect(run.result_timeline.status.message.contains(reason_fragment, Qt::CaseInsensitive), "illegal valve topology message must explain the hydraulic restriction");
+    context.expect(run.result_timeline.status.backend_error_code == 0, "prevalidation must prevent native EPANET Error 220 from surfacing as a backend failure");
+    context.expect(run.result_timeline.status.backend_operation.isEmpty(), "prevalidation must not claim a native backend operation");
+    context.expect(!run.result_timeline.status.details.isEmpty(), "illegal valve topology must provide structured diagnostic details");
+    context.expect(run.result_timeline.status.details.join(QChar('\n')).contains(QStringLiteral("Error 220"), Qt::CaseInsensitive), "illegal valve topology details must identify EPANET Error 220");
+    context.expect(!run.result_timeline.diagnostics.isEmpty(), "illegal valve topology must be retained as a structured diagnostic");
 }
 
 void expectQualityRejected(
@@ -830,6 +910,62 @@ void scenarioInvalidPumpNumeric(TestContext &context)
     expectRejected(context, network, HydraulicSimulationStatusEntityType::Pump, pump->id, pump->uuid, QStringLiteral("invalid numeric"));
 }
 
+void scenarioIllegalPrvSharedDownstream(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("10"), QStringLiteral("PRV_A"), HydraulicLinkValveType::PRV);
+    const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("111"), QStringLiteral("PRV_B"), HydraulicLinkValveType::PRV, true);
+    expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("same downstream junction"));
+}
+
+void scenarioIllegalPrvSeries(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("10"), QStringLiteral("PRV_A"), HydraulicLinkValveType::PRV);
+    const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("11"), QStringLiteral("PRV_B"), HydraulicLinkValveType::PRV);
+    expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("series"));
+}
+
+void scenarioIllegalPsvSharedUpstream(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("11"), QStringLiteral("PSV_A"), HydraulicLinkValveType::PSV);
+    const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("111"), QStringLiteral("PSV_B"), HydraulicLinkValveType::PSV);
+    expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("same upstream junction"));
+}
+
+void scenarioIllegalPsvSeries(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("10"), QStringLiteral("PSV_A"), HydraulicLinkValveType::PSV);
+    const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("11"), QStringLiteral("PSV_B"), HydraulicLinkValveType::PSV);
+    expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("series"));
+}
+
+void scenarioIllegalPrvToPsv(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("10"), QStringLiteral("PRV_A"), HydraulicLinkValveType::PRV);
+    const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("11"), QStringLiteral("PSV_B"), HydraulicLinkValveType::PSV);
+    expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("downstream junction of a PRV"));
+}
+
+void scenarioIllegalPrvToFcv(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("10"), QStringLiteral("PRV_A"), HydraulicLinkValveType::PRV);
+    const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("11"), QStringLiteral("FCV_B"), HydraulicLinkValveType::FCV);
+    expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("upstream junction of an FCV"));
+}
+
+void scenarioIllegalFcvToPsv(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("10"), QStringLiteral("FCV_A"), HydraulicLinkValveType::FCV);
+    const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("11"), QStringLiteral("PSV_B"), HydraulicLinkValveType::PSV);
+    expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("downstream junction of an FCV"));
+}
+
 void scenarioInvalidValveNumeric(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
@@ -1112,6 +1248,41 @@ void registerNegativeValidationScenarios(ScenarioRegistry &registry)
         "Reject a non-finite pump hydraulic input before calling EPANET.",
         {"conformance", "hydraulic", "negative"},
         &scenarioInvalidPumpNumeric});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-valve-prv-shared-downstream",
+        "Reject two PRVs that control the same downstream junction with a preflight Error-220 diagnostic naming both valves and the junction.",
+        {"conformance", "hydraulic", "negative", "valve"},
+        &scenarioIllegalPrvSharedDownstream});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-valve-prv-series",
+        "Reject PRVs connected in series with an actionable preflight Error-220 diagnostic.",
+        {"conformance", "hydraulic", "negative", "valve"},
+        &scenarioIllegalPrvSeries});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-valve-psv-shared-upstream",
+        "Reject two PSVs that control the same upstream junction with a preflight Error-220 diagnostic naming both valves and the junction.",
+        {"conformance", "hydraulic", "negative", "valve"},
+        &scenarioIllegalPsvSharedUpstream});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-valve-psv-series",
+        "Reject PSVs connected in series with an actionable preflight Error-220 diagnostic.",
+        {"conformance", "hydraulic", "negative", "valve"},
+        &scenarioIllegalPsvSeries});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-valve-prv-to-psv",
+        "Reject a PSV whose upstream node is the controlled downstream node of a PRV.",
+        {"conformance", "hydraulic", "negative", "valve"},
+        &scenarioIllegalPrvToPsv});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-valve-prv-to-fcv",
+        "Reject a PRV whose controlled downstream node is the upstream node of an FCV.",
+        {"conformance", "hydraulic", "negative", "valve"},
+        &scenarioIllegalPrvToFcv});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-valve-fcv-to-psv",
+        "Reject a PSV whose upstream node is the downstream node of an FCV.",
+        {"conformance", "hydraulic", "negative", "valve"},
+        &scenarioIllegalFcvToPsv});
     registry.add(ScenarioDefinition{
         "conformance-negative-invalid-valve-numeric",
         "Reject a non-finite valve hydraulic input before calling EPANET.",

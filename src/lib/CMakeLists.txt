@@ -28,6 +28,7 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/internal/epanet_network_validator_numerics.cpp
     src/lib/internal/epanet_network_validator_references.cpp
     src/lib/internal/epanet_network_validator_support.cpp
+    src/lib/internal/epanet_network_validator_topology.cpp
     src/lib/internal/epanet_prepared_project.cpp
     src/lib/internal/epanet_project.cpp
     src/lib/internal/epanet_project_initializer.cpp

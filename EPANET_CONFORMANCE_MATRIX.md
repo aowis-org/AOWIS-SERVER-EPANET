@@ -191,6 +191,7 @@ Negative validation and disabled-reference hardening use dedicated scenarios:
 | `conformance-negative-disabled-entity-pruning` | Unreferenced disabled hydraulic entities (including stale invalid values and report selections) are intentionally omitted while the remaining network stays runnable |
 | `conformance-negative-disabled-control-link-reference` / `-disabled-rule-link-reference` | Simple controls and structured rules referencing disabled links fail explicitly as disabled-reference errors |
 | `conformance-negative-missing-pattern` / `-missing-curve` / `-missing-valve-curve` | Missing demand patterns, pump curves, and GPV valve curves are rejected before backend construction |
+| `conformance-negative-valve-*` / `conformance-valve-adjacent-tcv-allowed` | EPANET Error-220 PRV/PSV/FCV topology restrictions are rejected in preflight with both valve IDs, the conflicting junction, and the precise reason; legal valve adjacency remains accepted |
 | `conformance-negative-invalid-*-numeric` | Non-finite pattern, curve, node, pipe, pump, valve, simple-control, solver-option, and typed-report inputs are rejected before EPANET receives them |
 | `conformance-negative-unsupported-configuration` | Unsupported hydraulic enum/configuration values return an explicit structured failure |
 | `conformance-negative-structured-diagnostics` | Validation diagnostics retain stage, operation, entity identity, unresolved UUID detail, and backend provenance |
