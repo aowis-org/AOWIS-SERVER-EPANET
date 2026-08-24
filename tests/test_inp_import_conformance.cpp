@@ -6,6 +6,7 @@
 #include "conformance/native_epanet_reference_runner.h"
 #include "conformance/native_quality_reference_runner.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -24,6 +25,34 @@ constexpr NumericTolerance numeric_tolerance{1.0e-10, 1.0e-10};
 constexpr double epanet_cmh_per_cfs = 101.94;
 constexpr double epanet_gpm_per_cfs = 448.831;
 constexpr double epanet_gpm_to_cmh = epanet_cmh_per_cfs / epanet_gpm_per_cfs;
+
+constexpr double wgs84_equatorial_radius_m = 6378137.0;
+
+double greatCircleDistanceM(const CoordinateWGS84 &first, const CoordinateWGS84 &second)
+{
+    const double first_latitude = first.latitude_deg * 3.14159265358979323846 / 180.0;
+    const double second_latitude = second.latitude_deg * 3.14159265358979323846 / 180.0;
+    const double latitude_delta = second_latitude - first_latitude;
+    const double longitude_delta =
+        (second.longitude_deg - first.longitude_deg) * 3.14159265358979323846 / 180.0;
+    const double sin_latitude = std::sin(latitude_delta / 2.0);
+    const double sin_longitude = std::sin(longitude_delta / 2.0);
+    const double a = sin_latitude * sin_latitude
+        + std::cos(first_latitude) * std::cos(second_latitude)
+            * sin_longitude * sin_longitude;
+    return 2.0 * wgs84_equatorial_radius_m
+        * std::atan2(std::sqrt(a), std::sqrt(std::max(0.0, 1.0 - a)));
+}
+
+bool hasDiagnosticContaining(const EpanetResultImport &result, const QString &text)
+{
+    for (const HydraulicSimulationDiagnostic &diagnostic : result.diagnostics)
+    {
+        if (diagnostic.message.contains(text, Qt::CaseInsensitive))
+            return true;
+    }
+    return false;
+}
 
 ComparisonContext comparison(std::string field)
 {
@@ -398,7 +427,7 @@ void scenarioImportNet1ProjectGlobals(TestContext &context)
         QStringLiteral(AOWIS_EPANET_TEST_NET1_INP));
 
     context.expect(result.status.success, "Net1 INP import must open successfully");
-    context.expect(!result.complete, "Net1 import must report source families that remain deferred");
+    context.expect(result.complete, "Net1 import must be complete across the supported EPANET 2.3 INP surface");
 
     const NetworkHydraulic &network = result.request.network;
     context.expectEqual(network.id.toStdString(), std::string("Net1"), comparison("network.id"));
@@ -443,7 +472,6 @@ void scenarioImportNet1ProjectGlobals(TestContext &context)
         std::int64_t{1},
         comparison("quality_runs.size"),
         "Net1 CHEMICAL configuration must be imported as one quality child");
-    context.expect(!result.diagnostics.isEmpty(), "partial import must explain deferred source data through structured diagnostics");
 }
 
 void scenarioImportCanonicalGlobalUnits(TestContext &context)
@@ -453,7 +481,7 @@ void scenarioImportCanonicalGlobalUnits(TestContext &context)
 
     context.expect(result.status.success, "custom global-options INP import must open successfully");
     expectNoDeferredQualityImportDiagnostics(context, result);
-    context.expect(!result.complete, "global-options fixture still omits report directives and coordinate metadata");
+    context.expect(result.complete, "global-options fixture must import completely once report directives are reconstructed");
     context.expect(result.request.quality_runs.isEmpty(), "QUALITY NONE must import as a hydraulics-only request");
     const NetworkHydraulic &network = result.request.network;
 
@@ -518,7 +546,7 @@ void scenarioImportCoreTopologyNet1(TestContext &context)
     const EpanetResultImport result = EpanetRunner().importInp(
         QStringLiteral(AOWIS_EPANET_TEST_NET1_INP));
     context.expect(result.status.success, "Net1 core topology import must succeed");
-    context.expect(!result.complete, "Net1 still contains deferred non-quality import layers such as report directives");
+    context.expect(result.complete, "Net1 core import must no longer depend on deferred metadata/report layers");
 
     const NetworkHydraulic &network = result.request.network;
     const HydraulicNodeJunction *junction_11 = junctionById(network, QStringLiteral("11"));
@@ -1778,6 +1806,399 @@ void scenarioImportQualityNet1Equivalence(TestContext &context)
     compareImportedQualityTimeline(context, native, run, WaterQualityAnalysisType::Chemical);
 }
 
+void scenarioImportGeometryDegrees(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GEOMETRY_DEGREES_INP));
+    context.expect(result.status.success, "degree geometry fixture must import successfully");
+
+    const NetworkHydraulic &network = result.request.network;
+    const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
+    const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
+    const HydraulicLinkPipe *pipe = pipeById(network, QStringLiteral("P1"));
+    context.expect(reservoir != nullptr && junction != nullptr && pipe != nullptr,
+        "degree geometry fixture entities must be imported");
+    if (reservoir == nullptr || junction == nullptr || pipe == nullptr)
+        return;
+
+    context.expectNear(reservoir->coordinate_wgs84.longitude_deg, 7.0, numeric_tolerance,
+        comparison("R1.longitude_deg"));
+    context.expectNear(reservoir->coordinate_wgs84.latitude_deg, 50.0, numeric_tolerance,
+        comparison("R1.latitude_deg"));
+    context.expectNear(junction->coordinate_wgs84.longitude_deg, 7.01, numeric_tolerance,
+        comparison("J1.longitude_deg"));
+    context.expectNear(junction->coordinate_wgs84.latitude_deg, 50.0, numeric_tolerance,
+        comparison("J1.latitude_deg"));
+    context.expectEqual(static_cast<std::int64_t>(pipe->vertices.size()), std::int64_t{1},
+        comparison("P1.vertices.size"));
+    if (!pipe->vertices.isEmpty())
+    {
+        context.expectNear(pipe->vertices.first().coordinate_wgs84.longitude_deg, 7.005,
+            numeric_tolerance, comparison("P1.vertex.longitude_deg"));
+        context.expectNear(pipe->vertices.first().coordinate_wgs84.latitude_deg, 50.001,
+            numeric_tolerance, comparison("P1.vertex.latitude_deg"));
+    }
+
+    context.expectEqual(static_cast<std::int64_t>(network.map_labels.size()), std::int64_t{1},
+        comparison("map_labels.size"));
+    if (!network.map_labels.isEmpty())
+    {
+        const HydraulicMapLabel &label = network.map_labels.first();
+        context.expectEqual(label.text.toStdString(), std::string("Pump Area"), comparison("label.text"));
+        context.expect(label.anchor_node_uuid == junction->uuid,
+            "map label anchor must resolve to the imported junction UUID");
+    }
+    context.expect(network.map_backdrop.enabled, "degree backdrop must be imported");
+    context.expectEqual(network.map_backdrop.file.toStdString(), std::string("map.png"),
+        comparison("map_backdrop.file"));
+    context.expectNear(network.map_backdrop.offset_longitude_deg, 0.001, numeric_tolerance,
+        comparison("map_backdrop.offset_longitude_deg"));
+    context.expectNear(network.map_backdrop.offset_latitude_deg, 0.002, numeric_tolerance,
+        comparison("map_backdrop.offset_latitude_deg"));
+    context.expect(hasDiagnosticContaining(result, QStringLiteral("interpreted as WGS84")),
+        "degree import must document its WGS84 interpretation");
+}
+
+void scenarioImportGeometryMeters(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GEOMETRY_METERS_INP));
+    context.expect(result.status.success, "metric geometry fixture must import successfully");
+
+    const NetworkHydraulic &network = result.request.network;
+    const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
+    const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
+    const HydraulicLinkPipe *pipe = pipeById(network, QStringLiteral("P1"));
+    context.expect(reservoir != nullptr && junction != nullptr && pipe != nullptr,
+        "metric geometry fixture entities must be imported");
+    if (reservoir == nullptr || junction == nullptr || pipe == nullptr)
+        return;
+
+    context.expectNear(
+        greatCircleDistanceM(reservoir->coordinate_wgs84, junction->coordinate_wgs84),
+        1000.0, NumericTolerance{0.2, 0.0}, comparison("metric_node_distance_m"));
+    context.expectNear(
+        (reservoir->coordinate_wgs84.longitude_deg + junction->coordinate_wgs84.longitude_deg) / 2.0,
+        0.0, NumericTolerance{1.0e-8, 0.0}, comparison("metric_center_longitude_deg"));
+    context.expectEqual(static_cast<std::int64_t>(pipe->vertices.size()), std::int64_t{1},
+        comparison("metric_vertices.size"));
+    context.expect(hasDiagnosticContaining(result, QStringLiteral("centered at WGS84 0")),
+        "metric geometry import must document synthetic WGS84 placement");
+}
+
+void scenarioImportGeometryFeet(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GEOMETRY_FEET_INP));
+    context.expect(result.status.success, "feet geometry fixture must import successfully");
+
+    const NetworkHydraulic &network = result.request.network;
+    const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
+    const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
+    context.expect(reservoir != nullptr && junction != nullptr,
+        "feet geometry fixture nodes must be imported");
+    if (reservoir == nullptr || junction == nullptr)
+        return;
+
+    context.expectNear(
+        greatCircleDistanceM(reservoir->coordinate_wgs84, junction->coordinate_wgs84),
+        304.8, NumericTolerance{0.1, 0.0}, comparison("feet_node_distance_m"));
+    context.expect(hasDiagnosticContaining(result, QStringLiteral("feet was converted to metres")),
+        "feet geometry import must document unit conversion");
+}
+
+void scenarioImportGeometryArbitrary(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GEOMETRY_ARBITRARY_INP));
+    context.expect(result.status.success, "arbitrary geometry fixture must import successfully");
+
+    const NetworkHydraulic &network = result.request.network;
+    const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
+    const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
+    context.expect(reservoir != nullptr && junction != nullptr,
+        "arbitrary geometry fixture nodes must be imported");
+    if (reservoir == nullptr || junction == nullptr)
+        return;
+
+    context.expectNear(
+        greatCircleDistanceM(reservoir->coordinate_wgs84, junction->coordinate_wgs84),
+        1000.0, NumericTolerance{0.2, 0.0}, comparison("arbitrary_node_distance_m"));
+    context.expect(hasDiagnosticContaining(result, QStringLiteral("one map unit as one metre")),
+        "arbitrary geometry import must document its synthetic scale convention");
+}
+
+void scenarioImportGeometryMissingCoordinates(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GEOMETRY_MISSING_INP));
+    context.expect(result.status.success, "coordinate-free geometry fixture must import successfully");
+
+    const NetworkHydraulic &network = result.request.network;
+    const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
+    const HydraulicNodeJunction *junction_1 = junctionById(network, QStringLiteral("J1"));
+    const HydraulicNodeJunction *junction_2 = junctionById(network, QStringLiteral("J2"));
+    context.expect(reservoir != nullptr && junction_1 != nullptr && junction_2 != nullptr,
+        "coordinate-free fixture nodes must be imported");
+    if (reservoir == nullptr || junction_1 == nullptr || junction_2 == nullptr)
+        return;
+
+    const bool all_same =
+        reservoir->coordinate_wgs84.longitude_deg == junction_1->coordinate_wgs84.longitude_deg
+        && reservoir->coordinate_wgs84.latitude_deg == junction_1->coordinate_wgs84.latitude_deg
+        && reservoir->coordinate_wgs84.longitude_deg == junction_2->coordinate_wgs84.longitude_deg
+        && reservoir->coordinate_wgs84.latitude_deg == junction_2->coordinate_wgs84.latitude_deg;
+    context.expect(!all_same, "coordinate-free nodes must receive distinct generated map positions");
+    context.expect(std::abs(reservoir->coordinate_wgs84.longitude_deg) < 0.01
+            && std::abs(reservoir->coordinate_wgs84.latitude_deg) < 0.01,
+        "generated geometry must remain near the synthetic 0°,0° origin");
+    context.expect(hasDiagnosticContaining(result, QStringLiteral("deterministic schematic WGS84 layout")),
+        "coordinate-free import must document generated geometry");
+}
+
+void scenarioImportMetadataReportFidelity(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_METADATA_REPORT_US_INP));
+
+    context.expect(result.status.success, "metadata/report fixture must import successfully");
+    context.expect(result.complete, "fully representable metadata/report fixture must import completely");
+    const NetworkHydraulic &network = result.request.network;
+
+    const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
+    const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
+    const HydraulicLinkPipe *pipe = pipeById(network, QStringLiteral("P1"));
+    context.expect(junction != nullptr, "metadata fixture junction must be imported");
+    context.expect(reservoir != nullptr, "metadata fixture reservoir must be imported");
+    context.expect(pipe != nullptr, "metadata fixture pipe must be imported");
+    if (junction != nullptr)
+    {
+        context.expectEqual(
+            junction->metadata.comment.toStdString(), std::string("Junction comment"),
+            comparison("J1.comment"));
+        context.expectEqual(
+            junction->metadata.tag.toStdString(), std::string("JunctionTag"),
+            comparison("J1.tag"));
+    }
+    if (reservoir != nullptr)
+    {
+        context.expectEqual(
+            reservoir->metadata.comment.toStdString(), std::string("Reservoir comment"),
+            comparison("R1.comment"));
+        context.expectEqual(
+            reservoir->metadata.tag.toStdString(), std::string("ReservoirTag"),
+            comparison("R1.tag"));
+    }
+    if (pipe != nullptr)
+    {
+        context.expectEqual(
+            pipe->metadata.comment.toStdString(), std::string("Pipe comment"),
+            comparison("P1.comment"));
+        context.expectEqual(
+            pipe->metadata.tag.toStdString(), std::string("PipeTag"),
+            comparison("P1.tag"));
+    }
+
+    const HydraulicSimulationReportOptions &report = network.options_report;
+    context.expectEqual(
+        static_cast<std::int64_t>(report.page_size), std::int64_t{77},
+        comparison("report.page_size"));
+    context.expectEqual(
+        static_cast<std::int64_t>(report.status),
+        static_cast<std::int64_t>(HydraulicSimulationReportStatus::Full),
+        comparison("report.status"));
+    context.expect(!report.summary, "report SUMMARY NO must be imported");
+    context.expect(!report.messages, "report MESSAGES NO must be imported");
+    context.expect(report.energy, "report ENERGY YES must be imported");
+
+    context.expect(
+        report.selection_nodes.mode == HydraulicSimulationReportSelectionMode::Selected,
+        "selected report nodes must retain Selected mode");
+    context.expectEqual(
+        static_cast<std::int64_t>(report.selection_nodes.uuids.size()), std::int64_t{2},
+        comparison("report.selection_nodes.size"));
+    if (report.selection_nodes.uuids.size() == 2)
+    {
+        const QString first = nodeIdForUuid(network, report.selection_nodes.uuids.at(0));
+        const QString second = nodeIdForUuid(network, report.selection_nodes.uuids.at(1));
+        context.expect(
+            (first == QStringLiteral("J1") && second == QStringLiteral("R1"))
+                || (first == QStringLiteral("R1") && second == QStringLiteral("J1")),
+            "selected report node UUIDs must resolve to J1 and R1");
+    }
+    context.expect(
+        report.selection_links.mode == HydraulicSimulationReportSelectionMode::Selected,
+        "selected report links must retain Selected mode");
+    context.expectEqual(
+        static_cast<std::int64_t>(report.selection_links.uuids.size()), std::int64_t{1},
+        comparison("report.selection_links.size"));
+    if (!report.selection_links.uuids.isEmpty())
+    {
+        context.expectEqual(
+            linkIdForUuid(network, report.selection_links.uuids.first()).toStdString(),
+            std::string("P1"), comparison("report.selection_links.first"));
+    }
+
+    context.expect(report.fields_node.elevation.enabled, "ELEVATION YES must be imported");
+    context.expectEqual(
+        static_cast<std::int64_t>(report.fields_node.elevation.precision.value_or(-1)),
+        std::int64_t{3}, comparison("report.elevation.precision"));
+    context.expectNear(
+        report.fields_node.elevation.below_m.value_or(-1.0), 90.0 * 0.3048,
+        numeric_tolerance, comparison("report.elevation.below_m"));
+    context.expectNear(
+        report.fields_node.elevation.above_m.value_or(-1.0), 150.0 * 0.3048,
+        numeric_tolerance, comparison("report.elevation.above_m"));
+
+    context.expectEqual(
+        static_cast<std::int64_t>(report.fields_node.demand.precision.value_or(-1)),
+        std::int64_t{4}, comparison("report.demand.precision"));
+    context.expectNear(
+        report.fields_node.demand.below_m3_per_h.value_or(-1.0),
+        10.0 * epanet_gpm_to_cmh, numeric_tolerance,
+        comparison("report.demand.below_m3_per_h"));
+    context.expectNear(
+        report.fields_node.demand.above_m3_per_h.value_or(-1.0),
+        50.0 * epanet_gpm_to_cmh, numeric_tolerance,
+        comparison("report.demand.above_m3_per_h"));
+
+    context.expectEqual(
+        static_cast<std::int64_t>(report.fields_node.head.precision.value_or(-1)),
+        std::int64_t{5}, comparison("report.head.precision"));
+    context.expectNear(
+        report.fields_node.head.below_m.value_or(-1.0), 200.0 * 0.3048,
+        numeric_tolerance, comparison("report.head.below_m"));
+
+    context.expectEqual(
+        static_cast<std::int64_t>(report.fields_node.pressure.precision.value_or(-1)),
+        std::int64_t{6}, comparison("report.pressure.precision"));
+    const double pressure_to_head_m = 0.3048 / (0.4333 * 1.2);
+    context.expectNear(
+        report.fields_node.pressure.below_m.value_or(-1.0), 20.0 * pressure_to_head_m,
+        numeric_tolerance, comparison("report.pressure.below_m"));
+    context.expect(!report.fields_node.quality.enabled, "QUALITY NO must be imported");
+
+    context.expect(report.fields_link.length.enabled, "LENGTH YES must be imported");
+    context.expectNear(
+        report.fields_link.length.below_m.value_or(-1.0), 500.0 * 0.3048,
+        numeric_tolerance, comparison("report.length.below_m"));
+    context.expect(report.fields_link.diameter.enabled, "DIAMETER YES must be imported");
+    context.expectNear(
+        report.fields_link.diameter.below_mm.value_or(-1.0), 254.0,
+        numeric_tolerance, comparison("report.diameter.below_mm"));
+    context.expectNear(
+        report.fields_link.flow.below_m3_per_h.value_or(-1.0),
+        100.0 * epanet_gpm_to_cmh, numeric_tolerance,
+        comparison("report.flow.below_m3_per_h"));
+    context.expectNear(
+        report.fields_link.velocity.below_m_per_s.value_or(-1.0), 2.0 * 0.3048,
+        numeric_tolerance, comparison("report.velocity.below_m_per_s"));
+    context.expectNear(
+        report.fields_link.headloss.below_m_per_km.value_or(-1.0), 5.0,
+        numeric_tolerance, comparison("report.headloss.below_m_per_km"));
+    context.expect(report.fields_link.position.enabled, "STATE YES must map to the AOWIS link-position report field");
+    context.expectEqual(
+        static_cast<std::int64_t>(report.fields_link.position.precision.value_or(-1)),
+        std::int64_t{0}, comparison("report.state.precision"));
+    context.expect(report.fields_link.setting.enabled, "SETTING YES must be imported");
+    context.expectEqual(
+        static_cast<std::int64_t>(report.fields_link.setting.precision.value_or(-1)),
+        std::int64_t{2}, comparison("report.setting.precision"));
+    context.expect(report.fields_link.reaction.enabled, "REACTION YES must be imported");
+    context.expectEqual(
+        static_cast<std::int64_t>(report.fields_link.reaction.precision.value_or(-1)),
+        std::int64_t{3}, comparison("report.reaction.precision"));
+    context.expect(report.fields_link.friction.enabled, "F-FACTOR YES must be imported");
+    context.expectEqual(
+        static_cast<std::int64_t>(report.fields_link.friction.precision.value_or(-1)),
+        std::int64_t{4}, comparison("report.friction.precision"));
+    context.expectNear(
+        report.fields_link.friction.below_friction_factor.value_or(-1.0), 0.01,
+        numeric_tolerance, comparison("report.friction.below"));
+
+    context.expect(
+        report.backend_commands.contains(QStringLiteral("STATE BELOW 1")),
+        "STATE threshold must be retained through backend report commands");
+    context.expect(
+        report.backend_commands.contains(QStringLiteral("REACTION BELOW 0.02")),
+        "REACTION threshold must be retained through backend report commands");
+    bool file_command_found = false;
+    for (const QString &command : report.backend_commands)
+    {
+        if (command.startsWith(QStringLiteral("File"), Qt::CaseInsensitive)
+            && command.contains(QStringLiteral("report-output.rpt")))
+        {
+            file_command_found = true;
+        }
+    }
+    context.expect(file_command_found, "REPORT FILE destination must be retained as a backend command");
+
+    const EpanetResultInp exported = EpanetRunner().retrieveInp(result.request);
+    context.expect(exported.status.success, "imported metadata/report configuration must export successfully");
+    if (exported.status.success)
+    {
+        context.expect(
+            exported.inp_text.contains(QStringLiteral("Junction comment")),
+            "imported junction comment must survive generated INP export");
+        context.expect(
+            exported.inp_text.contains(QStringLiteral("JunctionTag")),
+            "imported junction tag must survive generated INP export");
+        context.expect(
+            exported.inp_text.contains(QStringLiteral("STATE BELOW 1"), Qt::CaseInsensitive),
+            "generic STATE report threshold must survive generated INP export");
+        context.expect(
+            exported.inp_text.contains(QStringLiteral("REACTION BELOW 0.02"), Qt::CaseInsensitive),
+            "generic REACTION report threshold must survive generated INP export");
+        context.expect(
+            exported.inp_text.contains(QStringLiteral("report-output.rpt"), Qt::CaseInsensitive),
+            "REPORT FILE destination must survive generated INP export");
+    }
+}
+
+void scenarioImportReportSettingThresholdCanonical(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_REPORT_SETTING_THRESHOLD_CANONICAL_INP));
+
+    context.expect(result.status.success, "canonical SETTING-threshold fixture must import successfully");
+    context.expect(result.complete, "canonical SETTING report threshold must import completely");
+    context.expect(
+        result.request.network.options_report.backend_commands.contains(
+            QStringLiteral("SETTING BELOW 5")),
+        "canonical SETTING threshold must be retained exactly as a backend report command");
+
+    const EpanetResultInp exported = EpanetRunner().retrieveInp(result.request);
+    context.expect(exported.status.success, "canonical SETTING threshold must export successfully");
+    if (exported.status.success)
+    {
+        context.expect(
+            exported.inp_text.contains(QStringLiteral("SETTING BELOW 5"), Qt::CaseInsensitive),
+            "canonical SETTING threshold must survive generated INP export");
+    }
+}
+
+void scenarioImportReportSettingThresholdDiagnostic(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_REPORT_SETTING_THRESHOLD_US_INP));
+
+    context.expect(result.status.success, "SETTING-threshold fixture must still import successfully");
+    context.expect(!result.complete, "non-canonical SETTING report threshold must mark import incomplete");
+    context.expect(
+        hasDiagnosticContaining(result, QStringLiteral("SETTING report threshold")),
+        "lossy SETTING threshold must produce an explicit import diagnostic");
+
+    bool setting_threshold_preserved = false;
+    for (const QString &command : result.request.network.options_report.backend_commands)
+    {
+        if (command.startsWith(QStringLiteral("SETTING BELOW"), Qt::CaseInsensitive))
+            setting_threshold_preserved = true;
+    }
+    context.expect(
+        !setting_threshold_preserved,
+        "non-canonical SETTING threshold must not be silently replayed with incorrect units");
+}
+
 void scenarioImportOpenErrorDiagnostic(TestContext &context)
 {
     const EpanetResultImport result = EpanetRunner().importInp(
@@ -1872,6 +2293,46 @@ void registerInpImportScenarios(ScenarioRegistry &registry)
         "Imports TRACE configuration, UUID-resolved trace source node, tolerance, and quality timestep, then proves native quality equivalence.",
         {"conformance", "import", "quality"},
         &scenarioImportQualitySourceTrace});
+    registry.add(ScenarioDefinition{
+        "conformance-import-geometry-degrees-wgs84",
+        "Imports EPANET degree coordinates, link vertices, labels, and backdrop geometry directly as WGS84.",
+        {"conformance", "import", "coordinate"},
+        &scenarioImportGeometryDegrees});
+    registry.add(ScenarioDefinition{
+        "conformance-import-geometry-meters-null-island",
+        "Imports metric EPANET map coordinates through GeographicLib and centers the preserved metric layout at WGS84 0°,0°.",
+        {"conformance", "import", "coordinate"},
+        &scenarioImportGeometryMeters});
+    registry.add(ScenarioDefinition{
+        "conformance-import-geometry-feet-null-island",
+        "Converts EPANET map feet to metres and centers the preserved layout at WGS84 0°,0°.",
+        {"conformance", "import", "coordinate"},
+        &scenarioImportGeometryFeet});
+    registry.add(ScenarioDefinition{
+        "conformance-import-geometry-arbitrary-null-island",
+        "Applies the documented one-map-unit-equals-one-metre convention to arbitrary EPANET map coordinates and centers them at WGS84 0°,0°.",
+        {"conformance", "import", "coordinate"},
+        &scenarioImportGeometryArbitrary});
+    registry.add(ScenarioDefinition{
+        "conformance-import-geometry-missing-layout",
+        "Generates deterministic WGS84 schematic positions near 0°,0° for EPANET nodes without source coordinates.",
+        {"conformance", "import", "coordinate"},
+        &scenarioImportGeometryMissingCoordinates});
+    registry.add(ScenarioDefinition{
+        "conformance-import-metadata-report-fidelity",
+        "Imports node/link comments and tags plus the complete representable EPANET report surface, canonicalizes report thresholds, and proves generated-INP persistence.",
+        {"conformance", "import", "hydraulic"},
+        &scenarioImportMetadataReportFidelity});
+    registry.add(ScenarioDefinition{
+        "conformance-import-report-setting-threshold-canonical",
+        "Preserves a SETTING report threshold exactly when the source project already uses AOWIS canonical CMH/metre setting units.",
+        {"conformance", "import", "hydraulic"},
+        &scenarioImportReportSettingThresholdCanonical});
+    registry.add(ScenarioDefinition{
+        "conformance-import-report-setting-threshold-diagnostic",
+        "Diagnoses non-canonical SETTING report thresholds whose mixed link-setting units cannot be converted losslessly after project normalization.",
+        {"conformance", "import", "negative"},
+        &scenarioImportReportSettingThresholdDiagnostic});
     registry.add(ScenarioDefinition{
         "conformance-import-open-error-diagnostic",
         "Rejects an unavailable INP path with native EPANET error details and a structured import diagnostic.",

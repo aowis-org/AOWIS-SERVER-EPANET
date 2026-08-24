@@ -4,22 +4,22 @@
 @headers|hydraulic_types.h,hydraulic_nodes.h,hydraulic_links.h,hydraulic_curves.h,hydraulic_controls.h,hydraulic_simulation_options.h,hydraulic_simulation_results.h,water_quality_simulation_results.h,hydraulic_simulation_status.h,hydraulic_simulation_diagnostics.h,hydraulic_map.h,network_hydraulic.h
 hydraulic_types.h|HydraulicEntityMetadata|enabled|complete|conformance-negative-disabled-entity-pruning|
 hydraulic_types.h|HydraulicEntityMetadata|model_role,date_added,date_installed|excluded-non-epanet||AOWIS lifecycle/presentation metadata is not an EPANET simulation input.
-hydraulic_types.h|HydraulicEntityMetadata|comment,tag|complete|conformance-export-titles-comments-tags|
-hydraulic_types.h|HydraulicLinkVertex|coordinate_wgs84|complete|conformance-export-coordinates-vertices|
+hydraulic_types.h|HydraulicEntityMetadata|comment,tag|complete|conformance-export-titles-comments-tags,conformance-import-metadata-report-fidelity|
+hydraulic_types.h|HydraulicLinkVertex|coordinate_wgs84|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84|
 hydraulic_types.h|HydraulicNodeQualitySource|type,chemical_concentration_mg_per_l,chemical_mass_flow_mg_per_min,pattern_uuid|complete|conformance-quality-input-chemical|Typed water-quality source configuration maps to EPANET source type, strength, and optional pattern.
 hydraulic_types.h|WaterQualityBulkReaction|coefficient,order|complete|conformance-quality-input-chemical|Bulk reaction coefficient and network-wide-compatible order map to EPANET reaction configuration.
 hydraulic_types.h|WaterQualityWallReaction|coefficient,order|complete|conformance-quality-input-chemical|Wall reaction coefficient and EPANET-compatible wall order map to reaction configuration.
 hydraulic_nodes.h|HydraulicNodeJunctionDemand|category_name,base_demand_m3_per_h,pattern_mode,pattern_uuid|complete|conformance-upstream-demand-categories,conformance-upstream-demand-pattern|
 hydraulic_nodes.h|HydraulicNodeJunctionDemand|source_method,note|excluded-non-epanet||Demand provenance/note metadata is not an EPANET hydraulic input.
 hydraulic_nodes.h|HydraulicNodeJunction|id,uuid|complete|conformance-net1,conformance-negative-duplicate-node-id,conformance-negative-duplicate-uuid|
-hydraulic_nodes.h|HydraulicNodeJunction|coordinate_wgs84|complete|conformance-export-coordinates-vertices|
+hydraulic_nodes.h|HydraulicNodeJunction|coordinate_wgs84|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84,conformance-import-geometry-missing-layout|
 hydraulic_nodes.h|HydraulicNodeJunctionEmitter|coefficient,pressure_exponent|complete|conformance-upstream-junction-reservoir-inputs,conformance-negative-invalid-emitter-configuration|
 hydraulic_nodes.h|HydraulicNodeJunction|elevation_input_type,elevation_m,terrain_elevation_m,elevation_offset_m,emitter|complete|conformance-upstream-junction-reservoir-inputs,conformance-upstream-dda-pda|
 hydraulic_nodes.h|HydraulicNodeJunction|demands|complete|conformance-upstream-demand-categories|
 hydraulic_nodes.h|HydraulicNodeJunction|initial_chemical_concentration_mg_per_l,initial_water_age_h,quality_source|complete|conformance-quality-input-chemical,conformance-quality-input-water-age,conformance-quality-input-source-trace|Chemical/water-age initial quality and node source configuration map to EPANET. Source trace uses the network-level trace node.
 hydraulic_nodes.h|HydraulicNodeJunction|metadata|complete|conformance-export-titles-comments-tags,conformance-negative-disabled-entity-pruning|
 hydraulic_nodes.h|HydraulicNodeReservoir|id,uuid|complete|conformance-net1,conformance-negative-duplicate-node-id,conformance-negative-duplicate-uuid|
-hydraulic_nodes.h|HydraulicNodeReservoir|coordinate_wgs84|complete|conformance-export-coordinates-vertices|
+hydraulic_nodes.h|HydraulicNodeReservoir|coordinate_wgs84|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84,conformance-import-geometry-missing-layout|
 hydraulic_nodes.h|HydraulicNodeReservoir|head_input_type,hydraulic_head_m,terrain_elevation_m,hydraulic_head_offset_m,head_pattern_mode,head_pattern_uuid|complete|conformance-upstream-junction-reservoir-inputs,conformance-upstream-demand-pattern|
 hydraulic_nodes.h|HydraulicNodeReservoir|initial_chemical_concentration_mg_per_l,initial_water_age_h,quality_source|complete|conformance-quality-input-chemical,conformance-quality-input-water-age,conformance-quality-input-source-trace|Chemical/water-age initial quality and source configuration map to EPANET. Source trace uses the network-level trace node.
 hydraulic_nodes.h|HydraulicNodeReservoir|metadata|complete|conformance-export-titles-comments-tags,conformance-negative-disabled-entity-pruning|
@@ -30,7 +30,7 @@ hydraulic_nodes.h|HydraulicNodeTank|initial_chemical_concentration_mg_per_l,init
 hydraulic_nodes.h|HydraulicNodeTank|metadata|complete|conformance-export-titles-comments-tags,conformance-negative-disabled-entity-pruning|
 hydraulic_links.h|HydraulicLinkPipe|id,uuid|complete|conformance-upstream-pipe-inputs,conformance-negative-duplicate-link-id,conformance-negative-duplicate-uuid|
 hydraulic_links.h|HydraulicLinkPipe|node_uuid_from,node_uuid_to,length_calculated_m,length_measured_m,initial_status,diameter_mm,roughness_hazen_williams,roughness_darcy_weisbach_mm,roughness_chezy_manning,minor_loss_coefficient|complete|conformance-upstream-pipe-inputs,conformance-upstream-pipe-darcy-weisbach,conformance-upstream-pipe-chezy-manning|
-hydraulic_links.h|HydraulicLinkPipe|vertices|complete|conformance-export-coordinates-vertices|
+hydraulic_links.h|HydraulicLinkPipe|vertices|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84|
 hydraulic_links.h|HydraulicLinkPipe|material_id|excluded-non-epanet||Material identity is AOWIS metadata, hydraulic roughness is mapped separately.
 hydraulic_links.h|HydraulicLinkPipe|override_bulk_reaction,bulk_reaction,override_wall_reaction,wall_reaction|complete|conformance-quality-input-chemical,conformance-quality-input-reactions|Pipe bulk and wall reaction overrides are independent, matching EPANET, while effective global/roughness-derived coefficients remain covered for every supported head-loss formula.
 hydraulic_links.h|HydraulicLinkPipe|leak_area_mm2_per_100m,leak_area_expansion_per_pressure_head_mm2_per_m|complete|conformance-upstream-leakage|
@@ -88,17 +88,17 @@ hydraulic_simulation_options.h|HydraulicSolverOptions|relative_viscosity|complet
 hydraulic_simulation_options.h|WaterQualitySolverOptions|analysis,chemical_name,trace_node_uuid,chemical_tolerance_mg_per_l,water_age_tolerance_h,source_trace_tolerance_percent,relative_diffusivity|complete|conformance-quality-input-none,conformance-quality-input-chemical,conformance-quality-input-water-age,conformance-quality-input-source-trace|Every quality mode, chemical metadata, trace node, mode-specific tolerance, and diffusivity map to EPANET.
 hydraulic_simulation_options.h|WaterQualityReactionOptions|global_pipe_bulk_reaction,global_pipe_wall_reaction,global_tank_bulk_reaction,limiting_concentration_mg_per_l,roughness_reaction_factor|complete|conformance-quality-input-chemical,conformance-quality-input-reactions|Reaction orders, limiting concentration, and effective global/roughness-derived coefficients map to EPANET.
 hydraulic_simulation_options.h|PumpEnergyOptions|currency_iso4217,global_pump_efficiency_percent,global_energy_price_per_kw_h,global_energy_price_pattern_uuid,demand_charge_per_kw|complete|conformance-upstream-pump-global-energy,conformance-upstream-pump-energy-pattern|
-hydraulic_simulation_options.h|HydraulicSimulationReportField|enabled,precision|complete|conformance-export-report-options|
-hydraulic_simulation_options.h|HydraulicSimulationReportFieldM|enabled,precision,below_m,above_m|complete|conformance-export-report-options|
-hydraulic_simulation_options.h|HydraulicSimulationReportFieldM3PerH|enabled,precision,below_m3_per_h,above_m3_per_h|complete|conformance-export-report-options|
-hydraulic_simulation_options.h|HydraulicSimulationReportFieldMm|enabled,precision,below_mm,above_mm|complete|conformance-export-report-options|
-hydraulic_simulation_options.h|HydraulicSimulationReportFieldMPerS|enabled,precision,below_m_per_s,above_m_per_s|complete|conformance-export-report-options|
-hydraulic_simulation_options.h|HydraulicSimulationReportFieldMPerKm|enabled,precision,below_m_per_km,above_m_per_km|complete|conformance-export-report-options|
-hydraulic_simulation_options.h|HydraulicSimulationReportFieldFrictionFactor|enabled,precision,below_friction_factor,above_friction_factor|complete|conformance-export-report-options|
+hydraulic_simulation_options.h|HydraulicSimulationReportField|enabled,precision|complete|conformance-export-report-options,conformance-import-metadata-report-fidelity|
+hydraulic_simulation_options.h|HydraulicSimulationReportFieldM|enabled,precision,below_m,above_m|complete|conformance-export-report-options,conformance-import-metadata-report-fidelity|
+hydraulic_simulation_options.h|HydraulicSimulationReportFieldM3PerH|enabled,precision,below_m3_per_h,above_m3_per_h|complete|conformance-export-report-options,conformance-import-metadata-report-fidelity|
+hydraulic_simulation_options.h|HydraulicSimulationReportFieldMm|enabled,precision,below_mm,above_mm|complete|conformance-export-report-options,conformance-import-metadata-report-fidelity|
+hydraulic_simulation_options.h|HydraulicSimulationReportFieldMPerS|enabled,precision,below_m_per_s,above_m_per_s|complete|conformance-export-report-options,conformance-import-metadata-report-fidelity|
+hydraulic_simulation_options.h|HydraulicSimulationReportFieldMPerKm|enabled,precision,below_m_per_km,above_m_per_km|complete|conformance-export-report-options,conformance-import-metadata-report-fidelity|
+hydraulic_simulation_options.h|HydraulicSimulationReportFieldFrictionFactor|enabled,precision,below_friction_factor,above_friction_factor|complete|conformance-export-report-options,conformance-import-metadata-report-fidelity|
 hydraulic_simulation_options.h|HydraulicSimulationReportNodeFields|elevation,demand,head,pressure,quality|complete|conformance-export-report-options|
 hydraulic_simulation_options.h|HydraulicSimulationReportLinkFields|length,diameter,flow,velocity,headloss,position,setting,reaction,friction|complete|conformance-export-report-options|
 hydraulic_simulation_options.h|HydraulicSimulationReportSelection|mode,uuids|complete|conformance-export-report-options|
-hydraulic_simulation_options.h|HydraulicSimulationReportOptions|page_size,status,summary,messages,energy,selection_nodes,selection_links,fields_node,fields_link,backend_commands|complete|conformance-export-report-options|
+hydraulic_simulation_options.h|HydraulicSimulationReportOptions|page_size,status,summary,messages,energy,selection_nodes,selection_links,fields_node,fields_link,backend_commands|complete|conformance-export-report-options,conformance-import-metadata-report-fidelity|
 hydraulic_simulation_results.h|HydraulicSimulationResultNodeJunction|id,uuid,demand_requested_m3_per_h,demand_delivered_m3_per_h,demand_deficit_m3_per_h,total_demand_m3_per_h,emitter_flow_m3_per_h,leakage_flow_m3_per_h,hydraulic_head_m,pressure_head_m,appears_in_control|complete|conformance-net1,conformance-upstream-dda-pda,conformance-upstream-leakage,conformance-controls-simple-low-level|
 hydraulic_simulation_results.h|HydraulicSimulationResultNodeReservoir|id,uuid,net_demand_m3_per_h,hydraulic_head_m,pressure_head_m,appears_in_control|complete|conformance-net1,conformance-upstream-junction-reservoir-inputs|
 hydraulic_simulation_results.h|HydraulicSimulationResultNodeTank|id,uuid,net_demand_m3_per_h,hydraulic_head_m,pressure_head_m,water_level_m,volume_m3,mixing_zone_volume_m3,appears_in_control|complete|conformance-net1,conformance-upstream-tank-overflow,conformance-upstream-tank-volume-curve|
@@ -131,11 +131,11 @@ hydraulic_simulation_status.h|HydraulicSimulationStatusEntity|index|excluded-run
 hydraulic_simulation_status.h|HydraulicSimulationStatus|success,stage,operation,property,entity,message,details,backend_name,backend_error_code,backend_operation,message_backend|complete|conformance-operational-warning-diagnostics,conformance-operational-error-diagnostics,conformance-negative-structured-diagnostics|
 hydraulic_simulation_diagnostics.h|HydraulicSimulationDiagnostic|severity,stage,operation,property,entity,message,details,backend_name,backend_error_code,backend_operation,message_backend|complete|conformance-operational-warning-diagnostics,conformance-operational-error-diagnostics,conformance-negative-structured-diagnostics|
 hydraulic_map.h|HydraulicMapLabel|id,uuid|excluded-non-epanet||AOWIS map-label identity is not serialized by EPANET.
-hydraulic_map.h|HydraulicMapLabel|coordinate_wgs84,text,anchor_node_uuid|complete|conformance-export-coordinates-vertices,conformance-negative-invalid-map-numeric,conformance-negative-missing-map-label-anchor|
-hydraulic_map.h|HydraulicMapBackdrop|enabled,lower_left_wgs84,upper_right_wgs84,file,offset_longitude_deg,offset_latitude_deg|complete|conformance-export-coordinates-vertices|
+hydraulic_map.h|HydraulicMapLabel|coordinate_wgs84,text,anchor_node_uuid|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84,conformance-negative-invalid-map-numeric,conformance-negative-missing-map-label-anchor|
+hydraulic_map.h|HydraulicMapBackdrop|enabled,lower_left_wgs84,upper_right_wgs84,file,offset_longitude_deg,offset_latitude_deg|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84|
 network_hydraulic.h|NetworkHydraulicCustomerPoint|id,uuid|excluded-non-epanet||Customer-point identity is application metadata, hydraulic demands are represented on junctions.
 network_hydraulic.h|NetworkHydraulic|id,uuid|excluded-non-epanet||Network application identity is not an EPANET simulation input.
-network_hydraulic.h|NetworkHydraulic|title_line_1,title_line_2,title_line_3|complete|conformance-export-titles-comments-tags|
+network_hydraulic.h|NetworkHydraulic|title_line_1,title_line_2,title_line_3|complete|conformance-export-titles-comments-tags,conformance-import-project-globals-net1,conformance-import-metadata-report-fidelity|
 network_hydraulic.h|NetworkHydraulic|duration_s|complete|conformance-options-time-duration|
 network_hydraulic.h|NetworkHydraulic|timestep_hydraulic_s|complete|conformance-options-time-hydraulic-step|
 network_hydraulic.h|NetworkHydraulic|timestep_quality_s|complete|conformance-options-time-quality-step|

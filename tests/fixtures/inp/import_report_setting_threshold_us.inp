@@ -1,0 +1,23 @@
+[TITLE]
+Setting threshold import diagnostic
+
+[JUNCTIONS]
+ J1 100 25
+
+[RESERVOIRS]
+ R1 250
+
+[PIPES]
+ P1 R1 J1 1000 12 110 0 Open
+
+[REPORT]
+ Links               All
+ Setting             Yes
+ Setting             Below 50
+
+[OPTIONS]
+ Units               GPM
+ Pressure            PSI
+ Quality             None
+
+[END]

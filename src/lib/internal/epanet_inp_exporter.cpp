@@ -172,6 +172,85 @@ QString preserveMapLayoutSections(QString inp_text, const NetworkHydraulic &netw
     return retained_lines.join(QChar('\n'));
 }
 
+QString reportCommandKey(const QString &command)
+{
+    const QStringList tokens = command.simplified().split(QChar(' '), Qt::SkipEmptyParts);
+    if (tokens.isEmpty())
+        return QString();
+
+    const QString first = tokens.first().toUpper();
+    if (tokens.size() == 1)
+        return first;
+
+    const QString second = tokens.at(1).toUpper();
+    if (second == QStringLiteral("YES")
+        || second == QStringLiteral("NO")
+        || second == QStringLiteral("PRECISION")
+        || second == QStringLiteral("BELOW")
+        || second == QStringLiteral("ABOVE"))
+    {
+        return first + QLatin1Char(' ') + second;
+    }
+
+    if (first == QStringLiteral("FILE"))
+        return first;
+
+    return command.simplified().toUpper();
+}
+
+QString preserveBackendReportCommands(
+    QString inp_text,
+    const QStringList &backend_commands)
+{
+    if (backend_commands.isEmpty())
+        return inp_text;
+
+    QStringList lines = inp_text.split(QChar('\n'));
+    int report_section_index = -1;
+    int next_section_index = lines.size();
+    for (int index = 0; index < lines.size(); index++)
+    {
+        const QString trimmed = lines.at(index).trimmed();
+        if (trimmed.compare(QStringLiteral("[REPORT]"), Qt::CaseInsensitive) == 0)
+        {
+            report_section_index = index;
+            continue;
+        }
+        if (report_section_index >= 0
+            && index > report_section_index
+            && trimmed.startsWith(QChar('[')))
+        {
+            next_section_index = index;
+            break;
+        }
+    }
+
+    if (report_section_index < 0)
+        return inp_text;
+
+    for (const QString &backend_command : backend_commands)
+    {
+        const QString command = backend_command.simplified();
+        if (command.isEmpty())
+            continue;
+
+        const QString command_key = reportCommandKey(command);
+        for (int index = next_section_index - 1; index > report_section_index; index--)
+        {
+            if (reportCommandKey(lines.at(index).trimmed()) != command_key)
+                continue;
+
+            lines.removeAt(index);
+            next_section_index--;
+        }
+
+        lines.insert(next_section_index, QLatin1Char(' ') + command);
+        next_section_index++;
+    }
+
+    return lines.join(QChar('\n'));
+}
+
 QString preserveFrictionReportField(QString inp_text, const HydraulicSimulationReportOptions &options)
 {
     QStringList commands;
@@ -362,6 +441,12 @@ HydraulicSimulationStatus retrieveEpanetInpText(
 
         inp_text = preserveNoDefaultDemandPattern(inp_text, unused_pattern_id);
     }
+
+    // EN_saveinpfile() does not serialize every accepted [REPORT] command.
+    // Preserve backend commands explicitly so report directives imported through
+    // the backend-command escape hatch survive generated-INP round trips.
+    inp_text = preserveBackendReportCommands(
+        inp_text, request.options_report.backend_commands);
 
     // EPANET 2.3's native INP writer currently omits the final F-Factor report
     // field from [REPORT]. Reinsert the effective configured value so reopening

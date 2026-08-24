@@ -1,0 +1,69 @@
+[TITLE]
+Metadata and report import fixture
+US report units
+
+[JUNCTIONS]
+ J1 100 25 ; Junction comment
+
+[RESERVOIRS]
+ R1 250 ; Reservoir comment
+
+[PIPES]
+ P1 R1 J1 1000 12 110 0 Open ; Pipe comment
+
+[TAGS]
+ NODE J1 JunctionTag
+ NODE R1 ReservoirTag
+ LINK P1 PipeTag
+
+[REPORT]
+ Page                77
+ Status              Full
+ Summary             No
+ Messages            No
+ Energy              Yes
+ Nodes               J1 R1
+ Links               P1
+ Elevation           Yes
+ Elevation           Precision 3
+ Elevation           Below 90
+ Elevation           Above 150
+ Demand              Precision 4
+ Demand              Below 10
+ Demand              Above 50
+ Head                Precision 5
+ Head                Below 200
+ Pressure            Precision 6
+ Pressure            Below 20
+ Quality             No
+ Length              Yes
+ Length              Precision 1
+ Length              Below 500
+ Diameter            Yes
+ Diameter            Below 10
+ Flow                Precision 3
+ Flow                Below 100
+ Velocity            Precision 4
+ Velocity            Below 2
+ Headloss            Precision 5
+ Headloss            Below 5
+ State               Yes
+ State               Precision 0
+ State               Below 1
+ Setting             Yes
+ Setting             Precision 2
+ Reaction            Yes
+ Reaction            Precision 3
+ Reaction            Below 0.02
+ F-Factor            Yes
+ F-Factor            Precision 4
+ F-Factor            Below 0.01
+ File                report-output.rpt
+
+[OPTIONS]
+ Units               GPM
+ Pressure            PSI
+ Specific Gravity    1.2
+ Quality             None
+
+[END]

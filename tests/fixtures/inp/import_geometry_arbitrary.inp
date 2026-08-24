@@ -1,0 +1,25 @@
+[TITLE]
+Import Geometry Arbitrary Fixture
+
+[JUNCTIONS]
+ J1 100 10
+
+[RESERVOIRS]
+ R1 120
+
+[PIPES]
+ P1 R1 J1 1000 300 120 0 Open
+
+[OPTIONS]
+ Units CMH
+ Headloss H-W
+ Quality None
+
+[COORDINATES]
+ R1 10 20
+ J1 1010 20
+
+[BACKDROP]
+ UNITS NONE
+
+[END]

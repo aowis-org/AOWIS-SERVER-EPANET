@@ -1,0 +1,28 @@
+[TITLE]
+Import Geometry Meters Fixture
+
+[JUNCTIONS]
+ J1 100 10
+
+[RESERVOIRS]
+ R1 120
+
+[PIPES]
+ P1 R1 J1 1000 300 120 0 Open
+
+[OPTIONS]
+ Units CMH
+ Headloss H-W
+ Quality None
+
+[COORDINATES]
+ R1 1000 2000
+ J1 2000 2000
+
+[VERTICES]
+ P1 1500 2100
+
+[BACKDROP]
+ UNITS METERS
+
+[END]

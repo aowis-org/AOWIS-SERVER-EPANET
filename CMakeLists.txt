@@ -72,6 +72,77 @@ if(NOT TARGET AOWIS::ServerModel)
     )
 endif()
 
+if(TARGET GeographicLib_STATIC)
+    # When embedded in AOWIS-SERVER-GUI, reuse the GeographicLib target that
+    # the parent project already provides.
+    set(AOWIS_SERVER_EPANET_GEOGRAPHICLIB_TARGET GeographicLib_STATIC)
+else()
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/GeographicLib/include/GeographicLib/LocalCartesian.hpp")
+        set(AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR
+            "${CMAKE_CURRENT_SOURCE_DIR}/external/GeographicLib")
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../GeographicLib/include/GeographicLib/LocalCartesian.hpp")
+        # Standalone adapter builds inside the GUI checkout can use the GUI's
+        # GeographicLib source tree even when the adapter-local submodule has
+        # not been initialized yet.
+        set(AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR
+            "${CMAKE_CURRENT_SOURCE_DIR}/../GeographicLib")
+    else()
+        message(FATAL_ERROR
+            "GeographicLib is required for INP geometry import. Add the adapter-local "
+            "submodule at external/GeographicLib (GeographicLib 2.7 / r2.7), or build "
+            "the adapter from the GUI checkout where ../GeographicLib is available."
+        )
+    endif()
+
+    # GeographicLib 2.7 unconditionally registers its own large CTest suite
+    # from its top-level CMakeLists.txt. The adapter only needs LocalCartesian,
+    # so build that dependency directly instead of polluting the AOWIS test
+    # registry with GeographicLib tests and tools.
+    include(TestBigEndian)
+    test_big_endian(AOWIS_SERVER_EPANET_GEOGRAPHICLIB_BIG_ENDIAN)
+    if(AOWIS_SERVER_EPANET_GEOGRAPHICLIB_BIG_ENDIAN)
+        set(AOWIS_SERVER_EPANET_GEOGRAPHICLIB_BIG_ENDIAN_VALUE 1)
+    else()
+        set(AOWIS_SERVER_EPANET_GEOGRAPHICLIB_BIG_ENDIAN_VALUE 0)
+    endif()
+
+    set(AOWIS_SERVER_EPANET_GEOGRAPHICLIB_GENERATED_INCLUDE_DIR
+        "${CMAKE_CURRENT_BINARY_DIR}/_deps/geographiclib-minimal/include")
+    file(MAKE_DIRECTORY
+        "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_GENERATED_INCLUDE_DIR}/GeographicLib")
+    file(WRITE
+        "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_GENERATED_INCLUDE_DIR}/GeographicLib/Config.h"
+        "#define GEOGRAPHICLIB_VERSION_STRING \"2.7.0\"\n"
+        "#define GEOGRAPHICLIB_VERSION_MAJOR 2\n"
+        "#define GEOGRAPHICLIB_VERSION_MINOR 7\n"
+        "#define GEOGRAPHICLIB_VERSION_PATCH 0\n"
+        "#define GEOGRAPHICLIB_DATA \"\"\n"
+        "#define GEOGRAPHICLIB_HAVE_LONG_DOUBLE 0\n"
+        "#define GEOGRAPHICLIB_WORDS_BIGENDIAN ${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_BIG_ENDIAN_VALUE}\n"
+        "#define GEOGRAPHICLIB_PRECISION 2\n"
+        "#define GEOGRAPHICLIB_SHARED_LIB 0\n"
+    )
+
+    add_library(aowis-server-epanet-geographiclib STATIC
+        "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/src/Math.cpp"
+        "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/src/Geocentric.cpp"
+        "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/src/LocalCartesian.cpp"
+    )
+    target_include_directories(aowis-server-epanet-geographiclib
+        PUBLIC
+            "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_GENERATED_INCLUDE_DIR}"
+            "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/include"
+    )
+    target_compile_definitions(aowis-server-epanet-geographiclib
+        PUBLIC GEOGRAPHICLIB_SHARED_LIB=0)
+    target_compile_features(aowis-server-epanet-geographiclib PUBLIC cxx_std_20)
+    set_target_properties(aowis-server-epanet-geographiclib PROPERTIES
+        POSITION_INDEPENDENT_CODE ON)
+
+    set(AOWIS_SERVER_EPANET_GEOGRAPHICLIB_TARGET
+        aowis-server-epanet-geographiclib)
+endif()
+
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/epanet/CMakeLists.txt")
     message(FATAL_ERROR
         "EPANET submodule is missing. Run: git submodule update --init --recursive"

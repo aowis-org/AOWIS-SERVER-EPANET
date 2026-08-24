@@ -1,0 +1,20 @@
+[TITLE]
+Import Geometry Missing Fixture
+
+[JUNCTIONS]
+ J1 100 10
+ J2 105 5
+
+[RESERVOIRS]
+ R1 120
+
+[PIPES]
+ P1 R1 J1 1000 300 120 0 Open
+ P2 J1 J2 1000 300 120 0 Open
+
+[OPTIONS]
+ Units CMH
+ Headloss H-W
+ Quality None
+
+[END]

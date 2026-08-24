@@ -1,0 +1,23 @@
+[TITLE]
+Canonical setting threshold import
+
+[JUNCTIONS]
+ J1 20 10
+
+[RESERVOIRS]
+ R1 100
+
+[PIPES]
+ P1 R1 J1 1000 100 100 0 Open
+
+[REPORT]
+ Links               All
+ Setting             Yes
+ Setting             Below 5
+
+[OPTIONS]
+ Units               CMH
+ Pressure            Meters
+ Quality             None
+
+[END]

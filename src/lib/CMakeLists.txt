@@ -11,6 +11,9 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/internal/epanet_hydraulic_run_configurator.cpp
     src/lib/internal/epanet_hydraulic_solver.cpp
     src/lib/internal/epanet_inp_exporter.cpp
+    src/lib/internal/epanet_inp_geometry_importer.cpp
+    src/lib/internal/epanet_inp_metadata_importer.cpp
+    src/lib/internal/epanet_inp_report_importer.cpp
     src/lib/internal/epanet_inp_importer.cpp
     src/lib/internal/epanet_network_builder.cpp
     src/lib/internal/epanet_network_builder_controls.cpp
@@ -60,6 +63,9 @@ set(AOWIS_SERVER_EPANET_INTERNAL_HEADERS
     src/lib/internal/epanet_hydraulic_run_configurator.h
     src/lib/internal/epanet_hydraulic_solver.h
     src/lib/internal/epanet_inp_exporter.h
+    src/lib/internal/epanet_inp_geometry_importer.h
+    src/lib/internal/epanet_inp_metadata_importer.h
+    src/lib/internal/epanet_inp_report_importer.h
     src/lib/internal/epanet_inp_importer.h
     src/lib/internal/epanet_index_registry.h
     src/lib/internal/epanet_network_builder.h
@@ -107,6 +113,8 @@ target_link_libraries(aowis-server-epanet
         Qt6::Core
         AOWIS::ServerModel
         epanet2
+    PRIVATE
+        ${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_TARGET}
 )
 
 target_compile_features(aowis-server-epanet PUBLIC cxx_std_20)

@@ -1,6 +1,9 @@
 #include "epanet_inp_importer.h"
 
 #include "epanet_diagnostic_helpers.h"
+#include "epanet_inp_geometry_importer.h"
+#include "epanet_inp_metadata_importer.h"
+#include "epanet_inp_report_importer.h"
 #include "epanet_project.h"
 #include "epanet_status_helpers.h"
 
@@ -642,7 +645,7 @@ HydraulicSimulationStatus readObjectComment(
             entity_type);
     }
 
-    comment = QString::fromUtf8(value);
+    comment = QString::fromUtf8(value).trimmed();
     return makeEpanetSuccess();
 }
 
@@ -3613,14 +3616,6 @@ HydraulicSimulationStatus importWaterQualityConfiguration(
     return makeEpanetSuccess();
 }
 
-HydraulicSimulationStatus collectDeferredImportDiagnostics(EpanetResultImport &result)
-{
-    appendImportWarning(
-        result,
-        QStringLiteral("Report directives beyond status level and statistic are not imported."),
-        HydraulicSimulationStatusEntityType::Report);
-    return makeEpanetSuccess();
-}
 }
 
 EpanetResultImport importEpanetInp(const QString &input_file_path)
@@ -3645,6 +3640,27 @@ EpanetResultImport importEpanetInp(const QString &input_file_path)
             HydraulicSimulationStatusEntityType::HydraulicSolver);
         return finishImport(std::move(result), status, project);
     }
+
+    double source_pressure_units_value = EN_METERS;
+    status = readOption(
+        project, EN_PRESS_UNITS, source_pressure_units_value,
+        QStringLiteral("EN_PRESS_UNITS"),
+        HydraulicSimulationStatusEntityType::HydraulicSolver);
+    if (!status.success)
+        return finishImport(std::move(result), status, project);
+
+    double source_specific_gravity = 1.0;
+    status = readOption(
+        project, EN_SP_GRAVITY, source_specific_gravity,
+        QStringLiteral("EN_SP_GRAVITY"),
+        HydraulicSimulationStatusEntityType::HydraulicSolver);
+    if (!status.success)
+        return finishImport(std::move(result), status, project);
+
+    EpanetInpSourceUnits source_units;
+    source_units.flow_units = source_flow_units;
+    source_units.pressure_units = static_cast<int>(std::llround(source_pressure_units_value));
+    source_units.specific_gravity = source_specific_gravity;
 
     status = normalizeProjectToCanonicalUnits(project, source_flow_units);
     if (!status.success)
@@ -3681,6 +3697,10 @@ EpanetResultImport importEpanetInp(const QString &input_file_path)
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
+    status = importEpanetInpGeometry(project, input_file_path, result);
+    if (!status.success)
+        return finishImport(std::move(result), status, project);
+
     status = importWaterQualityConfiguration(
         project, input_file_path, result, references, source_flow_units);
     if (!status.success)
@@ -3694,11 +3714,15 @@ EpanetResultImport importEpanetInp(const QString &input_file_path)
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
-    status = importReportStatus(project, network);
+    status = importEpanetInpEntityMetadata(project, result);
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
-    status = collectDeferredImportDiagnostics(result);
+    status = importEpanetInpReport(project, input_file_path, result, source_units);
+    if (!status.success)
+        return finishImport(std::move(result), status, project);
+
+    status = importReportStatus(project, network);
     if (!status.success)
         return finishImport(std::move(result), status, project);
 

@@ -18,3 +18,6 @@ Current purpose-built fixtures:
 - `import_quality_age.inp` exercises AGE mode, initial water age, tolerance, quality timestep, and native quality equivalence.
 - `import_quality_trace.inp` exercises TRACE mode, trace-node UUID resolution, percent tolerance, quality timestep, and native quality equivalence.
 - `import_quality_wall_reaction_us.inp`: US-customary CHEMICAL fixture proving zero-order wall-reaction area-basis conversion to canonical square-metre semantics.
+- `import_metadata_report_us.inp` exercises node/link comments and tags plus the complete representable `[REPORT]` surface, including canonical threshold conversion, selected entities, generic backend qualifiers, and report-file preservation.
+- `import_report_setting_threshold_canonical.inp` proves that `SETTING BELOW/ABOVE` filters are retained exactly when source flow/pressure units already match AOWIS canonical CMH/metres.
+- `import_report_setting_threshold_us.inp` proves that non-canonical `SETTING BELOW/ABOVE` report filters are diagnosed instead of being silently mis-scaled across link-setting unit families.

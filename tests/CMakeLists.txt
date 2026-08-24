@@ -144,6 +144,14 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-import-quality-sources-canonical-units
     conformance-import-quality-mixing-reactions-canonical-units
     conformance-import-quality-net1-equivalence
+    conformance-import-geometry-degrees-wgs84
+    conformance-import-geometry-meters-null-island
+    conformance-import-geometry-feet-null-island
+    conformance-import-geometry-arbitrary-null-island
+    conformance-import-geometry-missing-layout
+    conformance-import-metadata-report-fidelity
+    conformance-import-report-setting-threshold-canonical
+    conformance-import-report-setting-threshold-diagnostic
     conformance-import-open-error-diagnostic
     conformance-export-native-reopen
     conformance-export-titles-comments-tags
@@ -302,6 +310,14 @@ target_compile_definitions(aowis-server-epanet-conformance-tests
         AOWIS_EPANET_TEST_IMPORT_QUALITY_WALL_REACTION_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_wall_reaction_us.inp"
         AOWIS_EPANET_TEST_IMPORT_QUALITY_AGE_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_age.inp"
         AOWIS_EPANET_TEST_IMPORT_QUALITY_TRACE_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_quality_trace.inp"
+        AOWIS_EPANET_TEST_IMPORT_GEOMETRY_DEGREES_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_geometry_degrees.inp"
+        AOWIS_EPANET_TEST_IMPORT_GEOMETRY_METERS_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_geometry_meters.inp"
+        AOWIS_EPANET_TEST_IMPORT_GEOMETRY_FEET_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_geometry_feet.inp"
+        AOWIS_EPANET_TEST_IMPORT_GEOMETRY_ARBITRARY_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_geometry_arbitrary.inp"
+        AOWIS_EPANET_TEST_IMPORT_GEOMETRY_MISSING_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_geometry_missing.inp"
+        AOWIS_EPANET_TEST_IMPORT_METADATA_REPORT_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_metadata_report_us.inp"
+        AOWIS_EPANET_TEST_IMPORT_REPORT_SETTING_THRESHOLD_CANONICAL_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_report_setting_threshold_canonical.inp"
+        AOWIS_EPANET_TEST_IMPORT_REPORT_SETTING_THRESHOLD_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_report_setting_threshold_us.inp"
 )
 
 foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_TEST_SCENARIOS)
@@ -348,7 +364,7 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "stress")
     endif()
 
-    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "coordinates-vertices|map-label")
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "coordinates-vertices|map-label|^conformance-import-geometry-")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "coordinate")
     endif()
 
