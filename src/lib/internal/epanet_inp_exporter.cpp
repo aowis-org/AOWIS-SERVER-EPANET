@@ -247,24 +247,24 @@ QString preserveMapLayoutSections(QString inp_text, const NetworkHydraulic &netw
         layout_lines.append(QString());
     }
 
+    layout_lines.append(QStringLiteral("[BACKDROP]"));
     if (network.map_backdrop.enabled)
     {
-        layout_lines.append(QStringLiteral("[BACKDROP]"));
         layout_lines.append(QStringLiteral("DIMENSIONS %1 %2 %3 %4")
             .arg(mapNumber(network.map_backdrop.lower_left_wgs84.longitude_deg),
                 mapNumber(network.map_backdrop.lower_left_wgs84.latitude_deg),
                 mapNumber(network.map_backdrop.upper_right_wgs84.longitude_deg),
                 mapNumber(network.map_backdrop.upper_right_wgs84.latitude_deg)));
-        layout_lines.append(QStringLiteral("UNITS DEGREES"));
+    }
+    layout_lines.append(QStringLiteral("UNITS DEGREES"));
+    if (network.map_backdrop.enabled)
+    {
         layout_lines.append(QStringLiteral("FILE %1").arg(network.map_backdrop.file));
         layout_lines.append(QStringLiteral("OFFSET %1 %2")
             .arg(mapNumber(network.map_backdrop.offset_longitude_deg),
                 mapNumber(network.map_backdrop.offset_latitude_deg)));
-        layout_lines.append(QString());
     }
-
-    if (layout_lines.isEmpty())
-        return retained_lines.join(QChar('\n'));
+    layout_lines.append(QString());
 
     int end_index = retained_lines.size();
     for (int index = 0; index < retained_lines.size(); index++)
@@ -572,7 +572,8 @@ HydraulicSimulationStatus retrieveEpanetInpText(
 
     // AOWIS hydraulic geometry uses canonical WGS84 longitude/latitude. EPANET
     // [COORDINATES], [VERTICES], [LABELS], and [BACKDROP] therefore share that
-    // same degree-based map space in generated INP files.
+    // same degree-based map space in generated INP files. Always retain a
+    // [BACKDROP] UNITS DEGREES declaration, even when no backdrop image is active.
     inp_text = preserveMapLayoutSections(inp_text, request);
 
     return makeEpanetSuccess();

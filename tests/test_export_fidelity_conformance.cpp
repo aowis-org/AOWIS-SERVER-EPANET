@@ -595,6 +595,75 @@ void scenarioCoordinatesVertices(TestContext &context)
         "Generated [BACKDROP] must preserve WGS84 degree offsets");
 }
 
+void scenarioCoordinatesWithoutBackdropRoundTrip(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    network.map_backdrop.enabled = false;
+    network.nodes_junctions.first().coordinate_wgs84.longitude_deg = 18.192000;
+    network.nodes_junctions.first().coordinate_wgs84.latitude_deg = 11.981190;
+    network.nodes_reservoirs.first().coordinate_wgs84.longitude_deg = 18.190800;
+    network.nodes_reservoirs.first().coordinate_wgs84.latitude_deg = 11.981190;
+    network.nodes_tanks.first().coordinate_wgs84.longitude_deg = 18.195000;
+    network.nodes_tanks.first().coordinate_wgs84.latitude_deg = 11.979580;
+
+    NativeSavedProject native(network);
+    const QString backdrop = sectionText(native.inpText(), QStringLiteral("BACKDROP"));
+    context.expect(sectionContainsCommand(backdrop, QStringLiteral("UNITS DEGREES")),
+        "Generated INP without an active backdrop must still declare WGS84 degree map units");
+    context.expect(!backdrop.contains(QStringLiteral("DIMENSIONS"), Qt::CaseInsensitive),
+        "Disabled backdrop must not export backdrop dimensions");
+    context.expect(!backdrop.contains(QStringLiteral("FILE"), Qt::CaseInsensitive),
+        "Disabled backdrop must not export a backdrop file");
+    context.expect(!backdrop.contains(QStringLiteral("OFFSET"), Qt::CaseInsensitive),
+        "Disabled backdrop must not export backdrop offsets");
+
+    QTemporaryDir directory;
+    context.expect(directory.isValid(), "Coordinate round-trip temporary directory must be available");
+    if (!directory.isValid())
+        return;
+
+    const QString input_path = directory.filePath(QStringLiteral("coordinates-without-backdrop.inp"));
+    QFile input_file(input_path);
+    context.expect(input_file.open(QIODevice::WriteOnly | QIODevice::Truncate),
+        "Generated coordinate round-trip INP must be writable");
+    if (!input_file.isOpen())
+        return;
+    const QByteArray input_text = native.inpText().toUtf8();
+    const qint64 bytes_written = input_file.write(input_text);
+    context.expect(bytes_written == input_text.size(),
+        "Generated coordinate round-trip INP must be written completely");
+    input_file.close();
+    if (bytes_written != input_text.size())
+        return;
+
+    const EpanetResultImport imported = EpanetRunner().importInp(input_path);
+    context.expect(imported.status.success,
+        "Generated INP without an active backdrop must re-import successfully");
+    if (!imported.status.success)
+        return;
+
+    context.expect(imported.source_geometry.units_declared,
+        "Round-tripped coordinate geometry must retain an explicit map-unit declaration");
+    context.expectEqual(static_cast<std::int64_t>(imported.source_geometry.units),
+        static_cast<std::int64_t>(EpanetImportMapUnits::Degrees),
+        comparison("source_geometry.units"));
+    context.expect(!imported.request.network.map_backdrop.enabled,
+        "UNITS DEGREES metadata alone must not enable an AOWIS map backdrop");
+
+    context.expectNear(imported.request.network.nodes_junctions.first().coordinate_wgs84.longitude_deg,
+        18.192000, NumericTolerance{1.0e-9, 0.0}, comparison("longitude_deg", "Junction", network.nodes_junctions.first().id.toStdString()));
+    context.expectNear(imported.request.network.nodes_junctions.first().coordinate_wgs84.latitude_deg,
+        11.981190, NumericTolerance{1.0e-9, 0.0}, comparison("latitude_deg", "Junction", network.nodes_junctions.first().id.toStdString()));
+    context.expectNear(imported.request.network.nodes_reservoirs.first().coordinate_wgs84.longitude_deg,
+        18.190800, NumericTolerance{1.0e-9, 0.0}, comparison("longitude_deg", "Reservoir", network.nodes_reservoirs.first().id.toStdString()));
+    context.expectNear(imported.request.network.nodes_reservoirs.first().coordinate_wgs84.latitude_deg,
+        11.981190, NumericTolerance{1.0e-9, 0.0}, comparison("latitude_deg", "Reservoir", network.nodes_reservoirs.first().id.toStdString()));
+    context.expectNear(imported.request.network.nodes_tanks.first().coordinate_wgs84.longitude_deg,
+        18.195000, NumericTolerance{1.0e-9, 0.0}, comparison("longitude_deg", "Tank", network.nodes_tanks.first().id.toStdString()));
+    context.expectNear(imported.request.network.nodes_tanks.first().coordinate_wgs84.latitude_deg,
+        11.979580, NumericTolerance{1.0e-9, 0.0}, comparison("latitude_deg", "Tank", network.nodes_tanks.first().id.toStdString()));
+}
+
 void scenarioReportOptions(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
@@ -1119,6 +1188,11 @@ void registerExportFidelityScenarios(ScenarioRegistry &registry)
         "Maps source-trace analysis, trace-node reference, initial trace percentage, and tolerance into EPANET.",
         {"conformance", "quality", "mapping", "export"},
         &scenarioQualityInputSourceTrace});
+    registry.add(ScenarioDefinition{
+        "conformance-export-coordinates-without-backdrop-roundtrip",
+        "Export WGS84 geometry without an active backdrop, declare degree units explicitly, and re-import at the original geographic coordinates.",
+        {"conformance", "export", "import", "coordinate", "proof"},
+        &scenarioCoordinatesWithoutBackdropRoundTrip});
     registry.add(ScenarioDefinition{
         "conformance-export-report-options",
         "Persist general, selection, and typed report options in a native-reopenable generated INP.",
