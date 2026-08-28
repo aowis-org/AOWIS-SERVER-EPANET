@@ -167,6 +167,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-export-titles-comments-tags
     conformance-export-patterns-curves
     conformance-export-coordinates-vertices
+    conformance-export-coordinates-without-backdrop-roundtrip
     conformance-export-report-options
     conformance-export-multiple-quality-rejected
     conformance-quality-input-none
@@ -394,11 +395,13 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "stress")
     endif()
 
-    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "coordinates-vertices|map-label|^conformance-import-geometry-")
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "coordinates-vertices|map-label|^conformance-import-geometry-"
+       OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-export-coordinates-without-backdrop-roundtrip")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "coordinate")
     endif()
 
-    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-import-")
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-import-"
+       OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-export-coordinates-without-backdrop-roundtrip")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "import")
     endif()
 
@@ -406,6 +409,8 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "proof")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-reentrancy-independent-runners")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "quality" "proof")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-export-coordinates-without-backdrop-roundtrip")
+        list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "proof")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-import-quality-net1-equivalence"
            OR AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-import-(quality-)?roundtrip-")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "proof")
