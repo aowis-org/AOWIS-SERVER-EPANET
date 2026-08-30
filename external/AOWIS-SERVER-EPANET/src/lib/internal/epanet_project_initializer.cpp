@@ -100,6 +100,11 @@ HydraulicSimulationStatus initializeEpanetProject(
             return epanet_status;
     }
 
+    // EN_init() emits EPANET's native logo through the report callback. Keep it
+    // separate from generated report bodies so the combined UI output can show
+    // the logo once without changing EN_report() collection semantics.
+    report_collector.captureCurrentLinesAsHeader();
+
     error = EN_setreportcallbackuserdata(project.handle(), &report_collector);
     if (error != 0)
     {
@@ -115,8 +120,6 @@ HydraulicSimulationStatus initializeEpanetProject(
         if (!epanet_status.success)
             return epanet_status;
     }
-
-    report_collector.preserveHeader();
 
     const QByteArray title_line_1 = request.title_line_1.toUtf8();
     const QByteArray title_line_2 = request.title_line_2.toUtf8();
@@ -248,3 +251,4 @@ HydraulicSimulationStatus initializeEpanetProject(
 
     return makeEpanetSuccess();
 }
+

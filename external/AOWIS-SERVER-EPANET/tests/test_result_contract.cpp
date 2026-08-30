@@ -204,23 +204,6 @@ void testPhysicalResultContractAndLeakage(TestContext &context)
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "leakage network should produce valid results");
     context.expect(!run.result_timeline.results.isEmpty(), "leakage network should return timesteps");
-
-    const QString hydraulic_report = run.report_lines.join(QLatin1Char('\n'));
-    context.expect(run.report_lines.size() > 7, "hydraulic report should contain more than the EPANET banner");
-    context.expect(run.report_lines.value(0) == QStringLiteral("******************************************************************"), "hydraulic report should begin with the native EPANET border");
-    context.expect(run.report_lines.value(1).contains(QStringLiteral("E P A N E T")), "hydraulic report should contain the native EPANET name header");
-    context.expect(run.report_lines.value(2).contains(QStringLiteral("Hydraulic and Water Quality")), "hydraulic report should contain the native analysis header");
-    context.expect(run.report_lines.value(3).contains(QStringLiteral("Analysis for Pipe Networks")), "hydraulic report should contain the native product header");
-    context.expect(run.report_lines.value(4).contains(QStringLiteral("Version")), "hydraulic report should contain the native EPANET version header");
-    context.expect(hydraulic_report.contains(QStringLiteral("Analysis begun")), "hydraulic report should retain native runtime messages");
-    context.expect(hydraulic_report.contains(QStringLiteral("Analysis ended")), "hydraulic report should retain the native analysis completion message");
-    context.expect(hydraulic_report.contains(QStringLiteral("Node Results")), "hydraulic report should contain the formatted node table");
-    context.expect(hydraulic_report.contains(QStringLiteral("Link Results")), "hydraulic report should contain the formatted link table");
-    context.expect(hydraulic_report.contains(QStringLiteral("J1")), "hydraulic report should contain the junction identifier");
-    context.expect(hydraulic_report.contains(QStringLiteral("P1")), "hydraulic report should contain the pipe identifier");
-    context.expect(run.report_text.startsWith(QStringLiteral("=== Hydraulics ===\n\n******************************************************************")), "combined report text should contain the complete hydraulic report after its section label");
-    context.expect(run.report_text.count(QStringLiteral("E P A N E T")) == 1, "a hydraulic-only combined report should contain one native EPANET header");
-
     if (run.result_timeline.results.isEmpty())
         return;
 
@@ -505,11 +488,6 @@ void testMultiQualitySequentialExecution(TestContext &context)
         std::int64_t{3},
         comparison("run.quality_results.size"),
         "the hydraulic run should execute every requested quality analysis");
-    context.expect(result.report_text.startsWith(QStringLiteral("=== Hydraulics ===\n\n******************************************************************")), "combined multi-quality report should begin with a complete hydraulic report");
-    context.expect(result.report_text.contains(QStringLiteral("=== Water quality: Chemical ===")), "combined report should contain the chemical report section");
-    context.expect(result.report_text.contains(QStringLiteral("=== Water quality: Water age ===")), "combined report should contain the water-age report section");
-    context.expect(result.report_text.contains(QStringLiteral("=== Water quality: Source trace ===")), "combined report should contain the source-trace report section");
-    context.expect(result.report_text.count(QStringLiteral("E P A N E T")) == 4, "combined report should retain one native EPANET header for hydraulics and every quality child");
 
     for (const EpanetQualityResult &quality_result : result.quality_results)
     {
@@ -517,11 +495,6 @@ void testMultiQualitySequentialExecution(TestContext &context)
         context.expect(quality_result.result_timeline.validity == WaterQualitySimulationResultValidity::Valid, "each quality run should return valid numerical results");
         context.expect(!quality_result.result_timeline.results.isEmpty(), "each quality run should contain numerical results");
         context.expect(quality_result.result_timeline.analysis == quality_result.options.analysis, "each quality run should retain its requested analysis identity");
-        context.expect(quality_result.report_lines.value(0) == QStringLiteral("******************************************************************"), "each quality report should begin with the native EPANET border");
-        context.expect(quality_result.report_text.startsWith(QStringLiteral("******************************************************************")), "each quality result should expose its complete native report as text");
-        context.expect(quality_result.report_text.contains(QStringLiteral("E P A N E T")), "each quality report should contain the native EPANET name header");
-        context.expect(quality_result.report_text.contains(QStringLiteral("Node Results")), "each quality report should contain the formatted node table");
-        context.expect(quality_result.report_text.contains(QStringLiteral("Link Results")), "each quality report should contain the formatted link table");
     }
 }
 

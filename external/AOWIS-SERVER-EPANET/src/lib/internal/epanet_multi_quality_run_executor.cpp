@@ -83,11 +83,8 @@ void markPendingQualityRuns(EpanetResultRun &result, EpanetRunState state)
     }
 }
 
-void finalizeRunState(EpanetResultRun &result, const EpanetPreparedProject &prepared_project)
+void finalizeRunState(EpanetResultRun &result)
 {
-    if (result.report_lines.isEmpty())
-        result.report_lines = prepared_project.reportCollector().lines();
-
     if (result.cancelled)
     {
         result.state = EpanetRunState::Cancelled;
@@ -143,7 +140,7 @@ HydraulicSimulationStatus generateReport(
     QStringList &report_lines,
     QList<HydraulicSimulationDiagnostic> &diagnostics)
 {
-    const qsizetype generated_report_start = prepared_project.reportCollector().lines().size();
+    prepared_project.reportCollector().clear();
     const EpanetDiagnosticCheckpoint report_diagnostics(prepared_project.project().diagnostics());
     const int error = EN_report(prepared_project.project().handle());
     report_lines = prepared_project.reportCollector().lines();
@@ -165,7 +162,7 @@ HydraulicSimulationStatus generateReport(
     }
 
     report_diagnostics.appendSince(diagnostics, prepared_project.project().diagnostics());
-    appendEpanetReportDiagnostics(diagnostics, report_lines.mid(generated_report_start));
+    appendEpanetReportDiagnostics(diagnostics, report_lines);
     return status;
 }
 }
@@ -198,7 +195,7 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
         appendEpanetDiagnostics(result.diagnostics, result.result_timeline.diagnostics);
         recordFailureStatus(result, status);
         markPendingQualityRuns(result, EpanetRunState::Skipped);
-        finalizeRunState(result, this->prepared_project_);
+        finalizeRunState(result);
         return result;
     }
 
@@ -222,7 +219,7 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
         markEpanetHydraulicResultCancelled(result.result_timeline);
         appendEpanetDiagnostics(result.diagnostics, result.result_timeline.diagnostics);
         result.cancelled = true;
-        finalizeRunState(result, this->prepared_project_);
+        finalizeRunState(result);
         return result;
     }
 
@@ -234,7 +231,7 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
         appendEpanetDiagnostics(result.diagnostics, result.result_timeline.diagnostics);
         recordFailureStatus(result, status);
         markPendingQualityRuns(result, EpanetRunState::Skipped);
-        finalizeRunState(result, this->prepared_project_);
+        finalizeRunState(result);
         return result;
     }
 
@@ -249,7 +246,7 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
         markEpanetHydraulicResultCancelled(result.result_timeline);
         appendEpanetDiagnostics(result.diagnostics, result.result_timeline.diagnostics);
         result.cancelled = true;
-        finalizeRunState(result, this->prepared_project_);
+        finalizeRunState(result);
         return result;
     }
 
@@ -261,7 +258,7 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
         appendEpanetDiagnostics(result.diagnostics, result.result_timeline.diagnostics);
         recordFailureStatus(result, status);
         markPendingQualityRuns(result, EpanetRunState::Skipped);
-        finalizeRunState(result, this->prepared_project_);
+        finalizeRunState(result);
         return result;
     }
 
@@ -294,11 +291,10 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
         if (cancellationRequested(cancellation_requested))
         {
             result.cancelled = true;
-            finalizeRunState(result, this->prepared_project_);
+            finalizeRunState(result);
             return result;
         }
 
-        this->prepared_project_.reportCollector().restartFromHeader();
         quality_result.state = EpanetRunState::Running;
         QList<HydraulicSimulationStatus> quality_validation_failures;
         status = validateEpanetQualityRun(
@@ -315,7 +311,6 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
             }
             quality_result.result_timeline.status = status;
             finalizeEpanetQualityResultValidity(quality_result.result_timeline);
-            quality_result.report_lines = this->prepared_project_.reportCollector().lines();
             quality_result.state = EpanetRunState::Error;
             appendEpanetDiagnostics(result.diagnostics, quality_result.result_timeline.diagnostics);
             recordFailureStatus(result, status);
@@ -337,7 +332,6 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
             quality_result.result_timeline.status = status;
             appendEpanetDiagnosticIfUnique(quality_result.result_timeline.diagnostics, epanetDiagnosticFromStatus(status));
             finalizeEpanetQualityResultValidity(quality_result.result_timeline);
-            quality_result.report_lines = this->prepared_project_.reportCollector().lines();
             quality_result.state = EpanetRunState::Error;
             appendEpanetDiagnostics(result.diagnostics, quality_result.result_timeline.diagnostics);
             recordFailureStatus(result, status);
@@ -366,11 +360,10 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
         if (cancelled || cancellationRequested(cancellation_requested))
         {
             markEpanetQualityResultCancelled(quality_result.result_timeline);
-            quality_result.report_lines = this->prepared_project_.reportCollector().lines();
             quality_result.state = EpanetRunState::Cancelled;
             appendEpanetDiagnostics(result.diagnostics, quality_result.result_timeline.diagnostics);
             result.cancelled = true;
-            finalizeRunState(result, this->prepared_project_);
+            finalizeRunState(result);
             return result;
         }
 
@@ -394,6 +387,6 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
     }
 
     appendEpanetDiagnostics(result.diagnostics, this->prepared_project_.project().diagnostics());
-    finalizeRunState(result, this->prepared_project_);
+    finalizeRunState(result);
     return result;
 }

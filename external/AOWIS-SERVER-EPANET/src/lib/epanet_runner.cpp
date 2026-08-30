@@ -23,56 +23,14 @@ bool cancellationRequested(const std::function<bool()> &cancellation_requested)
     return cancellation_requested && cancellation_requested();
 }
 
-QString qualityAnalysisName(WaterQualityAnalysisType analysis)
-{
-    switch (analysis)
-    {
-    case WaterQualityAnalysisType::None:
-        return QStringLiteral("None");
-    case WaterQualityAnalysisType::Chemical:
-        return QStringLiteral("Chemical");
-    case WaterQualityAnalysisType::WaterAge:
-        return QStringLiteral("Water age");
-    case WaterQualityAnalysisType::SourceTrace:
-        return QStringLiteral("Source trace");
-    }
-
-    return QStringLiteral("Unknown");
-}
-
-void finalizeReportText(EpanetResultRun &result)
-{
-    QStringList sections;
-    if (!result.report_lines.isEmpty())
-    {
-        sections.append(
-            QStringLiteral("=== Hydraulics ===\n\n")
-            + result.report_lines.join(QLatin1Char('\n')));
-    }
-
-    for (EpanetQualityResult &quality_result : result.quality_results)
-    {
-        quality_result.report_text = quality_result.report_lines.join(QLatin1Char('\n'));
-        if (quality_result.report_text.isEmpty())
-            continue;
-
-        sections.append(
-            QStringLiteral("=== Water quality: ")
-            + qualityAnalysisName(quality_result.options.analysis)
-            + QStringLiteral(" ===\n\n")
-            + quality_result.report_text);
-    }
-
-    result.report_text = sections.join(QStringLiteral("\n\n"));
-}
-
 EpanetResultInp finishInp(
     EpanetResultInp result,
     const HydraulicSimulationStatus &status,
     const EpanetPreparedProject &prepared_project)
 {
     result.status = status;
-    result.report_lines = prepared_project.reportCollector().lines();
+    result.report_lines = prepared_project.reportCollector().headerLines();
+    result.report_lines.append(prepared_project.reportCollector().lines());
     return result;
 }
 
@@ -111,8 +69,6 @@ EpanetResultRun cancelledRun(EpanetResultRun result, const EpanetPreparedProject
     result.state = EpanetRunState::Cancelled;
     markPendingQualityRuns(result, EpanetRunState::Cancelled);
     appendEpanetDiagnostics(result.diagnostics, prepared_project.project().diagnostics());
-    result.report_lines = prepared_project.reportCollector().lines();
-    finalizeReportText(result);
     return result;
 }
 
@@ -140,7 +96,6 @@ EpanetResultRun failedRun(
 
     appendEpanetDiagnostics(result.diagnostics, result.result_timeline.diagnostics);
     markPendingQualityRuns(result, EpanetRunState::Skipped);
-    finalizeReportText(result);
     return result;
 }
 
@@ -235,6 +190,7 @@ EpanetResultRun EpanetRunner::run(
         return cancelledRun(std::move(result), prepared_project);
 
     const HydraulicSimulationStatus status = prepared_project.prepare(request.network);
+    result.report_header_lines = prepared_project.reportCollector().headerLines();
     if (cancellationRequested(cancellation_requested))
         return cancelledRun(std::move(result), prepared_project);
 
@@ -243,7 +199,5 @@ EpanetResultRun EpanetRunner::run(
 
     appendEpanetDiagnostics(result.diagnostics, prepared_project.project().diagnostics());
     EpanetMultiQualityRunExecutor executor(prepared_project);
-    EpanetResultRun completed_result = executor.run(std::move(result), cancellation_requested);
-    finalizeReportText(completed_result);
-    return completed_result;
+    return executor.run(std::move(result), cancellation_requested);
 }

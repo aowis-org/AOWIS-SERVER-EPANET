@@ -3,14 +3,20 @@
 #include <QString>
 #include <QtGlobal>
 
-void EpanetReportCollector::preserveHeader()
+void EpanetReportCollector::captureCurrentLinesAsHeader()
 {
     this->report_header_lines = this->report_lines;
+    this->report_lines.clear();
 }
 
-void EpanetReportCollector::restartFromHeader()
+void EpanetReportCollector::clear()
 {
-    this->report_lines = this->report_header_lines;
+    this->report_lines.clear();
+}
+
+QStringList EpanetReportCollector::headerLines() const
+{
+    return this->report_header_lines;
 }
 
 QStringList EpanetReportCollector::lines() const

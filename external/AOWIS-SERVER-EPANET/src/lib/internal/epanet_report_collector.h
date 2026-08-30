@@ -6,8 +6,9 @@
 class EpanetReportCollector
 {
 public:
-    void preserveHeader();
-    void restartFromHeader();
+    void captureCurrentLinesAsHeader();
+    void clear();
+    QStringList headerLines() const;
     QStringList lines() const;
 
     static void callback(void *user_data, void *project_handle, const char *line);

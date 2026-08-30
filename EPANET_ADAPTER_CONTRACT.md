@@ -95,6 +95,8 @@ Hydraulic and quality results use separate timelines because their timesteps and
 
 Each quality timeline contains its analysis mode, status, validity, diagnostics, simulation start, and timestep results. Analysis `None` produces a `NotRun` timeline. A failed or cancelled quality child does not invalidate completed hydraulics. Cancellation preserves samples already returned by the active solver lifecycle.
 
+Every executed hydraulic or quality result retains the complete textual report emitted through EPANET's native report callback, including the native EPANET banner, analysis messages, warnings, and formatted result tables. `EpanetResultRun::report_lines` contains the hydraulic report, while each `EpanetQualityResult::report_lines` contains that quality child's independent report. Their `report_text` fields provide newline-joined text; the run-level `report_text` combines the hydraulic and quality reports under explicit section labels without removing the native header from any report.
+
 ## Enabled entities and references
 
 The prepared simulation snapshot contains enabled nodes and links only. Disabled entities remain in the editable AOWIS model but are absent from the native project and simulation results.

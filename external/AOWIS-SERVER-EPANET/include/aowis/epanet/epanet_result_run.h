@@ -3,7 +3,6 @@
 
 #include <QList>
 #include <QMetaType>
-#include <QString>
 #include <QStringList>
 
 #include <aowis/model/hydraulic/hydraulic_simulation_diagnostics.h>
@@ -28,7 +27,6 @@ struct EpanetQualityResult
     WaterQualitySolverOptions options;
     WaterQualitySimulationResultTimeline result_timeline;
     QStringList report_lines;
-    QString report_text;
     EpanetRunState state = EpanetRunState::Pending;
 };
 
@@ -39,8 +37,8 @@ struct EpanetResultRun
 
     HydraulicSimulationStatus status;
     QList<HydraulicSimulationDiagnostic> diagnostics;
+    QStringList report_header_lines;
     QStringList report_lines;
-    QString report_text;
     EpanetRunState state = EpanetRunState::Pending;
     bool cancelled = false;
 };
