@@ -23,32 +23,25 @@ bool cancellationRequested(const std::function<bool()> &cancellation_requested)
     return cancellation_requested && cancellation_requested();
 }
 
-QString qualityAnalysisName(WaterQualityAnalysisType analysis)
+qsizetype sharedReportPrefixSize(const QStringList &first, const QStringList &second)
 {
-    switch (analysis)
+    const qsizetype maximum_prefix_size = qMin(first.size(), second.size());
+    qsizetype prefix_size = 0;
+    while (prefix_size < maximum_prefix_size)
     {
-    case WaterQualityAnalysisType::None:
-        return QStringLiteral("None");
-    case WaterQualityAnalysisType::Chemical:
-        return QStringLiteral("Chemical");
-    case WaterQualityAnalysisType::WaterAge:
-        return QStringLiteral("Water age");
-    case WaterQualityAnalysisType::SourceTrace:
-        return QStringLiteral("Source trace");
+        if (first.at(prefix_size) != second.at(prefix_size))
+            break;
+        prefix_size++;
     }
 
-    return QStringLiteral("Unknown");
+    return prefix_size;
 }
 
 void finalizeReportText(EpanetResultRun &result)
 {
-    QStringList sections;
+    QStringList native_reports;
     if (!result.report_lines.isEmpty())
-    {
-        sections.append(
-            QStringLiteral("=== Hydraulics ===\n\n")
-            + result.report_lines.join(QLatin1Char('\n')));
-    }
+        native_reports.append(result.report_lines.join(QLatin1Char('\n')));
 
     for (EpanetQualityResult &quality_result : result.quality_results)
     {
@@ -56,14 +49,17 @@ void finalizeReportText(EpanetResultRun &result)
         if (quality_result.report_text.isEmpty())
             continue;
 
-        sections.append(
-            QStringLiteral("=== Water quality: ")
-            + qualityAnalysisName(quality_result.options.analysis)
-            + QStringLiteral(" ===\n\n")
-            + quality_result.report_text);
+        const qsizetype repeated_header_size = sharedReportPrefixSize(
+            result.report_lines,
+            quality_result.report_lines);
+        const QString quality_report_body = quality_result.report_lines
+                                                .mid(repeated_header_size)
+                                                .join(QLatin1Char('\n'));
+        if (!quality_report_body.isEmpty())
+            native_reports.append(quality_report_body);
     }
 
-    result.report_text = sections.join(QStringLiteral("\n\n"));
+    result.report_text = native_reports.join(QStringLiteral("\n\n"));
 }
 
 EpanetResultInp finishInp(

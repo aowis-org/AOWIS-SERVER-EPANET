@@ -218,8 +218,9 @@ void testPhysicalResultContractAndLeakage(TestContext &context)
     context.expect(hydraulic_report.contains(QStringLiteral("Link Results")), "hydraulic report should contain the formatted link table");
     context.expect(hydraulic_report.contains(QStringLiteral("J1")), "hydraulic report should contain the junction identifier");
     context.expect(hydraulic_report.contains(QStringLiteral("P1")), "hydraulic report should contain the pipe identifier");
-    context.expect(run.report_text.startsWith(QStringLiteral("=== Hydraulics ===\n\n******************************************************************")), "combined report text should contain the complete hydraulic report after its section label");
-    context.expect(run.report_text.count(QStringLiteral("E P A N E T")) == 1, "a hydraulic-only combined report should contain one native EPANET header");
+    context.expect(run.report_text == hydraulic_report, "a hydraulic-only textual report should contain exactly the native EPANET report");
+    context.expect(run.report_text.startsWith(QStringLiteral("******************************************************************")), "textual report should begin directly with the native EPANET header");
+    context.expect(run.report_text.count(QStringLiteral("E P A N E T")) == 1, "a hydraulic-only textual report should contain one native EPANET header");
 
     if (run.result_timeline.results.isEmpty())
         return;
@@ -505,11 +506,10 @@ void testMultiQualitySequentialExecution(TestContext &context)
         std::int64_t{3},
         comparison("run.quality_results.size"),
         "the hydraulic run should execute every requested quality analysis");
-    context.expect(result.report_text.startsWith(QStringLiteral("=== Hydraulics ===\n\n******************************************************************")), "combined multi-quality report should begin with a complete hydraulic report");
-    context.expect(result.report_text.contains(QStringLiteral("=== Water quality: Chemical ===")), "combined report should contain the chemical report section");
-    context.expect(result.report_text.contains(QStringLiteral("=== Water quality: Water age ===")), "combined report should contain the water-age report section");
-    context.expect(result.report_text.contains(QStringLiteral("=== Water quality: Source trace ===")), "combined report should contain the source-trace report section");
-    context.expect(result.report_text.count(QStringLiteral("E P A N E T")) == 4, "combined report should retain one native EPANET header for hydraulics and every quality child");
+    context.expect(result.report_text.startsWith(QStringLiteral("******************************************************************")), "combined multi-quality report should begin directly with the native EPANET header");
+    context.expect(!result.report_text.contains(QStringLiteral("=== Hydraulics ===")), "native report text should not contain an AOWIS hydraulic section label");
+    context.expect(!result.report_text.contains(QStringLiteral("=== Water quality:")), "native report text should not contain AOWIS quality section labels");
+    context.expect(result.report_text.count(QStringLiteral("E P A N E T")) == 1, "combined report should contain exactly one native EPANET header");
 
     for (const EpanetQualityResult &quality_result : result.quality_results)
     {
@@ -522,6 +522,7 @@ void testMultiQualitySequentialExecution(TestContext &context)
         context.expect(quality_result.report_text.contains(QStringLiteral("E P A N E T")), "each quality report should contain the native EPANET name header");
         context.expect(quality_result.report_text.contains(QStringLiteral("Node Results")), "each quality report should contain the formatted node table");
         context.expect(quality_result.report_text.contains(QStringLiteral("Link Results")), "each quality report should contain the formatted link table");
+        context.expect(result.report_text.contains(quality_result.report_lines.mid(7).join(QLatin1Char('\n'))), "combined report should contain every quality child's native report body");
     }
 }
 

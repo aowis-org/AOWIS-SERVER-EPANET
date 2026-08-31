@@ -7,7 +7,6 @@
 #include <aowis/epanet/epanet_result_import.h>
 #include <aowis/epanet/epanet_result_run.h>
 #include <aowis/epanet/epanet_run_request.h>
-#include <epanet2_2.h>
 
 #include <QByteArray>
 #include <QFile>
@@ -194,84 +193,6 @@ QString exportFailureDetails(const HydraulicSimulationStatus &status)
 
     return details.join('\n');
 }
-QString qualityAnalysisName(WaterQualityAnalysisType analysis)
-{
-    switch (analysis)
-    {
-    case WaterQualityAnalysisType::None:
-        return QStringLiteral("None");
-    case WaterQualityAnalysisType::Chemical:
-        return QStringLiteral("Chemical");
-    case WaterQualityAnalysisType::WaterAge:
-        return QStringLiteral("Water age");
-    case WaterQualityAnalysisType::SourceTrace:
-        return QStringLiteral("Source trace");
-    }
-
-    return QStringLiteral("Unknown quality analysis");
-}
-QString centeredEpanetReportLine(const QString &text, int inner_width)
-{
-    const int text_width = static_cast<int>(text.size());
-    const int padding = inner_width > text_width ? inner_width - text_width : 0;
-    const int left_padding = padding / 2;
-    const int right_padding = padding - left_padding;
-    return QStringLiteral("*%1%2%3*")
-        .arg(QString(left_padding, QLatin1Char(' ')),
-             text,
-             QString(right_padding, QLatin1Char(' ')));
-}
-QString epanetReportHeaderText()
-{
-    int version = 0;
-    if (EN_getversion(&version) != 0)
-        return QString();
-
-    const int major = version / 10000;
-    const int minor = (version % 10000) / 100;
-    const int patch = version % 100;
-    const QString version_text = QStringLiteral("Version %1.%2.%3")
-                                     .arg(major)
-                                     .arg(minor)
-                                     .arg(patch, 2, 10, QLatin1Char('0'));
-
-    const QString border = QStringLiteral("******************************************************************");
-    const int inner_width = border.size() - 2;
-
-    return QStringList{
-               border,
-               centeredEpanetReportLine(QStringLiteral("E P A N E T"), inner_width),
-               centeredEpanetReportLine(QStringLiteral("Hydraulic and Water Quality"), inner_width),
-               centeredEpanetReportLine(QStringLiteral("Analysis for Pipe Networks"), inner_width),
-               centeredEpanetReportLine(version_text, inner_width),
-               border}
-        .join('\n');
-}
-QString runReportText(const EpanetResultRun &run_result)
-{
-    QStringList sections;
-
-    const QString report_header = epanetReportHeaderText();
-    if (!report_header.isEmpty())
-        sections.append(report_header);
-
-    if (!run_result.report_lines.isEmpty())
-    {
-        sections.append(QStringLiteral("=== Hydraulics ==="));
-        sections.append(run_result.report_lines.join('\n'));
-    }
-
-    for (const EpanetQualityResult &quality_result : run_result.quality_results)
-    {
-        if (quality_result.report_lines.isEmpty())
-            continue;
-        sections.append(QStringLiteral("=== Water quality: %1 ===")
-                            .arg(qualityAnalysisName(quality_result.options.analysis)));
-        sections.append(quality_result.report_lines.join('\n'));
-    }
-
-    return sections.join(QStringLiteral("\n\n"));
-}
 }
 
 SimulationManager::SimulationManager(HydraulicData *hydraulic_data, QObject *parent)
@@ -371,7 +292,7 @@ void SimulationManager::run(const QList<WaterQualityAnalysisType> &quality_analy
 }
 void SimulationManager::finishSimulation(const EpanetResultRun &run_result)
 {
-    this->epanet_log = runReportText(run_result);
+    this->epanet_log = run_result.report_text;
     if (this->widget_epanet_log)
         this->widget_epanet_log->setPlainText(this->epanet_log);
     emit signalEpanetLogAvailabilityChanged(!this->epanet_log.isEmpty());
