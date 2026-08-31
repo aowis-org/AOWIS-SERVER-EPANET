@@ -2,6 +2,7 @@
 
 #include "conformance/conformance_test_framework.h"
 #include "conformance/inp_import_scenarios.h"
+#include "conformance/inp_roundtrip_proof.h"
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
 #include "conformance/native_quality_reference_runner.h"
@@ -320,6 +321,12 @@ void compareImportedQualityTimeline(
         comparison("quality_results.size"));
     if (!native.success || !run.status.success || run.quality_results.size() != 1)
         return;
+
+    context.expectNear(
+        run.quality_results.constFirst().options.relative_diffusivity,
+        native.relative_diffusivity,
+        numeric_tolerance,
+        comparison("quality.relative_diffusivity"));
 
     const WaterQualitySimulationResultTimeline &actual =
         run.quality_results.constFirst().result_timeline;
@@ -1758,6 +1765,11 @@ void scenarioImportQualitySourceTrace(TestContext &context)
         0.05,
         numeric_tolerance,
         comparison("source_trace_tolerance_percent"));
+    context.expectNear(
+        quality.relative_diffusivity,
+        0.05,
+        numeric_tolerance,
+        comparison("relative_diffusivity"));
     context.expectEqual(
         static_cast<std::int64_t>(network.timestep_quality_s),
         std::int64_t{300},
@@ -1767,6 +1779,7 @@ void scenarioImportQualitySourceTrace(TestContext &context)
         AowisEpanetTests::runNativeQualityReference(input_file, network);
     const EpanetResultRun run = EpanetRunner().run(result.request);
     compareImportedQualityTimeline(context, native, run, WaterQualityAnalysisType::SourceTrace);
+    AowisEpanetTests::proveInpRoundTrip(context, input_file);
 }
 
 void scenarioImportQualityNet1Equivalence(TestContext &context)

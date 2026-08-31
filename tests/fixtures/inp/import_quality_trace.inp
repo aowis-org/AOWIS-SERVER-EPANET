@@ -18,6 +18,7 @@ AOWIS quality import fixture - source trace
  UNITS LPS
  HEADLOSS H-W
  QUALITY TRACE J1
+ DIFFUSIVITY 0.05
  TOLERANCE 0.05
 
 [TIMES]

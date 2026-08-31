@@ -3537,17 +3537,14 @@ HydraulicSimulationStatus importWaterQualityConfiguration(
         break;
     }
 
-    if (options.analysis == WaterQualityAnalysisType::Chemical)
-    {
-        status = readOption(
-            project,
-            EN_SP_DIFFUS,
-            options.relative_diffusivity,
-            QStringLiteral("EN_SP_DIFFUS"),
-            HydraulicSimulationStatusEntityType::QualitySolver);
-        if (!status.success)
-            return status;
-    }
+    status = readOption(
+        project,
+        EN_SP_DIFFUS,
+        options.relative_diffusivity,
+        QStringLiteral("EN_SP_DIFFUS"),
+        HydraulicSimulationStatusEntityType::QualitySolver);
+    if (!status.success)
+        return status;
 
     if (options.analysis == WaterQualityAnalysisType::Chemical
         || options.analysis == WaterQualityAnalysisType::WaterAge)

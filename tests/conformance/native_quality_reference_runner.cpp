@@ -136,6 +136,9 @@ NativeQualityReferenceTimeline runNativeQualityReference(
         {
             quality_scale = 0.001;
         }
+        checkEpanet(
+            EN_getoption(project, EN_SP_DIFFUS, &timeline.relative_diffusivity),
+            "EN_getoption(EN_SP_DIFFUS native generated quality)");
 
         checkEpanet(EN_solveH(project), "EN_solveH(native generated quality)");
         checkEpanet(EN_openQ(project), "EN_openQ(native generated quality)");

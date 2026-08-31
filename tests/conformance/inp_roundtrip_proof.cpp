@@ -525,6 +525,12 @@ void compareQualityTimeline(
     if (!native.success || !actual_run.status.success || actual_run.quality_results.size() != 1)
         return;
 
+    context.expectNear(
+        actual_run.quality_results.constFirst().options.relative_diffusivity,
+        native.relative_diffusivity,
+        NumericTolerance{1.0e-12, 1.0e-9},
+        comparison(phase + ".quality_relative_diffusivity"));
+
     const WaterQualitySimulationResultTimeline &actual =
         actual_run.quality_results.constFirst().result_timeline;
     context.expect(
@@ -576,6 +582,12 @@ void compareNativeQualityTimelines(
     context.expect(actual.success, "generated INP native quality solve must succeed");
     if (!expected.success || !actual.success)
         return;
+
+    context.expectNear(
+        actual.relative_diffusivity,
+        expected.relative_diffusivity,
+        NumericTolerance{1.0e-12, 1.0e-9},
+        comparison("roundtrip.native_quality_relative_diffusivity"));
 
     context.expectEqual(
         static_cast<std::int64_t>(actual.results.size()),

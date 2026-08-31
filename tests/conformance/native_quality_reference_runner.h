@@ -24,6 +24,7 @@ struct NativeQualityReferenceTimeline
 {
     bool success = false;
     QString error;
+    double relative_diffusivity = 1.0;
     QList<NativeQualityReferenceStep> results;
 };
 
