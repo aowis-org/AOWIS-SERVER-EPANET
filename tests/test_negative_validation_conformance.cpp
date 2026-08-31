@@ -205,6 +205,14 @@ void expectQualityRejected(
     context.expect(quality_result.result_timeline.status.entity.type == HydraulicSimulationStatusEntityType::QualitySolver, "quality validation status must identify the quality solver");
     context.expect(quality_result.result_timeline.status.message.contains(message_fragment, Qt::CaseInsensitive), "quality validation status must contain an actionable reason");
     context.expect(!quality_result.result_timeline.diagnostics.isEmpty(), "quality validation failure must be retained as a structured diagnostic");
+    context.expect(run.report_text.contains(quality_result.result_timeline.status.message), "quality validation failure must be included in the combined textual report");
+    if (options.analysis == WaterQualityAnalysisType::SourceTrace
+        && options.trace_node_uuid.isNull())
+    {
+        context.expect(
+            run.report_text.contains(QStringLiteral("=== Water quality: Source trace (origin: not set) ===")),
+            "a missing source-trace origin must be explicit in the textual report heading");
+    }
 }
 
 void scenarioInvalidIdentifiers(TestContext &context)
@@ -808,6 +816,14 @@ void scenarioInvalidEmitterConfiguration(TestContext &context)
 
 void scenarioInvalidQualityConfiguration(TestContext &context)
 {
+    {
+        const NetworkHydraulic network = cleanNet1();
+        WaterQualitySolverOptions options;
+        options.analysis = WaterQualityAnalysisType::SourceTrace;
+        context.expect(options.trace_node_uuid.isNull(), "default source-trace fixture must have no origin UUID");
+        expectQualityRejected(context, network, options, QStringLiteral("source-trace node"));
+    }
+
     {
         const NetworkHydraulic network = cleanNet1();
         WaterQualitySolverOptions options;
