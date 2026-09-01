@@ -16,6 +16,7 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/internal/epanet_inp_metadata_importer.cpp
     src/lib/internal/epanet_inp_report_importer.cpp
     src/lib/internal/epanet_inp_importer.cpp
+    src/lib/internal/epanet_network_advisories.cpp
     src/lib/internal/epanet_network_builder.cpp
     src/lib/internal/epanet_network_builder_controls.cpp
     src/lib/internal/epanet_network_builder_links.cpp

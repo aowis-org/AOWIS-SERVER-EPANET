@@ -910,10 +910,17 @@ void appendNodeResult(EN_Project project, int node_index, const NativeUnitSystem
 
 NativePumpState pumpState(double value)
 {
+    // See the matching comment in EpanetResultReader's resolvePumpState(): a constant-
+    // horsepower pump can be reported by EN_getlinkvalue(EN_PUMP_STATE) using EPANET's
+    // internal "temporarily closed" status (raw value 1), which sits outside the public
+    // EN_PumpStateType enum. Treat it the same as EN_PUMP_CLOSED.
+    constexpr int epanet_pump_temporarily_closed_state = 1;
+
     switch (static_cast<int>(value))
     {
     case EN_PUMP_XHEAD:
         return NativePumpState::CannotSupplyHead;
+    case epanet_pump_temporarily_closed_state:
     case EN_PUMP_CLOSED:
         return NativePumpState::Closed;
     case EN_PUMP_OPEN:

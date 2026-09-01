@@ -1,6 +1,7 @@
 #include "epanet_prepared_project.h"
 
 #include "epanet_diagnostic_helpers.h"
+#include "epanet_network_advisories.h"
 #include "epanet_network_builder.h"
 #include "epanet_network_preparer.h"
 #include "epanet_project_initializer.h"
@@ -13,6 +14,14 @@ HydraulicSimulationStatus EpanetPreparedProject::prepare(const NetworkHydraulic 
     HydraulicSimulationStatus status = prepareEpanetNetwork(request, this->prepared_network_, &validation_failures);
     for (const HydraulicSimulationStatus &validation_failure : validation_failures)
         this->project_.appendDiagnostic(epanetDiagnosticFromStatus(validation_failure));
+
+    // Non-blocking advisories (see epanet_network_advisories.h) are collected
+    // unconditionally, on the request as given, so they still surface even
+    // when a hard validation failure above is about to make us return early
+    // - and so the simulation still runs and reports them when nothing else
+    // is wrong.
+    for (const HydraulicSimulationDiagnostic &advisory : collectEpanetNetworkAdvisories(request))
+        this->project_.appendDiagnostic(advisory);
 
     if (!status.success)
         return status;

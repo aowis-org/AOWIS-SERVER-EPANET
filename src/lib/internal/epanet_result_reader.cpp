@@ -66,11 +66,22 @@ bool assignPipeRoughness(HydraulicSimulationResultLinkPipe &result, HydraulicHea
 
 bool resolvePumpState(double backend_state, HydraulicSimulationPumpState &state)
 {
+    // EN_getlinkvalue(EN_PUMP_STATE) does not restrict its result to the four values
+    // documented in the public EN_PumpStateType enum (EN_PUMP_XHEAD, EN_PUMP_CLOSED,
+    // EN_PUMP_OPEN, EN_PUMP_XFLOW). It passes through EPANET's internal StatusType value
+    // unchanged, which also includes a "temporarily closed" state (raw value 1, between
+    // EN_PUMP_XHEAD = 0 and EN_PUMP_CLOSED = 2). For a constant-horsepower pump (a POWER
+    // pump, as opposed to one driven by a head curve), EPANET reports this state whenever
+    // the pump's current flow is essentially zero, e.g. in the first hydraulic solution
+    // right after the pump is turned on. Treat it the same as EN_PUMP_CLOSED.
+    constexpr int epanet_pump_temporarily_closed_state = 1;
+
     switch (static_cast<int>(backend_state))
     {
     case EN_PUMP_XHEAD:
         state = HydraulicSimulationPumpState::CannotSupplyHead;
         return true;
+    case epanet_pump_temporarily_closed_state:
     case EN_PUMP_CLOSED:
         state = HydraulicSimulationPumpState::Closed;
         return true;
