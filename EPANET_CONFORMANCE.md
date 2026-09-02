@@ -139,7 +139,8 @@ Mismatch messages identify the scenario, timestep, entity type and stable ID, fi
 
 - `complete`, with one or more registered evidence scenarios;
 - `excluded-non-epanet`, with a reason explaining why it is application metadata rather than solver input;
-- `excluded-runtime-metadata`, with a reason explaining why it is unstable backend-local state.
+- `excluded-runtime-metadata`, with a reason explaining why it is unstable backend-local state;
+- `in-progress`, with a note explaining what remains before the field can be `complete`. This is for a field that is genuine EPANET/backend input, deliberately staged across more than one change, and not yet backed by an evidence scenario -- it is not an exclusion and must not be used as one. A conformance claim never covers `in-progress` fields.
 
 `aowis-server-epanet-model-field-conformance-audit`, implemented by `tests/conformance/verify_model_field_conformance.cmake`, compares that policy with the model headers and the registered scenario manifest. It fails when a field or struct appears without policy, policy references a removed model field, or evidence names an unregistered scenario.
 

@@ -150,6 +150,7 @@ network_hydraulic.h|NetworkHydraulic|options_hydraulic|complete|conformance-opti
 network_hydraulic.h|NetworkHydraulic|options_reaction|complete|conformance-quality-input-chemical,conformance-quality-input-tank-mixing-models,conformance-quality-input-reactions|Water-quality reaction configuration is fully mapped into the prepared EPANET project.
 network_hydraulic.h|NetworkHydraulic|options_energy|complete|conformance-upstream-pump-global-energy|
 network_hydraulic.h|NetworkHydraulic|options_report|complete|conformance-export-report-options|
+network_hydraulic.h|NetworkHydraulic|multi_species|in-progress||The multi-species (MSX) reaction model definition. This is a real EPANET-mapped field, not excluded, but adapter execution (the .msx exporter, EpanetMsxProject, and the result reader) is not implemented yet, so there is no evidence scenario to cite. Must move to complete with real evidence, or be reclassified with a stated reason, before any MSX conformance claim.
 network_hydraulic.h|NetworkHydraulic|patterns_time|complete|conformance-export-patterns-curves,conformance-upstream-demand-pattern|
 network_hydraulic.h|NetworkHydraulic|curves_tank_volume,curves_pump_head,curves_pump_efficiency,curves_valve_headloss,curves_valve_characteristic,curves_generic|complete|conformance-export-patterns-curves|
 network_hydraulic.h|NetworkHydraulic|nodes_reservoirs,nodes_junctions,nodes_tanks,links_pipes,links_pumps,links_valves|complete|conformance-net1,conformance-negative-disabled-entity-pruning|

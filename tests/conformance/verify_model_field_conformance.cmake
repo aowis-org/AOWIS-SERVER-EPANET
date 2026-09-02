@@ -33,6 +33,7 @@ set(AOWIS_REPORT_ROWS "")
 set(AOWIS_COMPLETE_FIELD_COUNT 0)
 set(AOWIS_EXCLUDED_NON_EPANET_FIELD_COUNT 0)
 set(AOWIS_EXCLUDED_RUNTIME_FIELD_COUNT 0)
+set(AOWIS_IN_PROGRESS_FIELD_COUNT 0)
 
 foreach(AOWIS_POLICY_LINE IN LISTS AOWIS_POLICY_LINES)
     string(STRIP "${AOWIS_POLICY_LINE}" AOWIS_POLICY_LINE)
@@ -59,7 +60,7 @@ foreach(AOWIS_POLICY_LINE IN LISTS AOWIS_POLICY_LINES)
     list(GET AOWIS_POLICY_COLUMNS 4 AOWIS_EVIDENCE_CSV)
     list(GET AOWIS_POLICY_COLUMNS 5 AOWIS_NOTE)
 
-    if(NOT AOWIS_STATE MATCHES "^(complete|excluded-non-epanet|excluded-runtime-metadata)$")
+    if(NOT AOWIS_STATE MATCHES "^(complete|excluded-non-epanet|excluded-runtime-metadata|in-progress)$")
         message(FATAL_ERROR "Unsupported audit state '${AOWIS_STATE}' in row: ${AOWIS_POLICY_LINE}")
     endif()
 
@@ -78,10 +79,10 @@ foreach(AOWIS_POLICY_LINE IN LISTS AOWIS_POLICY_LINES)
         endforeach()
     else()
         if(NOT AOWIS_EVIDENCE_CSV STREQUAL "")
-            message(FATAL_ERROR "Excluded field audit row must not claim scenario evidence: ${AOWIS_POLICY_LINE}")
+            message(FATAL_ERROR "Non-complete field audit row must not claim scenario evidence: ${AOWIS_POLICY_LINE}")
         endif()
         if(AOWIS_NOTE STREQUAL "")
-            message(FATAL_ERROR "Excluded field audit row must explain the exclusion: ${AOWIS_POLICY_LINE}")
+            message(FATAL_ERROR "Non-complete field audit row must explain the exclusion or in-progress state: ${AOWIS_POLICY_LINE}")
         endif()
     endif()
 
@@ -106,6 +107,8 @@ foreach(AOWIS_POLICY_LINE IN LISTS AOWIS_POLICY_LINES)
             math(EXPR AOWIS_EXCLUDED_NON_EPANET_FIELD_COUNT "${AOWIS_EXCLUDED_NON_EPANET_FIELD_COUNT} + 1")
         elseif(AOWIS_STATE STREQUAL "excluded-runtime-metadata")
             math(EXPR AOWIS_EXCLUDED_RUNTIME_FIELD_COUNT "${AOWIS_EXCLUDED_RUNTIME_FIELD_COUNT} + 1")
+        elseif(AOWIS_STATE STREQUAL "in-progress")
+            math(EXPR AOWIS_IN_PROGRESS_FIELD_COUNT "${AOWIS_IN_PROGRESS_FIELD_COUNT} + 1")
         endif()
 
         string(APPEND AOWIS_REPORT_ROWS
@@ -234,6 +237,6 @@ file(WRITE "${AOWIS_FIELD_AUDIT_REPORT}"
 message(STATUS
     "Model-field audit passed: ${AOWIS_MODEL_FIELD_COUNT} fields across ${AOWIS_MODEL_STRUCT_COUNT} structs; "
     "${AOWIS_COMPLETE_FIELD_COUNT} complete, ${AOWIS_EXCLUDED_NON_EPANET_FIELD_COUNT} non-EPANET, "
-    "${AOWIS_EXCLUDED_RUNTIME_FIELD_COUNT} runtime-metadata."
+    "${AOWIS_EXCLUDED_RUNTIME_FIELD_COUNT} runtime-metadata, ${AOWIS_IN_PROGRESS_FIELD_COUNT} in-progress."
 )
 message(STATUS "Model-field audit report: ${AOWIS_FIELD_AUDIT_REPORT}")

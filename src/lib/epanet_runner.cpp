@@ -255,6 +255,35 @@ HydraulicSimulationStatus validateAndConfigureQualityForInp(
         prepared_project.indices(),
         options);
 }
+
+// A network's chemical/age/trace quality_runs and its multi-species reaction
+// model are two independent EPANET solvers that both need sole ownership of
+// the one active quality configuration, so a request cannot carry both.
+// Multi-species execution itself is not implemented yet -- see
+// EpanetMultiSpeciesResult -- so any request that reaches this point with
+// multi_species_run set is rejected here rather than silently ignored.
+HydraulicSimulationStatus validateMultiSpeciesRunRequest(const EpanetRunRequest &request)
+{
+    if (!request.quality_runs.isEmpty())
+    {
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::ConfigureOptions,
+            HydraulicSimulationStatusOperation::ConfigureMultiSpecies,
+            HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
+            request.network.id,
+            request.network.uuid,
+            QStringLiteral("A run request cannot combine quality_runs with multi_species_run; "
+                           "EPANET's standard water-quality solver and MSX cannot both be active in the same run"));
+    }
+
+    return makeEpanetStatus(
+        HydraulicSimulationStatusStage::ConfigureOptions,
+        HydraulicSimulationStatusOperation::ConfigureMultiSpecies,
+        HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
+        request.network.id,
+        request.network.uuid,
+        QStringLiteral("Multi-species (MSX) execution is not implemented yet"));
+}
 }
 
 EpanetResultImport EpanetRunner::importInp(const QString &input_file_path) const
@@ -266,6 +295,19 @@ EpanetResultInp EpanetRunner::retrieveInp(const EpanetRunRequest &request) const
 {
     EpanetResultInp result;
     EpanetPreparedProject prepared_project;
+
+    if (request.multi_species_run.has_value())
+    {
+        const HydraulicSimulationStatus status = makeEpanetStatus(
+            HydraulicSimulationStatusStage::ConfigureOptions,
+            HydraulicSimulationStatusOperation::ConfigureMultiSpecies,
+            HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
+            request.network.id,
+            request.network.uuid,
+            QStringLiteral("A multi-species (MSX) run cannot be represented in a single EPANET INP file; "
+                           "retrieveInp() does not support multi_species_run"));
+        return finishInp(std::move(result), status, prepared_project);
+    }
 
     if (request.quality_runs.size() > 1)
     {
@@ -321,6 +363,12 @@ EpanetResultRun EpanetRunner::run(
 
     if (cancellationRequested(cancellation_requested))
         return cancelledRun(std::move(result), prepared_project, request.network);
+
+    if (request.multi_species_run.has_value())
+    {
+        const HydraulicSimulationStatus multi_species_status = validateMultiSpeciesRunRequest(request);
+        return failedRun(std::move(result), multi_species_status, prepared_project, request.network);
+    }
 
     const HydraulicSimulationStatus status = prepared_project.prepare(request.network);
     if (cancellationRequested(cancellation_requested))

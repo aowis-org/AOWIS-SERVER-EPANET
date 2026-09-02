@@ -241,6 +241,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-negative-unsupported-configuration
     conformance-negative-multiple-diagnostics
     conformance-negative-structured-diagnostics
+    conformance-negative-multi-species-with-quality-runs
     conformance-stress-chain-small-hw
     conformance-stress-chain-medium-dw
     conformance-stress-branch-medium-hw

@@ -1138,6 +1138,28 @@ void scenarioStructuredDiagnosticDetails(TestContext &context)
     if (!run.result_timeline.diagnostics.isEmpty())
         context.expect(run.result_timeline.diagnostics.first().details == run.result_timeline.status.details, "diagnostic must preserve structured status details");
 }
+
+void scenarioRunRejectsMultiSpeciesWithQualityRuns(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+
+    WaterQualitySolverOptions chemical;
+    chemical.analysis = WaterQualityAnalysisType::Chemical;
+    chemical.chemical_name = QStringLiteral("Chlorine");
+
+    EpanetRunRequest request = AowisEpanetTests::makeRunRequest(network, chemical);
+    request.multi_species_run = MultiSpeciesRunOptions{};
+
+    const EpanetResultRun result = EpanetRunner().run(request);
+
+    context.expect(!result.status.success, "a run request combining quality_runs with multi_species_run must be rejected");
+    context.expect(result.status.stage == HydraulicSimulationStatusStage::ConfigureOptions, "the rejection must identify the configuration stage");
+    context.expect(result.status.operation == HydraulicSimulationStatusOperation::ConfigureMultiSpecies, "the rejection must identify multi-species configuration");
+    context.expect(result.status.entity.type == HydraulicSimulationStatusEntityType::MultiSpeciesSolver, "the rejection must identify the multi-species solver as the entity");
+    context.expect(result.state == EpanetRunState::Error, "a rejected combined request must report an error run state");
+    context.expect(!result.quality_results.isEmpty() && result.quality_results.first().state == EpanetRunState::Skipped, "the quality_runs entry must be marked skipped rather than silently dropped");
+    context.expect(!result.multi_species_result.has_value(), "a rejected request must not report a multi-species result");
+}
 }
 
 namespace AowisEpanetTests
@@ -1334,5 +1356,10 @@ void registerNegativeValidationScenarios(ScenarioRegistry &registry)
         "Preserve stage, operation, entity, unresolved UUID detail, and backend provenance for validation errors.",
         {"conformance", "hydraulic", "negative"},
         &scenarioStructuredDiagnosticDetails});
+    registry.add(ScenarioDefinition{
+        "conformance-negative-multi-species-with-quality-runs",
+        "Reject a run request that combines quality_runs with multi_species_run.",
+        {"conformance", "hydraulic", "negative"},
+        &scenarioRunRejectsMultiSpeciesWithQualityRuns});
 }
 }
