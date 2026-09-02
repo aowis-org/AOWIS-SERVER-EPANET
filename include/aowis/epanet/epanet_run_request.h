@@ -12,12 +12,12 @@ struct EpanetRunRequest
     NetworkHydraulic network;
     QList<WaterQualitySolverOptions> quality_runs;
 
-    // A network's chemical/age/trace quality_runs and its multi-species
-    // reaction model are two independent EPANET solvers that both write into
-    // the one active INP quality slot, so a request may carry one or the
-    // other but not both -- EpanetRunner rejects a request setting both.
-    // nullopt means this run does not execute NetworkHydraulic::multi_species
-    // even if that model is defined.
+    // Standard EPANET chemical/age/trace quality_runs and the multi-species
+    // reaction model are independent quality analyses. EpanetRunner executes
+    // them sequentially against the same hydraulic solution; MSX consumes the
+    // hydraulic file persisted from that one EPANET hydraulic solve. nullopt
+    // means this run does not execute NetworkHydraulic::multi_species even if
+    // that model is defined.
     std::optional<MultiSpeciesRunOptions> multi_species_run;
 };
 

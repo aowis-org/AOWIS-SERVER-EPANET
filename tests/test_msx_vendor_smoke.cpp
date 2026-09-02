@@ -14,6 +14,7 @@
 #include <QTemporaryDir>
 #include <QUuid>
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <utility>
@@ -173,7 +174,8 @@ void scenarioMsxVendorOpenInitStepClose(AowisEpanetTests::TestContext &context)
 // Proves the Lew-style handoff directly at AOWIS's internal boundary:
 // hydraulics are solved by the normal handle-based AOWIS EPANET executor,
 // persisted once, and EpanetMsxProject consumes that exact file through
-// MSXusehydfile. EpanetRunner is intentionally not involved yet.
+// MSXusehydfile. This keeps the internal handoff covered independently of
+// the public EpanetRunner integration scenarios below.
 void scenarioMsxAowisHydraulicHandoff(AowisEpanetTests::TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
@@ -212,6 +214,218 @@ void scenarioMsxAowisHydraulicHandoff(AowisEpanetTests::TestContext &context)
     context.expect(timeline.validity == MultiSpeciesSimulationResultValidity::Valid, "MSX hydraulic-handoff timeline must be Valid");
     context.expect(!timeline.results.isEmpty(), "MSX hydraulic-handoff timeline must contain quality timesteps");
     context.expect(timelineHasSpeciesValue(timeline), "MSX hydraulic-handoff results must contain at least one junction species value");
+}
+
+NetworkHydraulic combinedQualityMsxNetwork()
+{
+    NetworkHydraulic network = cleanNet1();
+    if (!network.nodes_reservoirs.isEmpty())
+        network.nodes_reservoirs.first().initial_chemical_concentration_mg_per_l = 1.0;
+    addSimpleChlorineMsxModel(network);
+    return network;
+}
+
+WaterQualitySolverOptions chemicalQualityOptions()
+{
+    WaterQualitySolverOptions options;
+    options.analysis = WaterQualityAnalysisType::Chemical;
+    options.chemical_name = QStringLiteral("Chlorine");
+    return options;
+}
+
+WaterQualitySolverOptions waterAgeQualityOptions()
+{
+    WaterQualitySolverOptions options;
+    options.analysis = WaterQualityAnalysisType::WaterAge;
+    return options;
+}
+
+template<typename EntityResult>
+void compareQualityEntities(
+    AowisEpanetTests::TestContext &context,
+    const QList<EntityResult> &actual,
+    const QList<EntityResult> &expected,
+    std::int64_t time_s,
+    const std::string &entity_type)
+{
+    context.expectEqual(
+        static_cast<std::int64_t>(actual.size()),
+        static_cast<std::int64_t>(expected.size()),
+        {time_s, entity_type, std::string(), "count"},
+        "combined and isolated standard-quality entity counts must match");
+    if (actual.size() != expected.size())
+        return;
+
+    const AowisEpanetTests::NumericTolerance tolerance{1.0e-12, 1.0e-10};
+    for (qsizetype entity_index = 0; entity_index < actual.size(); entity_index++)
+    {
+        const EntityResult &actual_entity = actual.at(entity_index);
+        const EntityResult &expected_entity = expected.at(entity_index);
+        const std::string entity_id = actual_entity.id.toStdString();
+        context.expectEqual(
+            entity_id,
+            expected_entity.id.toStdString(),
+            {time_s, entity_type, entity_id, "id"},
+            "combined and isolated standard-quality entity ordering must match");
+        context.expect(
+            actual_entity.uuid == expected_entity.uuid,
+            "combined and isolated standard-quality entity UUIDs must match");
+        context.expectNear(
+            actual_entity.chemical_concentration_mg_per_l,
+            expected_entity.chemical_concentration_mg_per_l,
+            tolerance,
+            {time_s, entity_type, entity_id, "chemical_concentration_mg_per_l"});
+        context.expectNear(
+            actual_entity.water_age_h,
+            expected_entity.water_age_h,
+            tolerance,
+            {time_s, entity_type, entity_id, "water_age_h"});
+        context.expectNear(
+            actual_entity.source_trace_percent,
+            expected_entity.source_trace_percent,
+            tolerance,
+            {time_s, entity_type, entity_id, "source_trace_percent"});
+    }
+}
+
+void compareQualityTimelines(
+    AowisEpanetTests::TestContext &context,
+    const WaterQualitySimulationResultTimeline &actual,
+    const WaterQualitySimulationResultTimeline &expected)
+{
+    context.expect(actual.status.success == expected.status.success, "combined and isolated standard-quality statuses must match");
+    context.expect(actual.validity == expected.validity, "combined and isolated standard-quality validity must match");
+    context.expect(actual.analysis == expected.analysis, "combined and isolated standard-quality analysis types must match");
+    context.expectEqual(
+        static_cast<std::int64_t>(actual.results.size()),
+        static_cast<std::int64_t>(expected.results.size()),
+        {-1, "quality", std::string(), "timesteps"},
+        "combined and isolated standard-quality timestep counts must match");
+    if (actual.results.size() != expected.results.size())
+        return;
+
+    for (qsizetype step_index = 0; step_index < actual.results.size(); step_index++)
+    {
+        const WaterQualitySimulationResult &actual_step = actual.results.at(step_index);
+        const WaterQualitySimulationResult &expected_step = expected.results.at(step_index);
+        const std::int64_t time_s = static_cast<std::int64_t>(actual_step.time_elapsed_s);
+        context.expectEqual(
+            time_s,
+            static_cast<std::int64_t>(expected_step.time_elapsed_s),
+            {time_s, "quality", std::string(), "time_elapsed_s"},
+            "combined and isolated standard-quality timelines must use the same timestamps");
+        compareQualityEntities(context, actual_step.nodes_junctions, expected_step.nodes_junctions, time_s, "junction");
+        compareQualityEntities(context, actual_step.nodes_reservoirs, expected_step.nodes_reservoirs, time_s, "reservoir");
+        compareQualityEntities(context, actual_step.nodes_tanks, expected_step.nodes_tanks, time_s, "tank");
+        compareQualityEntities(context, actual_step.links_pipes, expected_step.links_pipes, time_s, "pipe");
+        compareQualityEntities(context, actual_step.links_pumps, expected_step.links_pumps, time_s, "pump");
+        compareQualityEntities(context, actual_step.links_valves, expected_step.links_valves, time_s, "valve");
+    }
+}
+
+void compareMsxSpeciesValues(
+    AowisEpanetTests::TestContext &context,
+    const QList<MultiSpeciesResultValue> &actual,
+    const QList<MultiSpeciesResultValue> &expected,
+    std::int64_t time_s,
+    const std::string &entity_type,
+    const std::string &entity_id)
+{
+    context.expectEqual(
+        static_cast<std::int64_t>(actual.size()),
+        static_cast<std::int64_t>(expected.size()),
+        {time_s, entity_type, entity_id, "species_values.size"},
+        "combined and isolated MSX species counts must match");
+    if (actual.size() != expected.size())
+        return;
+
+    const AowisEpanetTests::NumericTolerance tolerance{1.0e-12, 1.0e-10};
+    for (qsizetype species_index = 0; species_index < actual.size(); species_index++)
+    {
+        const MultiSpeciesResultValue &actual_value = actual.at(species_index);
+        const MultiSpeciesResultValue &expected_value = expected.at(species_index);
+        context.expect(
+            actual_value.species_uuid == expected_value.species_uuid,
+            "combined and isolated MSX species UUIDs must match");
+        context.expectNear(
+            actual_value.concentration,
+            expected_value.concentration,
+            tolerance,
+            {time_s, entity_type, entity_id, "concentration"});
+    }
+}
+
+template<typename EntityResult>
+void compareMsxEntities(
+    AowisEpanetTests::TestContext &context,
+    const QList<EntityResult> &actual,
+    const QList<EntityResult> &expected,
+    std::int64_t time_s,
+    const std::string &entity_type)
+{
+    context.expectEqual(
+        static_cast<std::int64_t>(actual.size()),
+        static_cast<std::int64_t>(expected.size()),
+        {time_s, entity_type, std::string(), "count"},
+        "combined and isolated MSX entity counts must match");
+    if (actual.size() != expected.size())
+        return;
+
+    for (qsizetype entity_index = 0; entity_index < actual.size(); entity_index++)
+    {
+        const EntityResult &actual_entity = actual.at(entity_index);
+        const EntityResult &expected_entity = expected.at(entity_index);
+        const std::string entity_id = actual_entity.id.toStdString();
+        context.expectEqual(
+            entity_id,
+            expected_entity.id.toStdString(),
+            {time_s, entity_type, entity_id, "id"},
+            "combined and isolated MSX entity ordering must match");
+        context.expect(
+            actual_entity.uuid == expected_entity.uuid,
+            "combined and isolated MSX entity UUIDs must match");
+        compareMsxSpeciesValues(
+            context,
+            actual_entity.species_values,
+            expected_entity.species_values,
+            time_s,
+            entity_type,
+            entity_id);
+    }
+}
+
+void compareMsxTimelines(
+    AowisEpanetTests::TestContext &context,
+    const MultiSpeciesSimulationResultTimeline &actual,
+    const MultiSpeciesSimulationResultTimeline &expected)
+{
+    context.expect(actual.status.success == expected.status.success, "combined and isolated MSX statuses must match");
+    context.expect(actual.validity == expected.validity, "combined and isolated MSX validity must match");
+    context.expectEqual(
+        static_cast<std::int64_t>(actual.results.size()),
+        static_cast<std::int64_t>(expected.results.size()),
+        {-1, "msx", std::string(), "timesteps"},
+        "combined and isolated MSX timestep counts must match");
+    if (actual.results.size() != expected.results.size())
+        return;
+
+    for (qsizetype step_index = 0; step_index < actual.results.size(); step_index++)
+    {
+        const MultiSpeciesSimulationResult &actual_step = actual.results.at(step_index);
+        const MultiSpeciesSimulationResult &expected_step = expected.results.at(step_index);
+        const std::int64_t time_s = static_cast<std::int64_t>(actual_step.time_elapsed_s);
+        context.expectEqual(
+            time_s,
+            static_cast<std::int64_t>(expected_step.time_elapsed_s),
+            {time_s, "msx", std::string(), "time_elapsed_s"},
+            "combined and isolated MSX timelines must use the same timestamps");
+        compareMsxEntities(context, actual_step.nodes_junctions, expected_step.nodes_junctions, time_s, "junction");
+        compareMsxEntities(context, actual_step.nodes_reservoirs, expected_step.nodes_reservoirs, time_s, "reservoir");
+        compareMsxEntities(context, actual_step.nodes_tanks, expected_step.nodes_tanks, time_s, "tank");
+        compareMsxEntities(context, actual_step.links_pipes, expected_step.links_pipes, time_s, "pipe");
+        compareMsxEntities(context, actual_step.links_pumps, expected_step.links_pumps, time_s, "pump");
+        compareMsxEntities(context, actual_step.links_valves, expected_step.links_valves, time_s, "valve");
+    }
 }
 
 // Runs a real reaction model through AOWIS's own EpanetRunner -- not the raw
@@ -297,6 +511,133 @@ void scenarioMsxIntegrationEndToEnd(AowisEpanetTests::TestContext &context)
         context.expect(found_nonzero_concentration, "chlorine dosed at the reservoir must show up as a non-zero concentration somewhere in the network over the 24-hour run");
     }
 }
+
+void scenarioMsxWithStandardQuality(AowisEpanetTests::TestContext &context)
+{
+    const NetworkHydraulic network = combinedQualityMsxNetwork();
+    EpanetRunRequest request;
+    request.network = network;
+    request.quality_runs = {chemicalQualityOptions(), waterAgeQualityOptions()};
+    request.multi_species_run = MultiSpeciesRunOptions{};
+
+    const EpanetResultRun result = EpanetRunner().run(request);
+
+    context.expect(result.status.success, "a valid combined standard-quality + MSX request must succeed");
+    context.expect(result.state == EpanetRunState::Success, "a valid combined standard-quality + MSX request must have Success aggregate state");
+    context.expect(result.result_timeline.status.success, "combined execution must retain a successful hydraulic timeline");
+    context.expectEqual(
+        static_cast<std::int64_t>(result.quality_results.size()),
+        std::int64_t{2},
+        {-1, "quality", std::string(), "quality_results.size"},
+        "both standard EPANET quality runs must be preserved");
+    for (const EpanetQualityResult &quality_result : result.quality_results)
+        context.expect(quality_result.state == EpanetRunState::Success, "each standard EPANET quality run must succeed before MSX executes");
+
+    context.expect(result.multi_species_result.has_value(), "combined execution must populate multi_species_result");
+    if (result.multi_species_result.has_value())
+    {
+        context.expect(result.multi_species_result->state == EpanetRunState::Success, "MSX must succeed after the standard EPANET quality runs");
+        context.expect(result.multi_species_result->result_timeline.validity == MultiSpeciesSimulationResultValidity::Valid, "combined MSX timeline must be Valid");
+        context.expect(timelineHasSpeciesValue(result.multi_species_result->result_timeline), "combined MSX execution must contain species values");
+    }
+}
+
+void scenarioMsxStandardQualityIsolatedEquivalence(AowisEpanetTests::TestContext &context)
+{
+    const NetworkHydraulic network = combinedQualityMsxNetwork();
+    const WaterQualitySolverOptions chemical = chemicalQualityOptions();
+    const WaterQualitySolverOptions water_age = waterAgeQualityOptions();
+
+    EpanetRunRequest combined_request;
+    combined_request.network = network;
+    combined_request.quality_runs = {chemical, water_age};
+    combined_request.multi_species_run = MultiSpeciesRunOptions{};
+
+    EpanetRunRequest quality_only_request;
+    quality_only_request.network = network;
+    quality_only_request.quality_runs = {chemical, water_age};
+
+    EpanetRunRequest msx_only_request;
+    msx_only_request.network = network;
+    msx_only_request.multi_species_run = MultiSpeciesRunOptions{};
+
+    const EpanetResultRun combined = EpanetRunner().run(combined_request);
+    const EpanetResultRun quality_only = EpanetRunner().run(quality_only_request);
+    const EpanetResultRun msx_only = EpanetRunner().run(msx_only_request);
+
+    context.expect(combined.status.success, "combined reference run must succeed");
+    context.expect(quality_only.status.success, "isolated standard-quality reference run must succeed");
+    context.expect(msx_only.status.success, "isolated MSX reference run must succeed");
+    context.expectEqual(
+        static_cast<std::int64_t>(combined.quality_results.size()),
+        static_cast<std::int64_t>(quality_only.quality_results.size()),
+        {-1, "quality", std::string(), "quality_results.size"},
+        "combined and isolated runs must return the same number of standard-quality results");
+
+    if (combined.quality_results.size() == quality_only.quality_results.size())
+    {
+        for (qsizetype quality_index = 0; quality_index < combined.quality_results.size(); quality_index++)
+        {
+            const EpanetQualityResult &combined_quality = combined.quality_results.at(quality_index);
+            const EpanetQualityResult &isolated_quality = quality_only.quality_results.at(quality_index);
+            context.expect(combined_quality.state == isolated_quality.state, "combined and isolated standard-quality run states must match");
+            compareQualityTimelines(context, combined_quality.result_timeline, isolated_quality.result_timeline);
+        }
+    }
+
+    context.expect(combined.multi_species_result.has_value(), "combined run must contain MSX results for equivalence comparison");
+    context.expect(msx_only.multi_species_result.has_value(), "isolated MSX run must contain MSX results for equivalence comparison");
+    if (combined.multi_species_result.has_value() && msx_only.multi_species_result.has_value())
+    {
+        context.expect(combined.multi_species_result->state == msx_only.multi_species_result->state, "combined and isolated MSX run states must match");
+        compareMsxTimelines(
+            context,
+            combined.multi_species_result->result_timeline,
+            msx_only.multi_species_result->result_timeline);
+    }
+}
+
+void scenarioMsxStandardQualityFailureIsolation(AowisEpanetTests::TestContext &context)
+{
+    const NetworkHydraulic network = combinedQualityMsxNetwork();
+
+    WaterQualitySolverOptions invalid_trace;
+    invalid_trace.analysis = WaterQualityAnalysisType::SourceTrace;
+    invalid_trace.trace_node_uuid = QUuid::createUuid();
+
+    EpanetRunRequest combined_request;
+    combined_request.network = network;
+    combined_request.quality_runs = {invalid_trace};
+    combined_request.multi_species_run = MultiSpeciesRunOptions{};
+
+    EpanetRunRequest msx_only_request;
+    msx_only_request.network = network;
+    msx_only_request.multi_species_run = MultiSpeciesRunOptions{};
+
+    const EpanetResultRun combined = EpanetRunner().run(combined_request);
+    const EpanetResultRun msx_only = EpanetRunner().run(msx_only_request);
+
+    context.expect(!combined.status.success, "an invalid standard-quality child must still make the aggregate combined run report failure");
+    context.expect(combined.state == EpanetRunState::Error, "an invalid standard-quality child must make the aggregate combined state Error");
+    context.expect(combined.result_timeline.status.success, "standard-quality failure must not invalidate the already-completed hydraulics");
+    context.expectEqual(
+        static_cast<std::int64_t>(combined.quality_results.size()),
+        std::int64_t{1},
+        {-1, "quality", std::string(), "quality_results.size"});
+    if (!combined.quality_results.isEmpty())
+        context.expect(combined.quality_results.first().state == EpanetRunState::Error, "the invalid standard-quality child must be isolated as Error");
+
+    context.expect(combined.multi_species_result.has_value(), "MSX must still execute after an isolated standard-quality validation failure");
+    context.expect(msx_only.multi_species_result.has_value(), "isolated MSX reference must produce a result");
+    if (combined.multi_species_result.has_value() && msx_only.multi_species_result.has_value())
+    {
+        context.expect(combined.multi_species_result->state == EpanetRunState::Success, "MSX must succeed despite the independent standard-quality child failure");
+        compareMsxTimelines(
+            context,
+            combined.multi_species_result->result_timeline,
+            msx_only.multi_species_result->result_timeline);
+    }
+}
 }
 
 namespace AowisEpanetTests
@@ -322,5 +663,20 @@ void registerMsxIntegrationScenarios(ScenarioRegistry &registry)
         "Run a network with a real reaction model through EpanetRunner::run() and confirm multi_species_result comes back Valid with real, non-zero species concentrations.",
         {"contract", "quality"},
         &scenarioMsxIntegrationEndToEnd});
+    registry.add(ScenarioDefinition{
+        "contract-msx-with-standard-quality",
+        "Run standard EPANET chemical and water-age analyses followed by MSX in one request against one hydraulic solution, and require all child results to succeed.",
+        {"contract", "hydraulic", "quality"},
+        &scenarioMsxWithStandardQuality});
+    registry.add(ScenarioDefinition{
+        "contract-msx-standard-quality-isolated-equivalence",
+        "Compare standard-quality and MSX outputs from one combined request against isolated reference requests, proving sequential orchestration does not change either solver's results.",
+        {"contract", "hydraulic", "quality", "proof"},
+        &scenarioMsxStandardQualityIsolatedEquivalence});
+    registry.add(ScenarioDefinition{
+        "contract-msx-standard-quality-failure-isolation",
+        "Fail one standard-quality child after hydraulics and prove MSX still executes successfully against the same saved hydraulic solution with results matching an isolated MSX run.",
+        {"contract", "hydraulic", "quality", "proof", "negative"},
+        &scenarioMsxStandardQualityFailureIsolation});
 }
 }

@@ -10,6 +10,10 @@ set(AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS
     contract-msx-export-species-selection
     contract-msx-export-rejects-unknown-species-selection
     contract-msx-export-rejects-broken-reaction-reference
+    contract-msx-integration-end-to-end
+    contract-msx-with-standard-quality
+    contract-msx-standard-quality-isolated-equivalence
+    contract-msx-standard-quality-failure-isolation
 )
 
 set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
@@ -246,7 +250,6 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-negative-unsupported-configuration
     conformance-negative-multiple-diagnostics
     conformance-negative-structured-diagnostics
-    conformance-negative-multi-species-with-quality-runs
     conformance-stress-chain-small-hw
     conformance-stress-chain-medium-dw
     conformance-stress-branch-medium-hw
@@ -384,6 +387,13 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONTRACT_
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^contract-msx-export-rejects-")
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;quality;negative")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-standard-quality-failure-isolation")
+        set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality;proof;negative")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-standard-quality-isolated-equivalence")
+        set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality;proof")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-integration-end-to-end"
+           OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-with-standard-quality")
+        set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^contract-msx-")
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;quality")
     else()

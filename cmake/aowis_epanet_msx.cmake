@@ -14,10 +14,33 @@ set(AOWIS_SERVER_EPANET_MSX_SOLVER_DIR
     "${CMAKE_CURRENT_LIST_DIR}/../external/epanet-msx/src/solver"
 )
 
-file(GLOB AOWIS_SERVER_EPANET_MSX_SOURCES CONFIGURE_DEPENDS
-    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/*.c"
-    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/*.h"
-    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/*.dat"
+# Keep the vendored solver input set explicit. Using CONFIGURE_DEPENDS here
+# makes Ninja re-run CMake whenever its glob verification sees the external
+# source directory change, which is especially fragile when this adapter is
+# itself built as a submodule of another project. The EPANET-MSX revision is
+# pinned, so additions/removals should be reviewed deliberately.
+set(AOWIS_SERVER_EPANET_MSX_SOURCES
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/hash.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/mathexpr.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/mempool.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxchem.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxcompiler.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxdispersion.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxerr.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxfile.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxfuncs.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxinp.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxout.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxproj.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxqual.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxrpt.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxtank.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxtoolkit.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/msxutils.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/newton.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/rk5.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/ros2.c"
+    "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/smatrix.c"
 )
 
 add_library(epanetmsx ${AOWIS_SERVER_EPANET_MSX_SOURCES})

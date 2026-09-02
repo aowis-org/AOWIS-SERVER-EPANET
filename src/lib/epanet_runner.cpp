@@ -5,6 +5,7 @@
 #include "internal/epanet_inp_exporter.h"
 #include "internal/epanet_inp_importer.h"
 #include "internal/epanet_multi_quality_run_executor.h"
+#include "internal/epanet_msx_project.h"
 #include "internal/epanet_network_validator.h"
 #include "internal/epanet_prepared_project.h"
 #include "internal/epanet_quality_run_configurator.h"
@@ -161,14 +162,14 @@ EpanetResultInp finishInp(
 }
 
 EpanetResultRun initializeRunResult(
-    const QList<WaterQualitySolverOptions> &quality_runs,
+    const EpanetRunRequest &request,
     const QDateTime &simulation_start_utc)
 {
     EpanetResultRun result;
     result.status = makeEpanetSuccess();
     result.result_timeline.simulation_start_utc = simulation_start_utc;
 
-    for (const WaterQualitySolverOptions &quality_options : quality_runs)
+    for (const WaterQualitySolverOptions &quality_options : request.quality_runs)
     {
         EpanetQualityResult quality_result;
         quality_result.options = quality_options;
@@ -189,6 +190,15 @@ void markPendingQualityRuns(EpanetResultRun &result, EpanetRunState state)
     }
 }
 
+void markPendingMultiSpeciesRun(EpanetResultRun &result, EpanetRunState state)
+{
+    if (result.multi_species_result.has_value()
+        && result.multi_species_result->state == EpanetRunState::Pending)
+    {
+        result.multi_species_result->state = state;
+    }
+}
+
 EpanetResultRun cancelledRun(
     EpanetResultRun result,
     const EpanetPreparedProject &prepared_project,
@@ -197,6 +207,7 @@ EpanetResultRun cancelledRun(
     result.cancelled = true;
     result.state = EpanetRunState::Cancelled;
     markPendingQualityRuns(result, EpanetRunState::Cancelled);
+    markPendingMultiSpeciesRun(result, EpanetRunState::Cancelled);
     appendEpanetDiagnostics(result.diagnostics, prepared_project.project().diagnostics());
     result.report_lines = prepared_project.reportCollector().lines();
     finalizeReportText(result, network);
@@ -228,6 +239,7 @@ EpanetResultRun failedRun(
 
     appendEpanetDiagnostics(result.diagnostics, result.result_timeline.diagnostics);
     markPendingQualityRuns(result, EpanetRunState::Skipped);
+    markPendingMultiSpeciesRun(result, EpanetRunState::Skipped);
     finalizeReportText(result, network);
     return result;
 }
@@ -256,34 +268,6 @@ HydraulicSimulationStatus validateAndConfigureQualityForInp(
         options);
 }
 
-// A network's chemical/age/trace quality_runs and its multi-species reaction
-// model are two independent EPANET solvers that both need sole ownership of
-// the one active quality configuration, so a request cannot carry both.
-// Multi-species execution itself is not implemented yet -- see
-// EpanetMultiSpeciesResult -- so any request that reaches this point with
-// multi_species_run set is rejected here rather than silently ignored.
-HydraulicSimulationStatus validateMultiSpeciesRunRequest(const EpanetRunRequest &request)
-{
-    if (!request.quality_runs.isEmpty())
-    {
-        return makeEpanetStatus(
-            HydraulicSimulationStatusStage::ConfigureOptions,
-            HydraulicSimulationStatusOperation::ConfigureMultiSpecies,
-            HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
-            request.network.id,
-            request.network.uuid,
-            QStringLiteral("A run request cannot combine quality_runs with multi_species_run; "
-                           "EPANET's standard water-quality solver and MSX cannot both be active in the same run"));
-    }
-
-    return makeEpanetStatus(
-        HydraulicSimulationStatusStage::ConfigureOptions,
-        HydraulicSimulationStatusOperation::ConfigureMultiSpecies,
-        HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
-        request.network.id,
-        request.network.uuid,
-        QStringLiteral("Multi-species (MSX) execution is not implemented yet"));
-}
 }
 
 EpanetResultImport EpanetRunner::importInp(const QString &input_file_path) const
@@ -358,7 +342,7 @@ EpanetResultRun EpanetRunner::run(
     const std::function<bool()> &cancellation_requested) const
 {
     const QDateTime simulation_start_utc = QDateTime::currentDateTimeUtc();
-    EpanetResultRun result = initializeRunResult(request.quality_runs, simulation_start_utc);
+    EpanetResultRun result = initializeRunResult(request, simulation_start_utc);
     EpanetPreparedProject prepared_project;
 
     if (cancellationRequested(cancellation_requested))
@@ -366,8 +350,10 @@ EpanetResultRun EpanetRunner::run(
 
     if (request.multi_species_run.has_value())
     {
-        const HydraulicSimulationStatus multi_species_status = validateMultiSpeciesRunRequest(request);
-        return failedRun(std::move(result), multi_species_status, prepared_project, request.network);
+        EpanetMultiSpeciesResult multi_species_result;
+        multi_species_result.options = request.multi_species_run.value();
+        multi_species_result.result_timeline.simulation_start_utc = simulation_start_utc;
+        result.multi_species_result = multi_species_result;
     }
 
     const HydraulicSimulationStatus status = prepared_project.prepare(request.network);
@@ -378,8 +364,62 @@ EpanetResultRun EpanetRunner::run(
         return failedRun(std::move(result), status, prepared_project, request.network);
 
     appendEpanetDiagnostics(result.diagnostics, prepared_project.project().diagnostics());
-    EpanetMultiQualityRunExecutor executor(prepared_project);
+    const bool needs_hydraulic_file = request.multi_species_run.has_value();
+    EpanetMultiQualityRunExecutor executor(prepared_project, needs_hydraulic_file);
     EpanetResultRun completed_result = executor.run(std::move(result), cancellation_requested);
+
+    if (request.multi_species_run.has_value() && completed_result.multi_species_result.has_value())
+    {
+        EpanetMultiSpeciesResult &multi_species_result = completed_result.multi_species_result.value();
+
+        if (completed_result.cancelled)
+        {
+            markPendingMultiSpeciesRun(completed_result, EpanetRunState::Cancelled);
+        }
+        else if (!completed_result.result_timeline.status.success || !executor.hasHydraulicFile())
+        {
+            markPendingMultiSpeciesRun(completed_result, EpanetRunState::Skipped);
+        }
+        else
+        {
+            multi_species_result.state = EpanetRunState::Running;
+            EpanetMsxProject msx_project;
+            bool multi_species_cancelled = false;
+            const HydraulicSimulationStatus multi_species_status = msx_project.run(
+                request.network,
+                request.multi_species_run.value(),
+                executor.hydraulicFilePath(),
+                multi_species_result.result_timeline,
+                cancellation_requested,
+                multi_species_cancelled);
+            multi_species_result.result_timeline.simulation_start_utc = simulation_start_utc;
+            appendEpanetDiagnostics(
+                completed_result.diagnostics,
+                multi_species_result.result_timeline.diagnostics);
+
+            if (multi_species_cancelled || cancellationRequested(cancellation_requested))
+            {
+                multi_species_result.state = EpanetRunState::Cancelled;
+                completed_result.cancelled = true;
+                completed_result.state = EpanetRunState::Cancelled;
+            }
+            else if (!multi_species_status.success)
+            {
+                multi_species_result.state = EpanetRunState::Error;
+                if (completed_result.status.success)
+                    completed_result.status = multi_species_status;
+                appendEpanetDiagnosticIfUnique(
+                    completed_result.diagnostics,
+                    epanetDiagnosticFromStatus(multi_species_status));
+                completed_result.state = EpanetRunState::Error;
+            }
+            else
+            {
+                multi_species_result.state = EpanetRunState::Success;
+            }
+        }
+    }
+
     finalizeReportText(completed_result, request.network);
     return completed_result;
 }

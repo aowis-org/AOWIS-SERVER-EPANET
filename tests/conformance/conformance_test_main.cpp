@@ -38,6 +38,7 @@ int main(int argc, char *argv[])
     AowisEpanetTests::registerDeterministicQualityStressScenarios(registry);
     AowisEpanetTests::registerMultiQualityExecutionScenarios(registry);
     AowisEpanetTests::registerMsxVendorSmokeScenarios(registry);
+    AowisEpanetTests::registerMsxIntegrationScenarios(registry);
     AowisEpanetTests::registerReentrancyScenarios(registry);
     return AowisEpanetTests::runTestProgram(argc, argv, registry, std::cout, std::cerr);
 }
