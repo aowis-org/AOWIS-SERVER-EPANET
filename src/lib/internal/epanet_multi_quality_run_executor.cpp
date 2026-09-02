@@ -12,6 +12,11 @@
 #include "epanet_result_reader.h"
 #include "epanet_status_helpers.h"
 
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QTemporaryDir>
+
 namespace
 {
 bool cancellationRequested(const std::function<bool()> &cancellation_requested)
@@ -121,23 +126,6 @@ void finalizeRunState(EpanetResultRun &result, const EpanetPreparedProject &prep
         result.status = makeEpanetSuccess();
 }
 
-HydraulicSimulationStatus saveHydraulics(EpanetPreparedProject &prepared_project)
-{
-    const int error = EN_saveH(prepared_project.project().handle());
-    if (error == 0)
-        return makeEpanetSuccess();
-
-    return processEpanetReturnCode(
-        prepared_project.project(),
-        error,
-        HydraulicSimulationStatusStage::SaveHydraulics,
-        HydraulicSimulationStatusOperation::SaveHydraulics,
-        QStringLiteral("EN_saveH"),
-        HydraulicSimulationStatusEntityType::HydraulicSolver,
-        QString(),
-        QStringLiteral("Failed to save EPANET hydraulic results"));
-}
-
 HydraulicSimulationStatus generateReport(
     EpanetPreparedProject &prepared_project,
     QStringList &report_lines,
@@ -170,15 +158,100 @@ HydraulicSimulationStatus generateReport(
 }
 }
 
-EpanetMultiQualityRunExecutor::EpanetMultiQualityRunExecutor(EpanetPreparedProject &prepared_project)
-    : prepared_project_(prepared_project)
+EpanetMultiQualityRunExecutor::EpanetMultiQualityRunExecutor(
+    EpanetPreparedProject &prepared_project,
+    bool persist_hydraulic_file)
+    : prepared_project_(prepared_project),
+      persist_hydraulic_file_(persist_hydraulic_file)
 {
+}
+
+EpanetMultiQualityRunExecutor::~EpanetMultiQualityRunExecutor() = default;
+
+bool EpanetMultiQualityRunExecutor::hasHydraulicFile() const
+{
+    return !this->hydraulic_file_path_.isEmpty()
+        && QFileInfo::exists(this->hydraulic_file_path_)
+        && QFileInfo(this->hydraulic_file_path_).isFile();
+}
+
+QString EpanetMultiQualityRunExecutor::hydraulicFilePath() const
+{
+    return this->hydraulic_file_path_;
+}
+
+HydraulicSimulationStatus EpanetMultiQualityRunExecutor::saveHydraulics()
+{
+    int error = EN_saveH(this->prepared_project_.project().handle());
+    if (error != 0)
+    {
+        return processEpanetReturnCode(
+            this->prepared_project_.project(),
+            error,
+            HydraulicSimulationStatusStage::SaveHydraulics,
+            HydraulicSimulationStatusOperation::SaveHydraulics,
+            QStringLiteral("EN_saveH"),
+            HydraulicSimulationStatusEntityType::HydraulicSolver,
+            QString(),
+            QStringLiteral("Failed to save EPANET hydraulic results"));
+    }
+
+    if (!this->persist_hydraulic_file_)
+        return makeEpanetSuccess();
+
+    this->hydraulic_artifact_directory_ = std::make_unique<QTemporaryDir>(
+        QDir::tempPath() + QStringLiteral("/aowis-epanet-hydraulics-XXXXXX"));
+    if (!this->hydraulic_artifact_directory_->isValid())
+    {
+        this->hydraulic_artifact_directory_.reset();
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::SaveHydraulics,
+            HydraulicSimulationStatusOperation::SaveHydraulics,
+            HydraulicSimulationStatusEntityType::HydraulicSolver,
+            QString(),
+            QStringLiteral("Failed to create a temporary directory for reusable EPANET hydraulic results"));
+    }
+
+    this->hydraulic_file_path_ = this->hydraulic_artifact_directory_->filePath(QStringLiteral("hydraulics.hyd"));
+    const QByteArray hydraulic_path_native = QFile::encodeName(this->hydraulic_file_path_);
+    error = EN_savehydfile(this->prepared_project_.project().handle(), hydraulic_path_native.constData());
+    if (error != 0)
+    {
+        const HydraulicSimulationStatus status = processEpanetReturnCode(
+            this->prepared_project_.project(),
+            error,
+            HydraulicSimulationStatusStage::SaveHydraulics,
+            HydraulicSimulationStatusOperation::SaveHydraulics,
+            QStringLiteral("EN_savehydfile"),
+            HydraulicSimulationStatusEntityType::HydraulicSolver,
+            QString(),
+            QStringLiteral("Failed to persist reusable EPANET hydraulic results"));
+        this->hydraulic_file_path_.clear();
+        this->hydraulic_artifact_directory_.reset();
+        return status;
+    }
+
+    if (!hasHydraulicFile())
+    {
+        this->hydraulic_file_path_.clear();
+        this->hydraulic_artifact_directory_.reset();
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::SaveHydraulics,
+            HydraulicSimulationStatusOperation::SaveHydraulics,
+            HydraulicSimulationStatusEntityType::HydraulicSolver,
+            QString(),
+            QStringLiteral("EPANET reported success while persisting hydraulics, but no reusable hydraulic file was created"));
+    }
+
+    return makeEpanetSuccess();
 }
 
 EpanetResultRun EpanetMultiQualityRunExecutor::run(
     EpanetResultRun result,
     const std::function<bool()> &cancellation_requested)
 {
+    this->hydraulic_file_path_.clear();
+    this->hydraulic_artifact_directory_.reset();
     result.state = EpanetRunState::Running;
 
     const EpanetDiagnosticCheckpoint hydraulic_diagnostics(this->prepared_project_.project().diagnostics());
@@ -238,7 +311,7 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
         return result;
     }
 
-    status = saveHydraulics(this->prepared_project_);
+    status = saveHydraulics();
     hydraulic_diagnostics.appendSince(
         result.result_timeline.diagnostics,
         this->prepared_project_.project().diagnostics());

@@ -158,6 +158,16 @@ set(BUILD_SHARED_LIBS ${AOWIS_SERVER_EPANET_BUILD_SHARED_EPANET} CACHE BOOL "Bui
 
 add_subdirectory(external/epanet EXCLUDE_FROM_ALL)
 
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/epanet-msx/src/solver/include/epanetmsx.h")
+    message(FATAL_ERROR
+        "EPANET-MSX submodule is missing. Run: git submodule update --init --recursive"
+    )
+endif()
+
+# Build only the USEPA EPANET-MSX solver and bind it to the already-created
+# AOWIS EPANET target. Do not configure the EPANET 2.2 copy bundled by MSX.
+include(cmake/aowis_epanet_msx.cmake)
+
 if(WIN32 AND NOT AOWIS_SERVER_EPANET_BUILD_SHARED_EPANET)
     target_compile_definitions(epanet2 PUBLIC "DLLEXPORT=__stdcall")
 endif()

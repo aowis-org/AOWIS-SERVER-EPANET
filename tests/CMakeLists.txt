@@ -21,6 +21,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-upstream-demand-pattern
     conformance-upstream-simple-control
     conformance-upstream-hydraulic-stepping
+    conformance-hydraulic-saved-file-reuse
     conformance-upstream-junction-reservoir-inputs
     conformance-upstream-demand-categories
     conformance-upstream-tank-uniform-area
@@ -256,9 +257,15 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-stress-dual-source-mesh-hw
 )
 
+set(AOWIS_SERVER_EPANET_MSX_VENDOR_TEST_SCENARIOS
+    proof-msx-vendor-open-init-step-close
+    proof-msx-aowis-hydraulic-handoff
+)
+
 set(AOWIS_SERVER_EPANET_TEST_SCENARIOS
     ${AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS}
     ${AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS}
+    ${AOWIS_SERVER_EPANET_MSX_VENDOR_TEST_SCENARIOS}
 )
 
 add_executable(aowis-server-epanet-conformance-tests
@@ -294,6 +301,7 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/deterministic_stress_scenarios.h
     conformance/deterministic_quality_stress_scenarios.h
     conformance/multi_quality_execution_scenarios.h
+    conformance/msx_vendor_smoke_scenarios.h
     conformance/reentrancy_scenarios.h
     test_net1_conformance.cpp
     test_result_contract.cpp
@@ -310,6 +318,7 @@ add_executable(aowis-server-epanet-conformance-tests
     test_deterministic_stress_conformance.cpp
     test_deterministic_quality_stress_conformance.cpp
     test_multi_quality_execution_conformance.cpp
+    test_msx_vendor_smoke.cpp
     test_reentrancy_conformance.cpp
 )
 
@@ -318,6 +327,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(aowis-server-epanet-conformance-tests
     PRIVATE
         AOWIS::ServerEpanet
+        epanetmsx
         Threads::Threads
 )
 
@@ -328,6 +338,8 @@ target_compile_definitions(aowis-server-epanet-conformance-tests
         AOWIS_EPANET_TEST_NET1_INP="${PROJECT_SOURCE_DIR}/external/epanet/example-networks/Net1.inp"
         AOWIS_EPANET_TEST_NET2_INP="${PROJECT_SOURCE_DIR}/external/epanet/example-networks/Net2.inp"
         AOWIS_EPANET_TEST_NET3_INP="${PROJECT_SOURCE_DIR}/external/epanet/example-networks/Net3.inp"
+        AOWIS_EPANET_MSX_EXAMPLE_INP="${PROJECT_SOURCE_DIR}/external/epanet-msx/Examples/example.inp"
+        AOWIS_EPANET_MSX_EXAMPLE_MSX="${PROJECT_SOURCE_DIR}/external/epanet-msx/Examples/example.msx"
         AOWIS_EPANET_TEST_UPSTREAM_DEMAND_CATEGORIES_INP="${PROJECT_SOURCE_DIR}/external/epanet/tests/data/net1_dem_cat.inp"
         AOWIS_EPANET_TEST_UPSTREAM_TANK_OVERFLOW_INP="${PROJECT_SOURCE_DIR}/external/epanet/tests/data/test_overflow.inp"
         AOWIS_EPANET_TEST_UPSTREAM_NETWORK_BUILDER_INP="${PROJECT_SOURCE_DIR}/external/epanet/tests/data/net_builder.inp"
@@ -385,6 +397,20 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONTRACT_
     )
 endforeach()
 
+foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_MSX_VENDOR_TEST_SCENARIOS)
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "proof-msx-aowis-hydraulic-handoff")
+        set(AOWIS_SERVER_EPANET_MSX_TEST_LABELS "proof;hydraulic;quality")
+    else()
+        set(AOWIS_SERVER_EPANET_MSX_TEST_LABELS "proof;quality")
+    endif()
+
+    set_tests_properties(
+        aowis-server-epanet-${AOWIS_SERVER_EPANET_TEST_SCENARIO}
+        PROPERTIES
+            LABELS "${AOWIS_SERVER_EPANET_MSX_TEST_LABELS}"
+    )
+endforeach()
+
 foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS)
     if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-multi-quality-")
         set(AOWIS_SERVER_EPANET_TEST_LABELS "conformance;hydraulic;quality")
@@ -414,7 +440,8 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "import")
     endif()
 
-    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-multi-quality-(isolated-equivalence|order-independence)$")
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^conformance-multi-quality-(isolated-equivalence|order-independence)$"
+       OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-hydraulic-saved-file-reuse")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "proof")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-reentrancy-independent-runners")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "quality" "proof")

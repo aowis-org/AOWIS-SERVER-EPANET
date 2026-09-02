@@ -1,5 +1,9 @@
 #include <aowis/epanet/epanet_runner.h>
 
+#include "../src/lib/internal/epanet_hydraulic_run_configurator.h"
+#include "../src/lib/internal/epanet_multi_quality_run_executor.h"
+#include "../src/lib/internal/epanet_prepared_project.h"
+
 #include "conformance/conformance_test_framework.h"
 #include "conformance/epanet_test_requests.h"
 #include "conformance/hydraulic_result_comparator.h"
@@ -7,7 +11,11 @@
 #include "conformance/net1_fixture.h"
 #include "conformance/hydraulic_behavior_scenarios.h"
 
+#include <QFile>
+#include <QFileInfo>
 #include <QUuid>
+
+#include <epanet2_2.h>
 
 #include <cmath>
 #include <cstdint>
@@ -563,6 +571,58 @@ void testSimpleControl(TestContext &context)
     AowisEpanetTests::compareHydraulicTimelines(native_timeline, wrapper_run, fixture.network, context);
 }
 
+void testSavedHydraulicFileReuse(TestContext &context)
+{
+    const Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
+
+    EpanetPreparedProject producing_project;
+    HydraulicSimulationStatus status = producing_project.prepare(fixture.network);
+    context.expect(status.success, "producer project must prepare before reusable hydraulics are persisted");
+    if (!status.success)
+        return;
+
+    QString hydraulic_file_path;
+    {
+        EpanetMultiQualityRunExecutor executor(producing_project, true);
+        EpanetResultRun run_result;
+        run_result = executor.run(std::move(run_result));
+        context.expect(run_result.result_timeline.status.success, "hydraulic run must succeed before its reusable hydraulic file is inspected");
+        context.expect(executor.hasHydraulicFile(), "hydraulic executor must persist a reusable .hyd file when requested");
+        if (!executor.hasHydraulicFile())
+            return;
+
+        hydraulic_file_path = executor.hydraulicFilePath();
+        const QFileInfo hydraulic_file_info(hydraulic_file_path);
+        context.expect(hydraulic_file_info.size() > 0, "persisted EPANET hydraulic file must be non-empty");
+
+        EpanetPreparedProject consuming_project;
+        status = consuming_project.prepare(fixture.network);
+        context.expect(status.success, "consumer project must prepare before loading reusable hydraulics");
+        if (!status.success)
+            return;
+
+        status = configureEpanetHydraulicRun(
+            consuming_project.project(),
+            consuming_project.network(),
+            consuming_project.indices());
+        context.expect(status.success, "consumer project must use the same hydraulic configuration as the producer");
+        if (!status.success)
+            return;
+
+        const QByteArray hydraulic_file_path_native = QFile::encodeName(hydraulic_file_path);
+        const int use_hydraulics_error = EN_usehydfile(
+            consuming_project.project().handle(),
+            hydraulic_file_path_native.constData());
+        context.expect(
+            use_hydraulics_error == 0,
+            "EN_usehydfile must accept the hydraulic file produced by the AOWIS hydraulic execution path");
+    }
+
+    context.expect(
+        !QFileInfo::exists(hydraulic_file_path),
+        "temporary reusable hydraulic file must be removed automatically when the run executor is destroyed");
+}
+
 void testHydraulicStepping(TestContext &context)
 {
     const Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
@@ -633,5 +693,10 @@ void registerHydraulicBehaviorScenarios(ScenarioRegistry &registry)
         "Ports upstream EN_runH/EN_nextH stepping and verifies the complete wrapper event timeline against native EPANET.",
         {"conformance", "hydraulic", "upstream", "timeline"},
         &testHydraulicStepping});
+    registry.add(ScenarioDefinition{
+        "conformance-hydraulic-saved-file-reuse",
+        "Persists the AOWIS hydraulic solution as a temporary .hyd artifact and proves a fresh EPANET project can consume it with EN_usehydfile.",
+        {"conformance", "hydraulic", "proof"},
+        &testSavedHydraulicFileReuse});
 }
 }

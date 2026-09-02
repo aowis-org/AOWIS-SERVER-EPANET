@@ -14,6 +14,7 @@
 #include "deterministic_stress_scenarios.h"
 #include "deterministic_quality_stress_scenarios.h"
 #include "multi_quality_execution_scenarios.h"
+#include "msx_vendor_smoke_scenarios.h"
 #include "reentrancy_scenarios.h"
 
 #include <iostream>
@@ -36,6 +37,7 @@ int main(int argc, char *argv[])
     AowisEpanetTests::registerDeterministicStressScenarios(registry);
     AowisEpanetTests::registerDeterministicQualityStressScenarios(registry);
     AowisEpanetTests::registerMultiQualityExecutionScenarios(registry);
+    AowisEpanetTests::registerMsxVendorSmokeScenarios(registry);
     AowisEpanetTests::registerReentrancyScenarios(registry);
     return AowisEpanetTests::runTestProgram(argc, argv, registry, std::cout, std::cerr);
 }
