@@ -6,6 +6,8 @@
 #include "conformance/net1_fixture.h"
 #include "conformance/export_fidelity_scenarios.h"
 
+#include "../src/lib/internal/epanet_msx_exporter.h"
+
 #include <QByteArray>
 #include <QFile>
 #include <QString>
@@ -1127,6 +1129,215 @@ void scenarioQualityInputSourceTrace(TestContext &context)
     context.expectNear(value, 0.0, NumericTolerance{1.0e-12, 1.0e-9}, comparison("source_trace_initqual", "Junction", junction.id.toStdString()), "source-trace mode must not expose an arbitrary per-node initial trace input");
 }
 
+void scenarioMsxExportBasicSections(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    const HydraulicNodeJunction &junction = network.nodes_junctions.first();
+    const HydraulicLinkPipe &pipe = network.links_pipes.first();
+
+    MultiSpeciesSpecies chlorine;
+    chlorine.id = QStringLiteral("CL2");
+    chlorine.uuid = QUuid::createUuid();
+    chlorine.type = MultiSpeciesSpeciesType::Bulk;
+    chlorine.units = MultiSpeciesUnits::Milligrams;
+    network.multi_species.species.append(chlorine);
+
+    MultiSpeciesConstant kb;
+    kb.id = QStringLiteral("Kb");
+    kb.uuid = QUuid::createUuid();
+    kb.value = 0.5;
+    network.multi_species.constants.append(kb);
+
+    MultiSpeciesTerm term;
+    term.id = QStringLiteral("T1");
+    term.uuid = QUuid::createUuid();
+    term.expression = QStringLiteral("Kb * CL2");
+    network.multi_species.terms.append(term);
+
+    MultiSpeciesReaction pipe_reaction;
+    pipe_reaction.uuid = QUuid::createUuid();
+    pipe_reaction.species_uuid = chlorine.uuid;
+    pipe_reaction.location = MultiSpeciesReactionLocation::Pipe;
+    pipe_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+    pipe_reaction.expression = QStringLiteral("-T1");
+    network.multi_species.reactions.append(pipe_reaction);
+
+    MultiSpeciesReaction tank_reaction;
+    tank_reaction.uuid = QUuid::createUuid();
+    tank_reaction.species_uuid = chlorine.uuid;
+    tank_reaction.location = MultiSpeciesReactionLocation::Tank;
+    tank_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+    tank_reaction.expression = QStringLiteral("-Kb * CL2");
+    network.multi_species.reactions.append(tank_reaction);
+
+    MultiSpeciesPattern pattern;
+    pattern.id = QStringLiteral("SRC1");
+    pattern.uuid = QUuid::createUuid();
+    pattern.multipliers = {1.0, 1.0, 0.5};
+    network.multi_species.patterns.append(pattern);
+
+    MultiSpeciesNodeSource source;
+    source.node_uuid = junction.uuid;
+    source.species_uuid = chlorine.uuid;
+    source.type = MultiSpeciesSourceType::Concentration;
+    source.concentration = 1.2;
+    source.pattern_uuid = pattern.uuid;
+    network.multi_species.sources.append(source);
+
+    MultiSpeciesGlobalInitialQuality global_initial;
+    global_initial.species_uuid = chlorine.uuid;
+    global_initial.concentration = 0.8;
+    network.multi_species.initial_quality_global.append(global_initial);
+
+    MultiSpeciesPipeInitialQuality pipe_initial;
+    pipe_initial.pipe_uuid = pipe.uuid;
+    pipe_initial.species_uuid = chlorine.uuid;
+    pipe_initial.concentration = 0.9;
+    network.multi_species.initial_quality_pipes.append(pipe_initial);
+
+    MultiSpeciesParameter param;
+    param.id = QStringLiteral("Kw");
+    param.uuid = QUuid::createUuid();
+    param.default_value = 1.0;
+    network.multi_species.parameters.append(param);
+
+    MultiSpeciesParameterOverridePipe param_override;
+    param_override.pipe_uuid = pipe.uuid;
+    param_override.parameter_uuid = param.uuid;
+    param_override.value = 2.5;
+    network.multi_species.parameter_overrides_pipes.append(param_override);
+
+    QString msx_text;
+    const HydraulicSimulationStatus status = retrieveEpanetMsxText(network, MultiSpeciesRunOptions{}, msx_text);
+
+    context.expect(status.success, "a well-formed multi-species model must export successfully");
+    context.expect(msx_text.contains(QStringLiteral("[SPECIES]")), "export must contain a [SPECIES] section");
+    context.expect(msx_text.contains(QStringLiteral("BULK CL2 MG")), "export must declare the bulk species with its units");
+    context.expect(msx_text.contains(QStringLiteral("CONSTANT Kb 0.5")), "export must declare the constant coefficient");
+    context.expect(msx_text.contains(QStringLiteral("T1 Kb * CL2")), "export must declare the term expression");
+    context.expect(msx_text.contains(QStringLiteral("RATE CL2 -T1")), "export must declare the pipe reaction under [PIPES]");
+    context.expect(msx_text.contains(QStringLiteral("RATE CL2 -Kb * CL2")), "export must declare the tank reaction under [TANKS]");
+    context.expect(msx_text.contains(QStringLiteral("CONC %1 CL2 1.2 SRC1").arg(junction.id)), "export must declare the node source with its pattern");
+    context.expect(msx_text.contains(QStringLiteral("GLOBAL CL2 0.8")), "export must declare global initial quality");
+    context.expect(msx_text.contains(QStringLiteral("LINK %1 CL2 0.9").arg(pipe.id)), "export must declare pipe initial quality");
+    context.expect(msx_text.contains(QStringLiteral("PIPE %1 Kw 2.5").arg(pipe.id)), "export must declare the per-pipe parameter override");
+    context.expect(msx_text.contains(QStringLiteral("SRC1 1 1 0.5")), "export must declare the source pattern's multipliers");
+    context.expect(msx_text.trimmed().endsWith(QStringLiteral("[END]")), "export must terminate with [END]");
+
+    const int species_index = msx_text.indexOf(QStringLiteral("[SPECIES]"));
+    const int pipes_index = msx_text.indexOf(QStringLiteral("[PIPES]"));
+    const int sources_index = msx_text.indexOf(QStringLiteral("[SOURCES]"));
+    context.expect(species_index >= 0 && pipes_index > species_index && sources_index > pipes_index, "sections must appear in the documented MSX order");
+}
+
+void scenarioMsxExportSpeciesSelection(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    const HydraulicNodeJunction &junction = network.nodes_junctions.first();
+
+    MultiSpeciesSpecies chlorine;
+    chlorine.id = QStringLiteral("CL2");
+    chlorine.uuid = QUuid::createUuid();
+    network.multi_species.species.append(chlorine);
+
+    MultiSpeciesSpecies fluoride;
+    fluoride.id = QStringLiteral("F");
+    fluoride.uuid = QUuid::createUuid();
+    network.multi_species.species.append(fluoride);
+
+    MultiSpeciesReaction chlorine_reaction;
+    chlorine_reaction.uuid = QUuid::createUuid();
+    chlorine_reaction.species_uuid = chlorine.uuid;
+    chlorine_reaction.location = MultiSpeciesReactionLocation::Pipe;
+    chlorine_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+    chlorine_reaction.expression = QStringLiteral("-0.5 * CL2");
+    network.multi_species.reactions.append(chlorine_reaction);
+
+    MultiSpeciesReaction fluoride_reaction;
+    fluoride_reaction.uuid = QUuid::createUuid();
+    fluoride_reaction.species_uuid = fluoride.uuid;
+    fluoride_reaction.location = MultiSpeciesReactionLocation::Pipe;
+    fluoride_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+    fluoride_reaction.expression = QStringLiteral("0");
+    network.multi_species.reactions.append(fluoride_reaction);
+
+    MultiSpeciesNodeSource chlorine_source;
+    chlorine_source.node_uuid = junction.uuid;
+    chlorine_source.species_uuid = chlorine.uuid;
+    chlorine_source.type = MultiSpeciesSourceType::Concentration;
+    chlorine_source.concentration = 1.0;
+    network.multi_species.sources.append(chlorine_source);
+
+    MultiSpeciesNodeSource fluoride_source;
+    fluoride_source.node_uuid = junction.uuid;
+    fluoride_source.species_uuid = fluoride.uuid;
+    fluoride_source.type = MultiSpeciesSourceType::Concentration;
+    fluoride_source.concentration = 0.7;
+    network.multi_species.sources.append(fluoride_source);
+
+    MultiSpeciesConstant shared_constant;
+    shared_constant.id = QStringLiteral("K1");
+    shared_constant.uuid = QUuid::createUuid();
+    shared_constant.value = 3.0;
+    network.multi_species.constants.append(shared_constant);
+
+    MultiSpeciesRunOptions run_options;
+    run_options.species_uuids.append(chlorine.uuid);
+
+    QString msx_text;
+    const HydraulicSimulationStatus status = retrieveEpanetMsxText(network, run_options, msx_text);
+
+    context.expect(status.success, "restricting to one known species must still export successfully");
+    context.expect(msx_text.contains(QStringLiteral("BULK CL2")), "the selected species must appear in [SPECIES]");
+    context.expect(!msx_text.contains(QStringLiteral("BULK F ")), "an unselected species must not appear in [SPECIES]");
+    context.expect(msx_text.contains(QStringLiteral("RATE CL2 -0.5 * CL2")), "the selected species' reaction must be exported");
+    context.expect(!msx_text.contains(QStringLiteral("RATE F 0")), "an unselected species' reaction must not be exported");
+    context.expect(msx_text.contains(QStringLiteral("CONC %1 CL2 1").arg(junction.id)), "the selected species' source must be exported");
+    context.expect(!msx_text.contains(QStringLiteral("CONC %1 F 0.7").arg(junction.id)), "an unselected species' source must not be exported");
+    context.expect(msx_text.contains(QStringLiteral("CONSTANT K1 3")), "coefficients are exported in full regardless of species selection, since a selected species' expression may reference them");
+}
+
+void scenarioMsxExportRejectsUnknownSpeciesSelection(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+
+    MultiSpeciesSpecies chlorine;
+    chlorine.id = QStringLiteral("CL2");
+    chlorine.uuid = QUuid::createUuid();
+    network.multi_species.species.append(chlorine);
+
+    MultiSpeciesRunOptions run_options;
+    run_options.species_uuids.append(QUuid::createUuid());
+
+    QString msx_text;
+    const HydraulicSimulationStatus status = retrieveEpanetMsxText(network, run_options, msx_text);
+
+    context.expect(!status.success, "selecting an unresolved species UUID must be rejected");
+    context.expect(msx_text.isEmpty(), "a rejected export must not return partial MSX text");
+    context.expect(status.operation == HydraulicSimulationStatusOperation::ConfigureMultiSpecies, "the rejection must identify multi-species configuration");
+    context.expect(status.entity.type == HydraulicSimulationStatusEntityType::MultiSpeciesSolver, "the rejection must identify the multi-species solver as the entity");
+}
+
+void scenarioMsxExportRejectsBrokenReactionReference(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+
+    MultiSpeciesReaction orphan_reaction;
+    orphan_reaction.uuid = QUuid::createUuid();
+    orphan_reaction.species_uuid = QUuid::createUuid();
+    orphan_reaction.location = MultiSpeciesReactionLocation::Pipe;
+    orphan_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+    orphan_reaction.expression = QStringLiteral("0");
+    network.multi_species.reactions.append(orphan_reaction);
+
+    QString msx_text;
+    const HydraulicSimulationStatus status = retrieveEpanetMsxText(network, MultiSpeciesRunOptions{}, msx_text);
+
+    context.expect(!status.success, "a reaction referencing an unresolved species UUID must be rejected even though no species selection was requested");
+    context.expect(msx_text.isEmpty(), "a rejected export must not return partial MSX text");
+    context.expect(status.operation == HydraulicSimulationStatusOperation::ConfigureMultiSpecies, "the rejection must identify multi-species configuration");
+}
+
 }
 
 namespace AowisEpanetTests
@@ -1198,5 +1409,25 @@ void registerExportFidelityScenarios(ScenarioRegistry &registry)
         "Persist general, selection, and typed report options in a native-reopenable generated INP.",
         {"conformance", "hydraulic", "upstream", "export"},
         &scenarioReportOptions});
+    registry.add(ScenarioDefinition{
+        "contract-msx-export-basic-sections",
+        "Format a multi-species reaction model into MSX 2.0 sections in the documented order.",
+        {"contract", "quality"},
+        &scenarioMsxExportBasicSections});
+    registry.add(ScenarioDefinition{
+        "contract-msx-export-species-selection",
+        "Restrict [SPECIES]/[PIPES]/[TANKS]/[SOURCES]/[QUALITY] to a requested species subset while exporting coefficients and patterns in full.",
+        {"contract", "quality"},
+        &scenarioMsxExportSpeciesSelection});
+    registry.add(ScenarioDefinition{
+        "contract-msx-export-rejects-unknown-species-selection",
+        "Reject a multi_species_run species selection that does not resolve against the network's species list.",
+        {"contract", "quality", "negative"},
+        &scenarioMsxExportRejectsUnknownSpeciesSelection});
+    registry.add(ScenarioDefinition{
+        "contract-msx-export-rejects-broken-reaction-reference",
+        "Reject a reaction referencing an unresolved species UUID even when no species selection narrows the run.",
+        {"contract", "quality", "negative"},
+        &scenarioMsxExportRejectsBrokenReactionReference});
 }
 }

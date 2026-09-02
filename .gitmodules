@@ -5,3 +5,7 @@
 [submodule "external/GeographicLib"]
 	path = external/GeographicLib
 	url = https://github.com/geographiclib/geographiclib.git
+[submodule "external/epanet-msx"]
+	path = external/epanet-msx
+	url = https://github.com/USEPA/EPANETMSX.git
+	branch = main

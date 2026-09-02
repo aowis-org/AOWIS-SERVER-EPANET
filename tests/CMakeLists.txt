@@ -6,6 +6,10 @@ set(AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS
     contract-steady-state-pump-energy
     contract-quality-model-boundary
     contract-multi-quality-run-envelope
+    contract-msx-export-basic-sections
+    contract-msx-export-species-selection
+    contract-msx-export-rejects-unknown-species-selection
+    contract-msx-export-rejects-broken-reaction-reference
 )
 
 set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
@@ -366,6 +370,10 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONTRACT_
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;quality")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-multi-quality-run-envelope")
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^contract-msx-export-rejects-")
+        set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;quality;negative")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^contract-msx-")
+        set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;quality")
     else()
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic")
     endif()
