@@ -9,9 +9,12 @@
 
 #include <epanetmsx.h>
 
+#include <QDateTime>
+#include <QFile>
 #include <QFileInfo>
 #include <QString>
 #include <QTemporaryDir>
+#include <QTimeZone>
 #include <QUuid>
 
 #include <cstdint>
@@ -71,6 +74,60 @@ void addSimpleChlorineMsxModel(NetworkHydraulic &network)
     initial_quality.species_uuid = chlorine.uuid;
     initial_quality.concentration = 1.0;
     network.multi_species.initial_quality_nodes.append(initial_quality);
+}
+
+std::pair<QUuid, QUuid> addCoupledTwoSpeciesMsxModel(NetworkHydraulic &network)
+{
+    MultiSpeciesSpecies species_one;
+    species_one.id = QStringLiteral("S1");
+    species_one.uuid = QUuid::createUuid();
+    species_one.type = MultiSpeciesSpeciesType::Bulk;
+    species_one.units = MultiSpeciesUnits::Milligrams;
+    network.multi_species.species.append(species_one);
+
+    MultiSpeciesSpecies species_two;
+    species_two.id = QStringLiteral("S2");
+    species_two.uuid = QUuid::createUuid();
+    species_two.type = MultiSpeciesSpeciesType::Bulk;
+    species_two.units = MultiSpeciesUnits::Milligrams;
+    network.multi_species.species.append(species_two);
+
+    MultiSpeciesConstant rate_constant;
+    rate_constant.id = QStringLiteral("K");
+    rate_constant.uuid = QUuid::createUuid();
+    rate_constant.value = 0.05;
+    network.multi_species.constants.append(rate_constant);
+
+    for (const MultiSpeciesReactionLocation location : {MultiSpeciesReactionLocation::Pipe, MultiSpeciesReactionLocation::Tank})
+    {
+        MultiSpeciesReaction species_one_reaction;
+        species_one_reaction.uuid = QUuid::createUuid();
+        species_one_reaction.species_uuid = species_one.uuid;
+        species_one_reaction.location = location;
+        species_one_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+        species_one_reaction.expression = QStringLiteral("-K*S1*S2");
+        network.multi_species.reactions.append(species_one_reaction);
+
+        MultiSpeciesReaction species_two_reaction;
+        species_two_reaction.uuid = QUuid::createUuid();
+        species_two_reaction.species_uuid = species_two.uuid;
+        species_two_reaction.location = location;
+        species_two_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+        species_two_reaction.expression = QStringLiteral("0");
+        network.multi_species.reactions.append(species_two_reaction);
+    }
+
+    MultiSpeciesGlobalInitialQuality species_one_initial;
+    species_one_initial.species_uuid = species_one.uuid;
+    species_one_initial.concentration = 1.0;
+    network.multi_species.initial_quality_global.append(species_one_initial);
+
+    MultiSpeciesGlobalInitialQuality species_two_initial;
+    species_two_initial.species_uuid = species_two.uuid;
+    species_two_initial.concentration = 2.0;
+    network.multi_species.initial_quality_global.append(species_two_initial);
+
+    return std::make_pair(species_one.uuid, species_two.uuid);
 }
 
 bool timelineHasSpeciesValue(const MultiSpeciesSimulationResultTimeline &timeline)
@@ -355,6 +412,79 @@ void compareMsxSpeciesValues(
     }
 }
 
+bool findMsxSpeciesConcentration(
+    const QList<MultiSpeciesResultValue> &values,
+    const QUuid &species_uuid,
+    double &concentration)
+{
+    for (const MultiSpeciesResultValue &value : values)
+    {
+        if (value.species_uuid == species_uuid)
+        {
+            concentration = value.concentration;
+            return true;
+        }
+    }
+    return false;
+}
+
+template<typename EntityResult>
+void compareFilteredMsxEntities(
+    AowisEpanetTests::TestContext &context,
+    const QList<EntityResult> &filtered,
+    const QList<EntityResult> &full,
+    const QUuid &selected_species_uuid,
+    std::int64_t time_s,
+    const std::string &entity_type)
+{
+    context.expectEqual(
+        static_cast<std::int64_t>(filtered.size()),
+        static_cast<std::int64_t>(full.size()),
+        {time_s, entity_type, std::string(), "count"},
+        "output filtering must not alter the MSX entity set");
+    if (filtered.size() != full.size())
+        return;
+
+    const AowisEpanetTests::NumericTolerance tolerance{1.0e-12, 1.0e-10};
+    for (qsizetype entity_index = 0; entity_index < filtered.size(); entity_index++)
+    {
+        const EntityResult &filtered_entity = filtered.at(entity_index);
+        const EntityResult &full_entity = full.at(entity_index);
+        const std::string entity_id = filtered_entity.id.toStdString();
+
+        context.expect(filtered_entity.uuid == full_entity.uuid, "output filtering must not alter MSX entity ordering");
+        context.expectEqual(
+            static_cast<std::int64_t>(filtered_entity.species_values.size()),
+            std::int64_t{1},
+            {time_s, entity_type, entity_id, "species_values.size"},
+            "a one-species output filter must return exactly one species value per entity");
+
+        if (!filtered_entity.species_values.isEmpty())
+        {
+            context.expect(
+                filtered_entity.species_values.first().species_uuid == selected_species_uuid,
+                "the returned MSX species value must match the requested output species");
+        }
+
+        double filtered_concentration = 0.0;
+        double full_concentration = 0.0;
+        const bool filtered_found = findMsxSpeciesConcentration(
+            filtered_entity.species_values, selected_species_uuid, filtered_concentration);
+        const bool full_found = findMsxSpeciesConcentration(
+            full_entity.species_values, selected_species_uuid, full_concentration);
+        context.expect(filtered_found, "the filtered result must contain the requested species");
+        context.expect(full_found, "the full result must contain the requested species");
+        if (filtered_found && full_found)
+        {
+            context.expectNear(
+                filtered_concentration,
+                full_concentration,
+                tolerance,
+                {time_s, entity_type, entity_id, "concentration"});
+        }
+    }
+}
+
 template<typename EntityResult>
 void compareMsxEntities(
     AowisEpanetTests::TestContext &context,
@@ -491,6 +621,10 @@ void scenarioMsxIntegrationEndToEnd(AowisEpanetTests::TestContext &context)
         const EpanetMultiSpeciesResult &multi_species_result = result.multi_species_result.value();
         context.expect(multi_species_result.state == EpanetRunState::Success, "multi_species_result.state must be Success for a valid run");
         context.expect(multi_species_result.result_timeline.validity == MultiSpeciesSimulationResultValidity::Valid, "multi_species_result's timeline must be Valid");
+        context.expect(multi_species_result.result_timeline.simulation_start_utc.isValid(), "multi_species_result must preserve a valid simulation_start_utc");
+        context.expect(
+            multi_species_result.result_timeline.simulation_start_utc == result.result_timeline.simulation_start_utc,
+            "MSX and hydraulics must report the same simulation_start_utc for one public run");
         context.expect(!multi_species_result.result_timeline.results.isEmpty(), "multi_species_result must contain at least one timestep of results");
 
         bool found_species_value = false;
@@ -510,6 +644,189 @@ void scenarioMsxIntegrationEndToEnd(AowisEpanetTests::TestContext &context)
         context.expect(found_species_value, "at least one junction result must carry a CL2 concentration value");
         context.expect(found_nonzero_concentration, "chlorine dosed at the reservoir must show up as a non-zero concentration somewhere in the network over the 24-hour run");
     }
+}
+
+void scenarioMsxBackendDiagnostics(AowisEpanetTests::TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    addSimpleChlorineMsxModel(network);
+
+    EpanetPreparedProject prepared_project;
+    HydraulicSimulationStatus status = prepared_project.prepare(network);
+    context.expect(status.success, "MSX backend-diagnostic fixture must prepare successfully");
+    if (!status.success)
+        return;
+
+    EpanetMultiQualityRunExecutor hydraulic_executor(prepared_project, true);
+    EpanetResultRun hydraulic_result;
+    hydraulic_result = hydraulic_executor.run(std::move(hydraulic_result));
+    context.expect(hydraulic_result.result_timeline.status.success, "MSX backend-diagnostic fixture hydraulics must succeed");
+    context.expect(hydraulic_executor.hasHydraulicFile(), "MSX backend-diagnostic fixture must persist hydraulics");
+    if (!hydraulic_result.result_timeline.status.success || !hydraulic_executor.hasHydraulicFile())
+        return;
+
+    QFile hydraulic_file(hydraulic_executor.hydraulicFilePath());
+    const bool opened = hydraulic_file.open(QIODevice::WriteOnly | QIODevice::Truncate);
+    context.expect(opened, "MSX backend-diagnostic fixture must be able to corrupt the saved hydraulic file");
+    if (!opened)
+        return;
+    hydraulic_file.write("not an EPANET hydraulic file");
+    hydraulic_file.close();
+
+    EpanetMsxProject msx_project;
+    MultiSpeciesSimulationResultTimeline timeline;
+    bool cancelled = false;
+    status = msx_project.run(
+        network,
+        MultiSpeciesRunOptions{},
+        hydraulic_executor.hydraulicFilePath(),
+        timeline,
+        std::function<bool()>(),
+        cancelled);
+
+    context.expect(!status.success, "corrupted hydraulics must fail the MSX backend run");
+    context.expect(!cancelled, "a backend failure must not be reported as cancellation");
+    context.expect(timeline.validity == MultiSpeciesSimulationResultValidity::Invalid, "MSX failure before the first usable result must be Invalid");
+    context.expect(!timeline.status.success, "failed MSX timeline must expose a failed status");
+    context.expect(timeline.status.backend_name == QStringLiteral("EPANET-MSX"), "MSX failure status must identify EPANET-MSX as the backend");
+    context.expect(timeline.status.backend_error_code != 0, "MSX failure status must preserve the backend error code");
+    context.expect(timeline.status.backend_operation == QStringLiteral("MSXusehydfile"), "corrupted hydraulics must identify MSXusehydfile as the failing backend operation");
+    context.expect(!timeline.status.message_backend.isEmpty(), "MSX failure status must preserve the backend error text");
+    context.expect(timeline.status.stage == HydraulicSimulationStatusStage::RunQuality, "MSX hydraulic-file failure must be classified in the RunQuality stage");
+    context.expect(timeline.status.operation == HydraulicSimulationStatusOperation::RunMultiSpecies, "MSX hydraulic-file failure must identify RunMultiSpecies");
+    context.expect(!timeline.diagnostics.isEmpty(), "failed MSX timeline must carry a structured diagnostic");
+
+    if (!timeline.diagnostics.isEmpty())
+    {
+        const HydraulicSimulationDiagnostic &diagnostic = timeline.diagnostics.first();
+        context.expect(diagnostic.backend_name == timeline.status.backend_name, "MSX diagnostic must preserve backend identity from the failure status");
+        context.expect(diagnostic.backend_error_code == timeline.status.backend_error_code, "MSX diagnostic must preserve the backend error code");
+        context.expect(diagnostic.backend_operation == timeline.status.backend_operation, "MSX diagnostic must preserve the backend operation");
+        context.expect(diagnostic.message_backend == timeline.status.message_backend, "MSX diagnostic must preserve the backend error text");
+        context.expect(diagnostic.severity == HydraulicSimulationDiagnosticSeverity::Fatal, "MSX hydraulic-file failure must be a fatal child diagnostic");
+    }
+}
+
+void scenarioMsxCancellationPartial(AowisEpanetTests::TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    addSimpleChlorineMsxModel(network);
+
+    EpanetPreparedProject prepared_project;
+    HydraulicSimulationStatus status = prepared_project.prepare(network);
+    context.expect(status.success, "MSX cancellation fixture must prepare successfully");
+    if (!status.success)
+        return;
+
+    EpanetMultiQualityRunExecutor hydraulic_executor(prepared_project, true);
+    EpanetResultRun hydraulic_result;
+    hydraulic_result = hydraulic_executor.run(std::move(hydraulic_result));
+    context.expect(hydraulic_result.result_timeline.status.success, "MSX cancellation fixture hydraulics must succeed");
+    context.expect(hydraulic_executor.hasHydraulicFile(), "MSX cancellation fixture must persist hydraulics");
+    if (!hydraulic_result.result_timeline.status.success || !hydraulic_executor.hasHydraulicFile())
+        return;
+
+    EpanetMsxProject msx_project;
+    MultiSpeciesSimulationResultTimeline timeline;
+    const QDateTime expected_start_utc = QDateTime::fromMSecsSinceEpoch(1788379200000LL, QTimeZone::UTC);
+    timeline.simulation_start_utc = expected_start_utc;
+
+    int cancellation_checks = 0;
+    const std::function<bool()> cancel_after_one_completed_step = [&cancellation_checks]()
+    {
+        cancellation_checks++;
+        return cancellation_checks >= 5;
+    };
+
+    bool cancelled = false;
+    status = msx_project.run(
+        network,
+        MultiSpeciesRunOptions{},
+        hydraulic_executor.hydraulicFilePath(),
+        timeline,
+        cancel_after_one_completed_step,
+        cancelled);
+
+    context.expect(status.success, "MSX cancellation is not a backend failure");
+    context.expect(cancelled, "MSX project must report deterministic mid-run cancellation");
+    context.expect(cancellation_checks >= 5, "MSX cancellation callback must be polled during stepping");
+    context.expect(timeline.validity == MultiSpeciesSimulationResultValidity::Partial, "MSX cancellation after a completed timestep must preserve Partial validity");
+    context.expect(!timeline.results.isEmpty(), "MSX cancellation after stepping must preserve completed timesteps");
+    context.expect(timeline.simulation_start_utc == expected_start_utc, "MSX run must preserve the caller-provided simulation_start_utc");
+    context.expect(timeline.status.success, "cancelled MSX timeline status must remain successful rather than inventing a backend failure");
+}
+
+void scenarioMsxOutputSpeciesFilterPreservesCoupledChemistry(AowisEpanetTests::TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    const std::pair<QUuid, QUuid> species = addCoupledTwoSpeciesMsxModel(network);
+
+    EpanetRunRequest full_request;
+    full_request.network = network;
+    full_request.multi_species_run = MultiSpeciesRunOptions{};
+
+    MultiSpeciesRunOptions filtered_options;
+    filtered_options.species_uuids.append(species.first);
+
+    EpanetRunRequest filtered_request;
+    filtered_request.network = network;
+    filtered_request.multi_species_run = filtered_options;
+
+    const EpanetResultRun full = EpanetRunner().run(full_request);
+    const EpanetResultRun filtered = EpanetRunner().run(filtered_request);
+
+    context.expect(full.status.success, "the full coupled two-species MSX reference run must succeed");
+    context.expect(filtered.status.success, "selecting one output species must not break coupled MSX chemistry");
+    context.expect(full.multi_species_result.has_value(), "the full coupled MSX run must return multi-species results");
+    context.expect(filtered.multi_species_result.has_value(), "the filtered coupled MSX run must return multi-species results");
+    if (!full.multi_species_result.has_value() || !filtered.multi_species_result.has_value())
+        return;
+
+    const MultiSpeciesSimulationResultTimeline &full_timeline = full.multi_species_result->result_timeline;
+    const MultiSpeciesSimulationResultTimeline &filtered_timeline = filtered.multi_species_result->result_timeline;
+    context.expect(full_timeline.validity == MultiSpeciesSimulationResultValidity::Valid, "the full coupled MSX timeline must be Valid");
+    context.expect(filtered_timeline.validity == MultiSpeciesSimulationResultValidity::Valid, "the filtered coupled MSX timeline must be Valid");
+    context.expectEqual(
+        static_cast<std::int64_t>(filtered_timeline.results.size()),
+        static_cast<std::int64_t>(full_timeline.results.size()),
+        {-1, "quality", std::string(), "timesteps"},
+        "output filtering must not alter the MSX timestep sequence");
+    if (filtered_timeline.results.size() != full_timeline.results.size())
+        return;
+
+    bool full_result_contains_unrequested_species = false;
+    for (qsizetype step_index = 0; step_index < filtered_timeline.results.size(); step_index++)
+    {
+        const MultiSpeciesSimulationResult &filtered_step = filtered_timeline.results.at(step_index);
+        const MultiSpeciesSimulationResult &full_step = full_timeline.results.at(step_index);
+        const std::int64_t time_s = static_cast<std::int64_t>(filtered_step.time_elapsed_s);
+        context.expectEqual(
+            time_s,
+            static_cast<std::int64_t>(full_step.time_elapsed_s),
+            {time_s, "quality", std::string(), "time_elapsed_s"},
+            "output filtering must not alter MSX simulation times");
+
+        compareFilteredMsxEntities(context, filtered_step.nodes_junctions, full_step.nodes_junctions, species.first, time_s, "junction");
+        compareFilteredMsxEntities(context, filtered_step.nodes_reservoirs, full_step.nodes_reservoirs, species.first, time_s, "reservoir");
+        compareFilteredMsxEntities(context, filtered_step.nodes_tanks, full_step.nodes_tanks, species.first, time_s, "tank");
+        compareFilteredMsxEntities(context, filtered_step.links_pipes, full_step.links_pipes, species.first, time_s, "pipe");
+        compareFilteredMsxEntities(context, filtered_step.links_pumps, full_step.links_pumps, species.first, time_s, "pump");
+        compareFilteredMsxEntities(context, filtered_step.links_valves, full_step.links_valves, species.first, time_s, "valve");
+
+        for (const MultiSpeciesSimulationResultNodeJunction &junction : full_step.nodes_junctions)
+        {
+            double concentration = 0.0;
+            if (findMsxSpeciesConcentration(junction.species_values, species.second, concentration))
+            {
+                full_result_contains_unrequested_species = true;
+                break;
+            }
+        }
+    }
+
+    context.expect(
+        full_result_contains_unrequested_species,
+        "the unfiltered reference must prove the coupled species was genuinely solved and available as output");
 }
 
 void scenarioMsxWithStandardQuality(AowisEpanetTests::TestContext &context)
@@ -663,6 +980,21 @@ void registerMsxIntegrationScenarios(ScenarioRegistry &registry)
         "Run a network with a real reaction model through EpanetRunner::run() and confirm multi_species_result comes back Valid with real, non-zero species concentrations.",
         {"contract", "quality"},
         &scenarioMsxIntegrationEndToEnd});
+    registry.add(ScenarioDefinition{
+        "contract-msx-backend-diagnostics",
+        "Corrupt an otherwise valid saved hydraulic file and require the MSXusehydfile failure to preserve EPANET-MSX backend code, text, operation, stage, validity, and diagnostic provenance.",
+        {"contract", "quality", "negative"},
+        &scenarioMsxBackendDiagnostics});
+    registry.add(ScenarioDefinition{
+        "contract-msx-cancellation-partial",
+        "Cancel MSX deterministically after a completed quality timestep and require preserved results, Partial validity, successful cancellation status, and stable simulation-start provenance.",
+        {"contract", "quality", "cancellation"},
+        &scenarioMsxCancellationPartial});
+    registry.add(ScenarioDefinition{
+        "contract-msx-output-species-filter-coupled-chemistry",
+        "Request only one species in the result while solving a two-species coupled reaction model, proving output selection neither prunes chemistry nor changes the selected species concentration.",
+        {"contract", "quality", "proof"},
+        &scenarioMsxOutputSpeciesFilterPreservesCoupledChemistry});
     registry.add(ScenarioDefinition{
         "contract-msx-with-standard-quality",
         "Run standard EPANET chemical and water-age analyses followed by MSX in one request against one hydraulic solution, and require all child results to succeed.",

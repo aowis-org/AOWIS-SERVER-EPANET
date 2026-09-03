@@ -1,6 +1,7 @@
 #include "epanet_network_validator.h"
 
 #include "epanet_network_validator_parts.h"
+#include "epanet_msx_validator.h"
 #include "epanet_network_validator_support.h"
 #include "epanet_status_helpers.h"
 
@@ -110,6 +111,10 @@ HydraulicSimulationStatus validateNetwork(
     EpanetNetworkValidatorSupport::appendValidationFailures(failures, EpanetNetworkValidatorParts::validateReferences(network));
     EpanetNetworkValidatorSupport::appendValidationFailures(failures, EpanetNetworkValidatorParts::validateTopology(network));
     EpanetNetworkValidatorSupport::appendValidationFailures(failures, EpanetNetworkValidatorParts::validateNumerics(network));
+
+    QList<HydraulicSimulationStatus> multi_species_failures;
+    validateEpanetMultiSpeciesModel(network, &multi_species_failures);
+    EpanetNetworkValidatorSupport::appendValidationFailures(failures, multi_species_failures);
 
     if (validation_failures != nullptr)
         *validation_failures = failures;

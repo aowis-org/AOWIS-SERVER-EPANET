@@ -11,6 +11,13 @@ set(AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS
     contract-msx-export-rejects-unknown-species-selection
     contract-msx-export-rejects-broken-reaction-reference
     contract-msx-integration-end-to-end
+    contract-msx-backend-diagnostics
+    contract-msx-cancellation-partial
+    contract-msx-output-species-filter-coupled-chemistry
+    contract-msx-validation-identities
+    contract-msx-validation-references-assignments
+    contract-msx-validation-numerics-expressions
+    contract-msx-validation-public-preflight
     contract-msx-with-standard-quality
     contract-msx-standard-quality-isolated-equivalence
     contract-msx-standard-quality-failure-isolation
@@ -305,6 +312,7 @@ add_executable(aowis-server-epanet-conformance-tests
     conformance/deterministic_quality_stress_scenarios.h
     conformance/multi_quality_execution_scenarios.h
     conformance/msx_vendor_smoke_scenarios.h
+    conformance/msx_validation_scenarios.h
     conformance/reentrancy_scenarios.h
     test_net1_conformance.cpp
     test_result_contract.cpp
@@ -322,6 +330,7 @@ add_executable(aowis-server-epanet-conformance-tests
     test_deterministic_quality_stress_conformance.cpp
     test_multi_quality_execution_conformance.cpp
     test_msx_vendor_smoke.cpp
+    test_msx_validation_conformance.cpp
     test_reentrancy_conformance.cpp
 )
 
@@ -387,6 +396,14 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONTRACT_
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^contract-msx-export-rejects-")
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;quality;negative")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-validation-public-preflight")
+        set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality;negative")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "^contract-msx-validation-")
+        set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;quality;negative")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-backend-diagnostics")
+        set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;quality;negative")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-cancellation-partial")
+        set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;quality;cancellation")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-standard-quality-failure-isolation")
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality;proof;negative")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-standard-quality-isolated-equivalence")

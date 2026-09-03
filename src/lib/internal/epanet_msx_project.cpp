@@ -19,6 +19,7 @@
 #include <QString>
 #include <QTemporaryDir>
 #include <QUuid>
+#include <QtGlobal>
 
 #include <string>
 
@@ -56,24 +57,46 @@ HydraulicSimulationStatus msxSuccessStatus()
     return status;
 }
 
+HydraulicSimulationStatus msxAdapterErrorStatus(
+    HydraulicSimulationStatusStage stage,
+    HydraulicSimulationStatusOperation operation,
+    HydraulicSimulationStatusEntityType entity_type,
+    const QString &entity_id,
+    const QUuid &entity_uuid,
+    const QString &message)
+{
+    HydraulicSimulationStatus status = makeEpanetStatus(
+        stage,
+        operation,
+        entity_type,
+        entity_id,
+        entity_uuid,
+        message);
+    status.backend_name = msxBackendName();
+    return status;
+}
+
 // backend_error_code/message_backend come from MSXgeterror unless
 // from_legacy_epanet is set, in which case the failing call was one of the
 // legacy EN_* functions MSX itself is built on (e.g. MSXENopen), whose error
 // codes and message text come from ENgeterror instead.
 HydraulicSimulationStatus msxErrorStatus(
     int return_code,
+    HydraulicSimulationStatusStage stage,
     HydraulicSimulationStatusOperation operation,
     const QString &backend_operation,
-    const NetworkHydraulic &network,
+    HydraulicSimulationStatusEntityType entity_type,
+    const QString &entity_id,
+    const QUuid &entity_uuid,
     const QString &message,
     bool from_legacy_epanet = false)
 {
     HydraulicSimulationStatus status = makeEpanetStatus(
-        HydraulicSimulationStatusStage::RunQuality,
+        stage,
         operation,
-        HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
-        network.id,
-        network.uuid,
+        entity_type,
+        entity_id,
+        entity_uuid,
         message);
     status.backend_name = msxBackendName();
     status.backend_error_code = return_code;
@@ -83,16 +106,66 @@ HydraulicSimulationStatus msxErrorStatus(
     return status;
 }
 
-// Every terminal-failure return point reports through timeline.status (the
-// overall outcome) and also records the same failure in timeline.diagnostics
-// -- mirroring how EpanetQualitySolver's collectQualityFailure keeps both in
-// sync -- so a caller inspecting diagnostics sees this failure the same way
-// it would see any other backend diagnostic.
-void failTimeline(MultiSpeciesSimulationResultTimeline &timeline, const HydraulicSimulationStatus &status, MultiSpeciesSimulationResultValidity validity)
+HydraulicSimulationStatus msxSolverErrorStatus(
+    int return_code,
+    HydraulicSimulationStatusStage stage,
+    HydraulicSimulationStatusOperation operation,
+    const QString &backend_operation,
+    const NetworkHydraulic &network,
+    const QString &message,
+    bool from_legacy_epanet = false)
+{
+    return msxErrorStatus(
+        return_code,
+        stage,
+        operation,
+        backend_operation,
+        HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
+        network.id,
+        network.uuid,
+        message,
+        from_legacy_epanet);
+}
+
+void appendMsxFailure(
+    MultiSpeciesSimulationResultTimeline &timeline,
+    const HydraulicSimulationStatus &status,
+    HydraulicSimulationStatus &first_failure,
+    HydraulicSimulationDiagnosticSeverity severity)
+{
+    if (status.success)
+        return;
+
+    timeline.diagnostics.append(epanetDiagnosticFromStatus(status, severity));
+    if (first_failure.success)
+        first_failure = status;
+}
+
+void failTimeline(
+    MultiSpeciesSimulationResultTimeline &timeline,
+    const HydraulicSimulationStatus &status,
+    MultiSpeciesSimulationResultValidity validity)
 {
     timeline.status = status;
     timeline.validity = validity;
     timeline.diagnostics.append(epanetDiagnosticFromStatus(status, HydraulicSimulationDiagnosticSeverity::Fatal));
+}
+
+MultiSpeciesSimulationResultValidity failedRuntimeValidity(
+    const MultiSpeciesSimulationResultTimeline &timeline,
+    const HydraulicSimulationStatus &status)
+{
+    if (status.stage == HydraulicSimulationStatusStage::CloseQuality
+        || status.stage == HydraulicSimulationStatusStage::Cleanup)
+    {
+        return timeline.results.isEmpty()
+            ? MultiSpeciesSimulationResultValidity::Invalid
+            : MultiSpeciesSimulationResultValidity::Valid;
+    }
+
+    return timeline.results.isEmpty()
+        ? MultiSpeciesSimulationResultValidity::Invalid
+        : MultiSpeciesSimulationResultValidity::Partial;
 }
 
 bool writeTextFile(const QString &path, const QString &text)
@@ -104,18 +177,6 @@ bool writeTextFile(const QString &path, const QString &text)
     return file.error() == QFileDevice::NoError;
 }
 
-bool resolveNodeIndex(const QString &id, int &index)
-{
-    const QByteArray id_utf8 = id.toUtf8();
-    return ENgetnodeindex(id_utf8.constData(), &index) == 0;
-}
-
-bool resolveLinkIndex(const QString &id, int &index)
-{
-    const QByteArray id_utf8 = id.toUtf8();
-    return ENgetlinkindex(id_utf8.constData(), &index) == 0;
-}
-
 struct IndexedEntity
 {
     QString id;
@@ -123,56 +184,134 @@ struct IndexedEntity
     int index = 0;
 };
 
-// Resolves every entity's EPANET index up front, once, rather than looking
-// each one up again on every quality timestep.
+struct IndexedSpecies
+{
+    QString id;
+    QUuid uuid;
+    int index = 0;
+};
+
 template<typename Entity>
-bool resolveNodeIndices(const QList<Entity> &entities, QList<IndexedEntity> &target)
+HydraulicSimulationStatus resolveNodeIndices(
+    const QList<Entity> &entities,
+    QList<IndexedEntity> &target,
+    HydraulicSimulationStatusEntityType entity_type)
 {
     for (const Entity &entity : entities)
     {
         int index = 0;
-        if (!resolveNodeIndex(entity.id, index))
-            return false;
+        const QByteArray id_utf8 = entity.id.toUtf8();
+        const int error = ENgetnodeindex(id_utf8.constData(), &index);
+        if (error != 0)
+        {
+            HydraulicSimulationStatus status = msxErrorStatus(
+                error,
+                HydraulicSimulationStatusStage::ReadResults,
+                HydraulicSimulationStatusOperation::ResolveEntity,
+                QStringLiteral("ENgetnodeindex"),
+                entity_type,
+                entity.id,
+                entity.uuid,
+                QStringLiteral("Failed to resolve an EPANET node index while preparing multi-species result reads"),
+                true);
+            status.entity.index = index;
+            return status;
+        }
         target.append(IndexedEntity{entity.id, entity.uuid, index});
     }
-    return true;
+
+    return msxSuccessStatus();
 }
 
 template<typename Entity>
-bool resolveLinkIndices(const QList<Entity> &entities, QList<IndexedEntity> &target)
+HydraulicSimulationStatus resolveLinkIndices(
+    const QList<Entity> &entities,
+    QList<IndexedEntity> &target,
+    HydraulicSimulationStatusEntityType entity_type)
 {
     for (const Entity &entity : entities)
     {
         int index = 0;
-        if (!resolveLinkIndex(entity.id, index))
-            return false;
+        const QByteArray id_utf8 = entity.id.toUtf8();
+        const int error = ENgetlinkindex(id_utf8.constData(), &index);
+        if (error != 0)
+        {
+            HydraulicSimulationStatus status = msxErrorStatus(
+                error,
+                HydraulicSimulationStatusStage::ReadResults,
+                HydraulicSimulationStatusOperation::ResolveEntity,
+                QStringLiteral("ENgetlinkindex"),
+                entity_type,
+                entity.id,
+                entity.uuid,
+                QStringLiteral("Failed to resolve an EPANET link index while preparing multi-species result reads"),
+                true);
+            status.entity.index = index;
+            return status;
+        }
         target.append(IndexedEntity{entity.id, entity.uuid, index});
     }
-    return true;
+
+    return msxSuccessStatus();
 }
 
-QList<MultiSpeciesResultValue> readSpeciesValuesForNode(int node_index, const QList<QPair<int, QUuid>> &species_by_index)
+HydraulicSimulationStatus readSpeciesValues(
+    int msx_entity_type,
+    const IndexedEntity &entity,
+    HydraulicSimulationStatusEntityType entity_type,
+    HydraulicSimulationStatusStage stage,
+    HydraulicSimulationStatusOperation operation,
+    double simulation_time_s,
+    const QList<IndexedSpecies> &species_by_index,
+    QList<MultiSpeciesResultValue> &values)
 {
-    QList<MultiSpeciesResultValue> values;
-    for (const QPair<int, QUuid> &species : species_by_index)
+    for (const IndexedSpecies &species : species_by_index)
     {
         double value = 0.0;
-        if (MSXgetqual(MSX_NODE, node_index, species.first, &value) == 0)
-            values.append(MultiSpeciesResultValue{species.second, value});
-    }
-    return values;
-}
+        const int error = MSXgetqual(msx_entity_type, entity.index, species.index, &value);
+        if (error != 0)
+        {
+            HydraulicSimulationStatus status = msxErrorStatus(
+                error,
+                stage,
+                operation,
+                QStringLiteral("MSXgetqual"),
+                entity_type,
+                entity.id,
+                entity.uuid,
+                QStringLiteral("Failed to read a multi-species concentration result"));
+            status.property = HydraulicSimulationStatusProperty::Quality;
+            status.entity.index = entity.index;
+            status.details.append(QStringLiteral("Species: %1").arg(species.id));
+            status.details.append(QStringLiteral("Species UUID: %1").arg(species.uuid.toString(QUuid::WithoutBraces)));
+            status.details.append(QStringLiteral("MSX species index: %1").arg(species.index));
+            status.details.append(QStringLiteral("Simulation time: %1 s").arg(simulation_time_s, 0, 'g', 17));
+            return status;
+        }
 
-QList<MultiSpeciesResultValue> readSpeciesValuesForLink(int link_index, const QList<QPair<int, QUuid>> &species_by_index)
-{
-    QList<MultiSpeciesResultValue> values;
-    for (const QPair<int, QUuid> &species : species_by_index)
-    {
-        double value = 0.0;
-        if (MSXgetqual(MSX_LINK, link_index, species.first, &value) == 0)
-            values.append(MultiSpeciesResultValue{species.second, value});
+        if (!qIsFinite(value))
+        {
+            HydraulicSimulationStatus status = msxAdapterErrorStatus(
+                stage,
+                operation,
+                entity_type,
+                entity.id,
+                entity.uuid,
+                QStringLiteral("EPANET-MSX returned a non-finite concentration result"));
+            status.backend_operation = QStringLiteral("MSXgetqual");
+            status.property = HydraulicSimulationStatusProperty::Quality;
+            status.entity.index = entity.index;
+            status.details.append(QStringLiteral("Species: %1").arg(species.id));
+            status.details.append(QStringLiteral("Species UUID: %1").arg(species.uuid.toString(QUuid::WithoutBraces)));
+            status.details.append(QStringLiteral("MSX species index: %1").arg(species.index));
+            status.details.append(QStringLiteral("Simulation time: %1 s").arg(simulation_time_s, 0, 'g', 17));
+            return status;
+        }
+
+        values.append(MultiSpeciesResultValue{species.uuid, value});
     }
-    return values;
+
+    return msxSuccessStatus();
 }
 }
 
@@ -185,7 +324,11 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     bool &cancelled)
 {
     cancelled = false;
+    const QDateTime requested_simulation_start_utc = timeline.simulation_start_utc;
     timeline = MultiSpeciesSimulationResultTimeline();
+    timeline.simulation_start_utc = requested_simulation_start_utc.isValid()
+        ? requested_simulation_start_utc
+        : QDateTime::currentDateTimeUtc();
 
     if (cancellationRequested(cancellation_requested))
     {
@@ -198,7 +341,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     const QFileInfo hydraulic_file_info(hydraulic_file_path);
     if (hydraulic_file_path.isEmpty() || !hydraulic_file_info.exists() || !hydraulic_file_info.isFile())
     {
-        const HydraulicSimulationStatus status = makeEpanetStatus(
+        const HydraulicSimulationStatus status = msxAdapterErrorStatus(
             HydraulicSimulationStatusStage::RunQuality,
             HydraulicSimulationStatusOperation::RunMultiSpecies,
             HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
@@ -241,7 +384,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     QTemporaryDir scratch_dir;
     if (!scratch_dir.isValid())
     {
-        status = makeEpanetStatus(
+        status = msxAdapterErrorStatus(
             HydraulicSimulationStatusStage::RunQuality,
             HydraulicSimulationStatusOperation::OpenMultiSpecies,
             HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
@@ -259,7 +402,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
 
     if (!writeTextFile(inp_path, inp_text) || !writeTextFile(msx_path, msx_text))
     {
-        status = makeEpanetStatus(
+        status = msxAdapterErrorStatus(
             HydraulicSimulationStatusStage::RunQuality,
             HydraulicSimulationStatusOperation::OpenMultiSpecies,
             HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
@@ -291,7 +434,14 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     int error = MSXENopen(inp_path_native.constData(), rpt_path_native.constData(), out_path_native.constData());
     if (error != 0)
     {
-        status = msxErrorStatus(error, HydraulicSimulationStatusOperation::OpenMultiSpecies, QStringLiteral("MSXENopen"), network, QStringLiteral("Failed to open the EPANET project for multi-species execution"), true);
+        status = msxSolverErrorStatus(
+            error,
+            HydraulicSimulationStatusStage::RunQuality,
+            HydraulicSimulationStatusOperation::OpenMultiSpecies,
+            QStringLiteral("MSXENopen"),
+            network,
+            QStringLiteral("Failed to open the EPANET project for multi-species execution"),
+            true);
         failTimeline(timeline, status, MultiSpeciesSimulationResultValidity::Invalid);
         return status;
     }
@@ -299,7 +449,13 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     error = MSXopen(msx_path_mutable.data());
     if (error != 0)
     {
-        status = msxErrorStatus(error, HydraulicSimulationStatusOperation::OpenMultiSpecies, QStringLiteral("MSXopen"), network, QStringLiteral("Failed to open the multi-species reaction model"));
+        status = msxSolverErrorStatus(
+            error,
+            HydraulicSimulationStatusStage::RunQuality,
+            HydraulicSimulationStatusOperation::OpenMultiSpecies,
+            QStringLiteral("MSXopen"),
+            network,
+            QStringLiteral("Failed to open the multi-species reaction model"));
         MSXENclose();
         failTimeline(timeline, status, MultiSpeciesSimulationResultValidity::Invalid);
         return status;
@@ -308,8 +464,9 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     error = MSXusehydfile(hydraulic_path_mutable.data());
     if (error != 0)
     {
-        status = msxErrorStatus(
+        status = msxSolverErrorStatus(
             error,
+            HydraulicSimulationStatusStage::RunQuality,
             HydraulicSimulationStatusOperation::RunMultiSpecies,
             QStringLiteral("MSXusehydfile"),
             network,
@@ -327,7 +484,13 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     error = MSXgetcount(MSX_SPECIES, &species_count);
     if (error != 0)
     {
-        status = msxErrorStatus(error, HydraulicSimulationStatusOperation::InitializeMultiSpecies, QStringLiteral("MSXgetcount"), network, QStringLiteral("Failed to read the multi-species species count"));
+        status = msxSolverErrorStatus(
+            error,
+            HydraulicSimulationStatusStage::ReadResults,
+            HydraulicSimulationStatusOperation::ResolveEntity,
+            QStringLiteral("MSXgetcount"),
+            network,
+            QStringLiteral("Failed to read the multi-species species count"));
         MSXclose();
         MSXENclose();
         failTimeline(timeline, status, MultiSpeciesSimulationResultValidity::Invalid);
@@ -338,17 +501,70 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     for (const MultiSpeciesSpecies &species : prepared_project.network().multi_species.species)
         species_uuid_by_id.insert(species.id, species.uuid);
 
-    QList<QPair<int, QUuid>> species_by_index;
+    // The complete species set has already been loaded into MSX above. The
+    // run option only controls which species we read back into AOWIS results;
+    // it must never change the reaction model that MSX solves.
+    QList<IndexedSpecies> species_by_index;
     for (int species_index = 1; species_index <= species_count; species_index++)
     {
         int id_len = 0;
-        MSXgetIDlen(MSX_SPECIES, species_index, &id_len);
+        error = MSXgetIDlen(MSX_SPECIES, species_index, &id_len);
+        if (error != 0)
+        {
+            status = msxSolverErrorStatus(
+                error,
+                HydraulicSimulationStatusStage::ReadResults,
+                HydraulicSimulationStatusOperation::ResolveEntity,
+                QStringLiteral("MSXgetIDlen"),
+                network,
+                QStringLiteral("Failed to read a multi-species identifier length"));
+            status.details.append(QStringLiteral("MSX species index: %1").arg(species_index));
+            MSXclose();
+            MSXENclose();
+            failTimeline(timeline, status, MultiSpeciesSimulationResultValidity::Invalid);
+            return status;
+        }
+
         std::string id_buffer(static_cast<std::size_t>(id_len) + 1, '\0');
-        MSXgetID(MSX_SPECIES, species_index, id_buffer.data(), id_len + 1);
+        error = MSXgetID(MSX_SPECIES, species_index, id_buffer.data(), id_len + 1);
+        if (error != 0)
+        {
+            status = msxSolverErrorStatus(
+                error,
+                HydraulicSimulationStatusStage::ReadResults,
+                HydraulicSimulationStatusOperation::ResolveEntity,
+                QStringLiteral("MSXgetID"),
+                network,
+                QStringLiteral("Failed to read a multi-species identifier"));
+            status.details.append(QStringLiteral("MSX species index: %1").arg(species_index));
+            MSXclose();
+            MSXENclose();
+            failTimeline(timeline, status, MultiSpeciesSimulationResultValidity::Invalid);
+            return status;
+        }
+
         const QString species_id = QString::fromStdString(id_buffer.c_str());
         const QUuid species_uuid = species_uuid_by_id.value(species_id);
-        if (!species_uuid.isNull())
-            species_by_index.append(QPair<int, QUuid>(species_index, species_uuid));
+        if (species_uuid.isNull())
+        {
+            status = msxAdapterErrorStatus(
+                HydraulicSimulationStatusStage::ReadResults,
+                HydraulicSimulationStatusOperation::ResolveEntity,
+                HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
+                network.id,
+                network.uuid,
+                QStringLiteral("EPANET-MSX returned a species that cannot be mapped back to the AOWIS model"));
+            status.backend_operation = QStringLiteral("MSXgetID");
+            status.details.append(QStringLiteral("Species: %1").arg(species_id));
+            status.details.append(QStringLiteral("MSX species index: %1").arg(species_index));
+            MSXclose();
+            MSXENclose();
+            failTimeline(timeline, status, MultiSpeciesSimulationResultValidity::Invalid);
+            return status;
+        }
+
+        if (run_options.species_uuids.isEmpty() || run_options.species_uuids.contains(species_uuid))
+            species_by_index.append(IndexedSpecies{species_id, species_uuid, species_index});
     }
 
     QList<IndexedEntity> node_junctions;
@@ -358,23 +574,48 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     QList<IndexedEntity> link_pumps;
     QList<IndexedEntity> link_valves;
 
-    const bool identities_resolved =
-        resolveNodeIndices(prepared_project.network().nodes_junctions, node_junctions) &&
-        resolveNodeIndices(prepared_project.network().nodes_reservoirs, node_reservoirs) &&
-        resolveNodeIndices(prepared_project.network().nodes_tanks, node_tanks) &&
-        resolveLinkIndices(prepared_project.network().links_pipes, link_pipes) &&
-        resolveLinkIndices(prepared_project.network().links_pumps, link_pumps) &&
-        resolveLinkIndices(prepared_project.network().links_valves, link_valves);
-
-    if (!identities_resolved)
+    status = resolveNodeIndices(
+        prepared_project.network().nodes_junctions,
+        node_junctions,
+        HydraulicSimulationStatusEntityType::Junction);
+    if (status.success)
     {
-        status = makeEpanetStatus(
-            HydraulicSimulationStatusStage::RunQuality,
-            HydraulicSimulationStatusOperation::InitializeMultiSpecies,
-            HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
-            network.id,
-            network.uuid,
-            QStringLiteral("Failed to resolve a node or link index while preparing to read multi-species results"));
+        status = resolveNodeIndices(
+            prepared_project.network().nodes_reservoirs,
+            node_reservoirs,
+            HydraulicSimulationStatusEntityType::Reservoir);
+    }
+    if (status.success)
+    {
+        status = resolveNodeIndices(
+            prepared_project.network().nodes_tanks,
+            node_tanks,
+            HydraulicSimulationStatusEntityType::Tank);
+    }
+    if (status.success)
+    {
+        status = resolveLinkIndices(
+            prepared_project.network().links_pipes,
+            link_pipes,
+            HydraulicSimulationStatusEntityType::Pipe);
+    }
+    if (status.success)
+    {
+        status = resolveLinkIndices(
+            prepared_project.network().links_pumps,
+            link_pumps,
+            HydraulicSimulationStatusEntityType::Pump);
+    }
+    if (status.success)
+    {
+        status = resolveLinkIndices(
+            prepared_project.network().links_valves,
+            link_valves,
+            HydraulicSimulationStatusEntityType::Valve);
+    }
+
+    if (!status.success)
+    {
         MSXclose();
         MSXENclose();
         failTimeline(timeline, status, MultiSpeciesSimulationResultValidity::Invalid);
@@ -384,7 +625,13 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     error = MSXinit(0);
     if (error != 0)
     {
-        status = msxErrorStatus(error, HydraulicSimulationStatusOperation::InitializeMultiSpecies, QStringLiteral("MSXinit"), network, QStringLiteral("Failed to initialize multi-species water-quality state"));
+        status = msxSolverErrorStatus(
+            error,
+            HydraulicSimulationStatusStage::RunQuality,
+            HydraulicSimulationStatusOperation::InitializeMultiSpecies,
+            QStringLiteral("MSXinit"),
+            network,
+            QStringLiteral("Failed to initialize multi-species water-quality state"));
         MSXclose();
         MSXENclose();
         failTimeline(timeline, status, MultiSpeciesSimulationResultValidity::Invalid);
@@ -395,6 +642,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     bool step_loop_cancelled = false;
     double t = 0.0;
     double tleft = 1.0;
+    double previous_t = -1.0;
 
     while (tleft > 0.0)
     {
@@ -407,62 +655,247 @@ HydraulicSimulationStatus EpanetMsxProject::run(
         error = MSXstep(&t, &tleft);
         if (error != 0)
         {
-            first_failure = msxErrorStatus(error, HydraulicSimulationStatusOperation::StepMultiSpecies, QStringLiteral("MSXstep"), network, QStringLiteral("Failed to advance the multi-species timestep"));
+            status = msxSolverErrorStatus(
+                error,
+                HydraulicSimulationStatusStage::RunQuality,
+                HydraulicSimulationStatusOperation::StepMultiSpecies,
+                QStringLiteral("MSXstep"),
+                network,
+                QStringLiteral("Failed to advance the multi-species timestep"));
+            appendMsxFailure(
+                timeline,
+                status,
+                first_failure,
+                HydraulicSimulationDiagnosticSeverity::Fatal);
             break;
         }
+
+        if (!qIsFinite(t) || t < 0.0 || !qIsFinite(tleft) || tleft < 0.0)
+        {
+            status = msxAdapterErrorStatus(
+                HydraulicSimulationStatusStage::RunQuality,
+                HydraulicSimulationStatusOperation::StepMultiSpecies,
+                HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
+                network.id,
+                network.uuid,
+                QStringLiteral("EPANET-MSX returned an invalid simulation time"));
+            status.backend_operation = QStringLiteral("MSXstep");
+            status.details.append(QStringLiteral("Simulation time: %1").arg(t, 0, 'g', 17));
+            status.details.append(QStringLiteral("Time left: %1").arg(tleft, 0, 'g', 17));
+            appendMsxFailure(
+                timeline,
+                status,
+                first_failure,
+                HydraulicSimulationDiagnosticSeverity::Fatal);
+            break;
+        }
+
+        if (previous_t >= 0.0 && t <= previous_t)
+        {
+            status = msxAdapterErrorStatus(
+                HydraulicSimulationStatusStage::RunQuality,
+                HydraulicSimulationStatusOperation::StepMultiSpecies,
+                HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
+                network.id,
+                network.uuid,
+                QStringLiteral("EPANET-MSX simulation time did not advance"));
+            status.backend_operation = QStringLiteral("MSXstep");
+            status.details.append(QStringLiteral("Previous simulation time: %1").arg(previous_t, 0, 'g', 17));
+            status.details.append(QStringLiteral("Current simulation time: %1").arg(t, 0, 'g', 17));
+            appendMsxFailure(
+                timeline,
+                status,
+                first_failure,
+                HydraulicSimulationDiagnosticSeverity::Fatal);
+            break;
+        }
+        previous_t = t;
 
         MultiSpeciesSimulationResult result;
         result.time_elapsed_s = static_cast<quint64>(t);
         result.status = msxSuccessStatus();
+
+        bool result_read_failed = false;
 
         for (const IndexedEntity &entity : node_junctions)
         {
             MultiSpeciesSimulationResultNodeJunction node_result;
             node_result.id = entity.id;
             node_result.uuid = entity.uuid;
-            node_result.species_values = readSpeciesValuesForNode(entity.index, species_by_index);
+            status = readSpeciesValues(
+                MSX_NODE,
+                entity,
+                HydraulicSimulationStatusEntityType::Junction,
+                HydraulicSimulationStatusStage::ReadJunctionResults,
+                HydraulicSimulationStatusOperation::ReadNodeResult,
+                t,
+                species_by_index,
+                node_result.species_values);
+            if (!status.success)
+            {
+                appendMsxFailure(
+                    timeline,
+                    status,
+                    first_failure,
+                    HydraulicSimulationDiagnosticSeverity::Error);
+                result_read_failed = true;
+                break;
+            }
             result.nodes_junctions.append(node_result);
         }
-        for (const IndexedEntity &entity : node_reservoirs)
+
+        if (!result_read_failed)
         {
-            MultiSpeciesSimulationResultNodeReservoir node_result;
-            node_result.id = entity.id;
-            node_result.uuid = entity.uuid;
-            node_result.species_values = readSpeciesValuesForNode(entity.index, species_by_index);
-            result.nodes_reservoirs.append(node_result);
+            for (const IndexedEntity &entity : node_reservoirs)
+            {
+                MultiSpeciesSimulationResultNodeReservoir node_result;
+                node_result.id = entity.id;
+                node_result.uuid = entity.uuid;
+                status = readSpeciesValues(
+                    MSX_NODE,
+                    entity,
+                    HydraulicSimulationStatusEntityType::Reservoir,
+                    HydraulicSimulationStatusStage::ReadReservoirResults,
+                    HydraulicSimulationStatusOperation::ReadNodeResult,
+                    t,
+                    species_by_index,
+                    node_result.species_values);
+                if (!status.success)
+                {
+                    appendMsxFailure(
+                        timeline,
+                        status,
+                        first_failure,
+                        HydraulicSimulationDiagnosticSeverity::Error);
+                    result_read_failed = true;
+                    break;
+                }
+                result.nodes_reservoirs.append(node_result);
+            }
         }
-        for (const IndexedEntity &entity : node_tanks)
+
+        if (!result_read_failed)
         {
-            MultiSpeciesSimulationResultNodeTank node_result;
-            node_result.id = entity.id;
-            node_result.uuid = entity.uuid;
-            node_result.species_values = readSpeciesValuesForNode(entity.index, species_by_index);
-            result.nodes_tanks.append(node_result);
+            for (const IndexedEntity &entity : node_tanks)
+            {
+                MultiSpeciesSimulationResultNodeTank node_result;
+                node_result.id = entity.id;
+                node_result.uuid = entity.uuid;
+                status = readSpeciesValues(
+                    MSX_NODE,
+                    entity,
+                    HydraulicSimulationStatusEntityType::Tank,
+                    HydraulicSimulationStatusStage::ReadTankResults,
+                    HydraulicSimulationStatusOperation::ReadNodeResult,
+                    t,
+                    species_by_index,
+                    node_result.species_values);
+                if (!status.success)
+                {
+                    appendMsxFailure(
+                        timeline,
+                        status,
+                        first_failure,
+                        HydraulicSimulationDiagnosticSeverity::Error);
+                    result_read_failed = true;
+                    break;
+                }
+                result.nodes_tanks.append(node_result);
+            }
         }
-        for (const IndexedEntity &entity : link_pipes)
+
+        if (!result_read_failed)
         {
-            MultiSpeciesSimulationResultLinkPipe link_result;
-            link_result.id = entity.id;
-            link_result.uuid = entity.uuid;
-            link_result.species_values = readSpeciesValuesForLink(entity.index, species_by_index);
-            result.links_pipes.append(link_result);
+            for (const IndexedEntity &entity : link_pipes)
+            {
+                MultiSpeciesSimulationResultLinkPipe link_result;
+                link_result.id = entity.id;
+                link_result.uuid = entity.uuid;
+                status = readSpeciesValues(
+                    MSX_LINK,
+                    entity,
+                    HydraulicSimulationStatusEntityType::Pipe,
+                    HydraulicSimulationStatusStage::ReadPipeResults,
+                    HydraulicSimulationStatusOperation::ReadLinkResult,
+                    t,
+                    species_by_index,
+                    link_result.species_values);
+                if (!status.success)
+                {
+                    appendMsxFailure(
+                        timeline,
+                        status,
+                        first_failure,
+                        HydraulicSimulationDiagnosticSeverity::Error);
+                    result_read_failed = true;
+                    break;
+                }
+                result.links_pipes.append(link_result);
+            }
         }
-        for (const IndexedEntity &entity : link_pumps)
+
+        if (!result_read_failed)
         {
-            MultiSpeciesSimulationResultLinkPump link_result;
-            link_result.id = entity.id;
-            link_result.uuid = entity.uuid;
-            link_result.species_values = readSpeciesValuesForLink(entity.index, species_by_index);
-            result.links_pumps.append(link_result);
+            for (const IndexedEntity &entity : link_pumps)
+            {
+                MultiSpeciesSimulationResultLinkPump link_result;
+                link_result.id = entity.id;
+                link_result.uuid = entity.uuid;
+                status = readSpeciesValues(
+                    MSX_LINK,
+                    entity,
+                    HydraulicSimulationStatusEntityType::Pump,
+                    HydraulicSimulationStatusStage::ReadPumpResults,
+                    HydraulicSimulationStatusOperation::ReadLinkResult,
+                    t,
+                    species_by_index,
+                    link_result.species_values);
+                if (!status.success)
+                {
+                    appendMsxFailure(
+                        timeline,
+                        status,
+                        first_failure,
+                        HydraulicSimulationDiagnosticSeverity::Error);
+                    result_read_failed = true;
+                    break;
+                }
+                result.links_pumps.append(link_result);
+            }
         }
-        for (const IndexedEntity &entity : link_valves)
+
+        if (!result_read_failed)
         {
-            MultiSpeciesSimulationResultLinkValve link_result;
-            link_result.id = entity.id;
-            link_result.uuid = entity.uuid;
-            link_result.species_values = readSpeciesValuesForLink(entity.index, species_by_index);
-            result.links_valves.append(link_result);
+            for (const IndexedEntity &entity : link_valves)
+            {
+                MultiSpeciesSimulationResultLinkValve link_result;
+                link_result.id = entity.id;
+                link_result.uuid = entity.uuid;
+                status = readSpeciesValues(
+                    MSX_LINK,
+                    entity,
+                    HydraulicSimulationStatusEntityType::Valve,
+                    HydraulicSimulationStatusStage::ReadValveResults,
+                    HydraulicSimulationStatusOperation::ReadLinkResult,
+                    t,
+                    species_by_index,
+                    link_result.species_values);
+                if (!status.success)
+                {
+                    appendMsxFailure(
+                        timeline,
+                        status,
+                        first_failure,
+                        HydraulicSimulationDiagnosticSeverity::Error);
+                    result_read_failed = true;
+                    break;
+                }
+                result.links_valves.append(link_result);
+            }
         }
+
+        if (result_read_failed)
+            break;
 
         timeline.results.append(result);
 
@@ -473,10 +906,40 @@ HydraulicSimulationStatus EpanetMsxProject::run(
         }
     }
 
-    MSXclose();
+    const int msx_close_error = MSXclose();
+    if (msx_close_error != 0)
+    {
+        status = msxSolverErrorStatus(
+            msx_close_error,
+            HydraulicSimulationStatusStage::CloseQuality,
+            HydraulicSimulationStatusOperation::CloseMultiSpecies,
+            QStringLiteral("MSXclose"),
+            network,
+            QStringLiteral("Failed to close the multi-species reaction model"));
+        appendMsxFailure(
+            timeline,
+            status,
+            first_failure,
+            HydraulicSimulationDiagnosticSeverity::Error);
+    }
+
     const int en_close_error = MSXENclose();
-    if (en_close_error != 0 && first_failure.success)
-        first_failure = msxErrorStatus(en_close_error, HydraulicSimulationStatusOperation::CloseMultiSpecies, QStringLiteral("MSXENclose"), network, QStringLiteral("Failed to close the EPANET project after the multi-species run"), true);
+    if (en_close_error != 0)
+    {
+        status = msxSolverErrorStatus(
+            en_close_error,
+            HydraulicSimulationStatusStage::CloseQuality,
+            HydraulicSimulationStatusOperation::CloseMultiSpecies,
+            QStringLiteral("MSXENclose"),
+            network,
+            QStringLiteral("Failed to close the EPANET project after the multi-species run"),
+            true);
+        appendMsxFailure(
+            timeline,
+            status,
+            first_failure,
+            HydraulicSimulationDiagnosticSeverity::Error);
+    }
 
     if (step_loop_cancelled)
     {
@@ -490,11 +953,12 @@ HydraulicSimulationStatus EpanetMsxProject::run(
 
     if (!first_failure.success)
     {
-        failTimeline(timeline, first_failure, MultiSpeciesSimulationResultValidity::Invalid);
+        timeline.status = first_failure;
+        timeline.validity = failedRuntimeValidity(timeline, first_failure);
         return first_failure;
     }
 
-    timeline.status = first_failure;
+    timeline.status = msxSuccessStatus();
     timeline.validity = MultiSpeciesSimulationResultValidity::Valid;
     return timeline.status;
 }

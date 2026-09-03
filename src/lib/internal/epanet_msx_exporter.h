@@ -19,13 +19,12 @@ struct NetworkHydraulic;
 // requires the vendored EPANETMSX submodule this repository does not have
 // yet.
 //
-// run_options.species_uuids, if non-empty, restricts [SPECIES], [PIPES],
-// [TANKS], [SOURCES], and [QUALITY] to the selected species. [COEFFICIENTS],
-// [TERMS], [PARAMETERS], and [PATTERNS] are always exported in full: symbols
-// they define may be referenced from a selected species' reaction expression
-// text, which this function does not parse, so dropping them on the basis of
-// species selection risks silently breaking a reaction that is still active.
-// An unused symbol is harmless; a missing one is a parse error.
+// run_options.species_uuids is validated here but never used to prune the
+// generated reaction model. MSX chemistry is coupled: an output species can
+// reference another species in an expression, so removing an unrequested
+// species would change or invalidate the chemistry. EpanetMsxProject applies
+// species_uuids only when reading results after the complete model is loaded
+// and solved. An empty list means return every species.
 HydraulicSimulationStatus retrieveEpanetMsxText(
     const NetworkHydraulic &network,
     const MultiSpeciesRunOptions &run_options,

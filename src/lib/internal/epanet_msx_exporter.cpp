@@ -1,9 +1,9 @@
 #include "epanet_msx_exporter.h"
 
 #include "epanet_status_helpers.h"
+#include "epanet_msx_validator.h"
 
 #include <QHash>
-#include <QSet>
 #include <QStringList>
 #include <QUuid>
 #include <QtGlobal>
@@ -207,44 +207,6 @@ HydraulicSimulationStatus resolveOrFail(
     return makeEpanetSuccess();
 }
 
-QSet<QUuid> selectedSpeciesUuids(
-    const NetworkHydraulic &network,
-    const MultiSpeciesRunOptions &run_options)
-{
-    if (run_options.species_uuids.isEmpty())
-    {
-        QSet<QUuid> all_species;
-        for (const MultiSpeciesSpecies &species : network.multi_species.species)
-            all_species.insert(species.uuid);
-        return all_species;
-    }
-
-    return QSet<QUuid>(run_options.species_uuids.constBegin(), run_options.species_uuids.constEnd());
-}
-
-HydraulicSimulationStatus validateSpeciesSelection(
-    const NetworkHydraulic &network,
-    const MultiSpeciesRunOptions &run_options,
-    const MsxLookups &lookups)
-{
-    for (const QUuid &species_uuid : run_options.species_uuids)
-    {
-        if (!lookups.species_ids.contains(species_uuid))
-        {
-            return makeEpanetStatus(
-                HydraulicSimulationStatusStage::ConfigureOptions,
-                HydraulicSimulationStatusOperation::ConfigureMultiSpecies,
-                HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
-                network.id,
-                network.uuid,
-                QStringLiteral("multi_species_run selects an unresolved species UUID %1")
-                    .arg(species_uuid.toString(QUuid::WithoutBraces)));
-        }
-    }
-
-    return makeEpanetSuccess();
-}
-
 void appendTitleSection(QStringList &lines, const NetworkHydraulic &network)
 {
     if (network.title_line_1.isEmpty())
@@ -270,15 +232,11 @@ void appendOptionsSection(QStringList &lines, const MultiSpeciesOptions &options
 
 void appendSpeciesSection(
     QStringList &lines,
-    const NetworkHydraulic &network,
-    const QSet<QUuid> &selected_species)
+    const NetworkHydraulic &network)
 {
     lines.append(QStringLiteral("[SPECIES]"));
     for (const MultiSpeciesSpecies &species : network.multi_species.species)
     {
-        if (!selected_species.contains(species.uuid))
-            continue;
-
         QString line = QStringLiteral("%1 %2 %3")
             .arg(speciesTypeToken(species.type), species.id, speciesUnitsToken(species.units));
         // Omitting the trailing tolerance pair means MSX applies the
@@ -317,8 +275,7 @@ HydraulicSimulationStatus appendReactionSection(
     const QString &section_name,
     MultiSpeciesReactionLocation location,
     const NetworkHydraulic &network,
-    const MsxLookups &lookups,
-    const QSet<QUuid> &selected_species)
+    const MsxLookups &lookups)
 {
     lines.append(QStringLiteral("[%1]").arg(section_name));
     for (const MultiSpeciesReaction &reaction : network.multi_species.reactions)
@@ -326,17 +283,14 @@ HydraulicSimulationStatus appendReactionSection(
         if (reaction.location != location)
             continue;
 
-        // Resolve before filtering by selection: a reaction naming a species
-        // UUID that does not exist at all is a broken reference regardless
-        // of whether that species would have been selected for this run.
+        // Every reaction remains part of the model regardless of which
+        // species the caller wants returned. Reaction expressions can couple
+        // species, so output selection must never alter solver chemistry.
         QString species_id;
         const HydraulicSimulationStatus status = resolveOrFail(
             lookups.species_ids, reaction.species_uuid, network, QStringLiteral("reaction species"), species_id);
         if (!status.success)
             return status;
-
-        if (!selected_species.contains(reaction.species_uuid))
-            continue;
 
         lines.append(QStringLiteral("%1 %2 %3")
             .arg(reactionExpressionTypeToken(reaction.expression_type), species_id, reaction.expression));
@@ -348,8 +302,7 @@ HydraulicSimulationStatus appendReactionSection(
 HydraulicSimulationStatus appendSourcesSection(
     QStringList &lines,
     const NetworkHydraulic &network,
-    const MsxLookups &lookups,
-    const QSet<QUuid> &selected_species)
+    const MsxLookups &lookups)
 {
     lines.append(QStringLiteral("[SOURCES]"));
     for (const MultiSpeciesNodeSource &source : network.multi_species.sources)
@@ -359,9 +312,6 @@ HydraulicSimulationStatus appendSourcesSection(
             lookups.species_ids, source.species_uuid, network, QStringLiteral("source species"), species_id);
         if (!status.success)
             return status;
-
-        if (!selected_species.contains(source.species_uuid))
-            continue;
 
         QString node_id;
         status = resolveOrFail(
@@ -395,8 +345,7 @@ HydraulicSimulationStatus appendSourcesSection(
 HydraulicSimulationStatus appendQualitySection(
     QStringList &lines,
     const NetworkHydraulic &network,
-    const MsxLookups &lookups,
-    const QSet<QUuid> &selected_species)
+    const MsxLookups &lookups)
 {
     lines.append(QStringLiteral("[QUALITY]"));
 
@@ -407,8 +356,6 @@ HydraulicSimulationStatus appendQualitySection(
             lookups.species_ids, initial.species_uuid, network, QStringLiteral("initial-quality species"), species_id);
         if (!status.success)
             return status;
-        if (!selected_species.contains(initial.species_uuid))
-            continue;
         lines.append(QStringLiteral("GLOBAL %1 %2").arg(species_id, mapNumber(initial.concentration)));
     }
 
@@ -419,8 +366,6 @@ HydraulicSimulationStatus appendQualitySection(
             lookups.species_ids, initial.species_uuid, network, QStringLiteral("initial-quality species"), species_id);
         if (!status.success)
             return status;
-        if (!selected_species.contains(initial.species_uuid))
-            continue;
         QString node_id;
         status = resolveOrFail(
             lookups.node_ids, initial.node_uuid, network, QStringLiteral("initial-quality node"), node_id);
@@ -436,8 +381,6 @@ HydraulicSimulationStatus appendQualitySection(
             lookups.species_ids, initial.species_uuid, network, QStringLiteral("initial-quality species"), species_id);
         if (!status.success)
             return status;
-        if (!selected_species.contains(initial.species_uuid))
-            continue;
         QString pipe_id;
         status = resolveOrFail(
             lookups.pipe_ids, initial.pipe_uuid, network, QStringLiteral("initial-quality pipe"), pipe_id);
@@ -518,31 +461,32 @@ HydraulicSimulationStatus retrieveEpanetMsxText(
 {
     msx_text.clear();
 
-    const MsxLookups lookups = buildLookups(network);
-
-    HydraulicSimulationStatus status = validateSpeciesSelection(network, run_options, lookups);
+    HydraulicSimulationStatus status = validateEpanetMultiSpeciesModel(network);
+    if (!status.success)
+        return status;
+    status = validateEpanetMultiSpeciesRun(network, run_options);
     if (!status.success)
         return status;
 
-    const QSet<QUuid> selected_species = selectedSpeciesUuids(network, run_options);
+    const MsxLookups lookups = buildLookups(network);
 
     QStringList lines;
     appendTitleSection(lines, network);
     appendOptionsSection(lines, network.multi_species.options);
-    appendSpeciesSection(lines, network, selected_species);
+    appendSpeciesSection(lines, network);
     appendCoefficientsSection(lines, network.multi_species);
     appendTermsSection(lines, network.multi_species);
 
-    status = appendReactionSection(lines, QStringLiteral("PIPES"), MultiSpeciesReactionLocation::Pipe, network, lookups, selected_species);
+    status = appendReactionSection(lines, QStringLiteral("PIPES"), MultiSpeciesReactionLocation::Pipe, network, lookups);
     if (!status.success)
         return status;
-    status = appendReactionSection(lines, QStringLiteral("TANKS"), MultiSpeciesReactionLocation::Tank, network, lookups, selected_species);
+    status = appendReactionSection(lines, QStringLiteral("TANKS"), MultiSpeciesReactionLocation::Tank, network, lookups);
     if (!status.success)
         return status;
-    status = appendSourcesSection(lines, network, lookups, selected_species);
+    status = appendSourcesSection(lines, network, lookups);
     if (!status.success)
         return status;
-    status = appendQualitySection(lines, network, lookups, selected_species);
+    status = appendQualitySection(lines, network, lookups);
     if (!status.success)
         return status;
     status = appendParametersSection(lines, network, lookups);

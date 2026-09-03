@@ -14,6 +14,7 @@ set(AOWIS_SERVER_EPANET_SOURCES
     src/lib/internal/epanet_inp_exporter.cpp
     src/lib/internal/epanet_msx_exporter.cpp
     src/lib/internal/epanet_msx_project.cpp
+    src/lib/internal/epanet_msx_validator.cpp
     src/lib/internal/epanet_inp_geometry_importer.cpp
     src/lib/internal/epanet_inp_metadata_importer.cpp
     src/lib/internal/epanet_inp_report_importer.cpp
@@ -71,6 +72,7 @@ set(AOWIS_SERVER_EPANET_INTERNAL_HEADERS
     src/lib/internal/epanet_inp_exporter.h
     src/lib/internal/epanet_msx_exporter.h
     src/lib/internal/epanet_msx_project.h
+    src/lib/internal/epanet_msx_validator.h
     src/lib/internal/epanet_inp_geometry_importer.h
     src/lib/internal/epanet_inp_metadata_importer.h
     src/lib/internal/epanet_inp_report_importer.h

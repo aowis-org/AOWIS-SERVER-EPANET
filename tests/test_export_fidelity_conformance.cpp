@@ -1287,14 +1287,14 @@ void scenarioMsxExportSpeciesSelection(TestContext &context)
     QString msx_text;
     const HydraulicSimulationStatus status = retrieveEpanetMsxText(network, run_options, msx_text);
 
-    context.expect(status.success, "restricting to one known species must still export successfully");
-    context.expect(msx_text.contains(QStringLiteral("BULK CL2")), "the selected species must appear in [SPECIES]");
-    context.expect(!msx_text.contains(QStringLiteral("BULK F ")), "an unselected species must not appear in [SPECIES]");
-    context.expect(msx_text.contains(QStringLiteral("RATE CL2 -0.5 * CL2")), "the selected species' reaction must be exported");
-    context.expect(!msx_text.contains(QStringLiteral("RATE F 0")), "an unselected species' reaction must not be exported");
-    context.expect(msx_text.contains(QStringLiteral("CONC %1 CL2 1").arg(junction.id)), "the selected species' source must be exported");
-    context.expect(!msx_text.contains(QStringLiteral("CONC %1 F 0.7").arg(junction.id)), "an unselected species' source must not be exported");
-    context.expect(msx_text.contains(QStringLiteral("CONSTANT K1 3")), "coefficients are exported in full regardless of species selection, since a selected species' expression may reference them");
+    context.expect(status.success, "selecting one output species must still export successfully");
+    context.expect(msx_text.contains(QStringLiteral("BULK CL2")), "the requested output species must appear in [SPECIES]");
+    context.expect(msx_text.contains(QStringLiteral("BULK F ")), "an unrequested output species must remain in [SPECIES] so output filtering cannot alter chemistry");
+    context.expect(msx_text.contains(QStringLiteral("RATE CL2 -0.5 * CL2")), "the requested output species' reaction must be exported");
+    context.expect(msx_text.contains(QStringLiteral("RATE F 0")), "an unrequested output species' reaction must remain in the solved chemistry");
+    context.expect(msx_text.contains(QStringLiteral("CONC %1 CL2 1").arg(junction.id)), "the requested output species' source must be exported");
+    context.expect(msx_text.contains(QStringLiteral("CONC %1 F 0.7").arg(junction.id)), "an unrequested output species' source must remain in the solved chemistry");
+    context.expect(msx_text.contains(QStringLiteral("CONSTANT K1 3")), "coefficients must remain in the complete MSX chemistry model");
 }
 
 void scenarioMsxExportRejectsUnknownSpeciesSelection(TestContext &context)
@@ -1416,7 +1416,7 @@ void registerExportFidelityScenarios(ScenarioRegistry &registry)
         &scenarioMsxExportBasicSections});
     registry.add(ScenarioDefinition{
         "contract-msx-export-species-selection",
-        "Restrict [SPECIES]/[PIPES]/[TANKS]/[SOURCES]/[QUALITY] to a requested species subset while exporting coefficients and patterns in full.",
+        "Validate a requested output-species subset without pruning any species, reactions, sources, or initial quality from the MSX chemistry model.",
         {"contract", "quality"},
         &scenarioMsxExportSpeciesSelection});
     registry.add(ScenarioDefinition{

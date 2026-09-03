@@ -6,6 +6,7 @@
 #include "internal/epanet_inp_importer.h"
 #include "internal/epanet_multi_quality_run_executor.h"
 #include "internal/epanet_msx_project.h"
+#include "internal/epanet_msx_validator.h"
 #include "internal/epanet_network_validator.h"
 #include "internal/epanet_prepared_project.h"
 #include "internal/epanet_quality_run_configurator.h"
@@ -354,6 +355,12 @@ EpanetResultRun EpanetRunner::run(
         multi_species_result.options = request.multi_species_run.value();
         multi_species_result.result_timeline.simulation_start_utc = simulation_start_utc;
         result.multi_species_result = multi_species_result;
+
+        const HydraulicSimulationStatus multi_species_run_status = validateEpanetMultiSpeciesRun(
+            request.network,
+            request.multi_species_run.value());
+        if (!multi_species_run_status.success)
+            return failedRun(std::move(result), multi_species_run_status, prepared_project, request.network);
     }
 
     const HydraulicSimulationStatus status = prepared_project.prepare(request.network);
