@@ -1,0 +1,140 @@
+[TITLE]
+
+[JUNCTIONS]
+;;ID                             	Elev        	Demand      	Pattern                        
+ N1                             	700.0000    
+ N2                             	710.0000    
+
+[RESERVOIRS]
+;;ID                             	Head        	Pattern                        
+ N3                             	800.0000    	                               
+
+[TANKS]
+;;ID                             	Elevation   	InitLevel   	MinLevel    	MaxLevel    	Diameter    	MinVol      	VolCurve                       	Overflow    
+ N4                             	850.0000    	120.0000    	100.0000    	150.0000    	50.5000     	200296.1666 	                               
+
+[PIPES]
+;;ID                             	Node1                          	Node2                          	Length      	Diameter    	Roughness   	MinorLoss   	Status
+ L2                             	N1                             	N3                             	10560.0000  	12.0000     	100.0000    	0.0000      	      
+ L3                             	N1                             	N2                             	5280.0000   	14.0000     	100.0000    	0.0000      	      
+
+[PUMPS]
+;;ID                             	Node1                          	Node2                          	Parameters  
+ L1                             	N3                             	N1                             	HEAD C1
+
+[VALVES]
+;;ID                             	Node1                          	Node2                          	Diameter    	Type  	Setting     	MinorLoss   
+
+[DEMANDS]
+;;Junction                       	Demand        	Pattern                        	Category                       
+ N1                             	500.000000    	                               
+ N2                             	500.000000    	                               
+
+[EMITTERS]
+;;Junction                       	Coefficient   
+
+[LEAKAGE]
+;;Pipe                           	Leak Area     	Leak Expansion
+
+[STATUS]
+;;ID                             	Status/Setting
+
+[PATTERNS]
+;;ID                             	Multipliers 
+
+[CURVES]
+;;ID                             	X-Value     	Y-Value     
+ C1                             	1500.0000   	250.0000    	PUMP
+
+[CONTROLS]
+
+[RULES]
+
+[QUALITY]
+;;ID                             	InitQual      
+
+[SOURCES]
+;;ID                             	Type     	Quality       	Pattern                        
+
+[MIXING]
+;;ID                             	Model   
+ N4                             	MIXED   	      1.0000
+
+[REACTIONS]
+ ORDER  BULK            1.00
+ ORDER  WALL            1
+ ORDER  TANK            1.00
+ GLOBAL BULK            0.000000
+ GLOBAL WALL            0.000000
+
+[REACTIONS]
+;Type     	Pipe/Tank                      	Coefficient 
+
+[ENERGY]
+ GLOBAL EFFIC        75.0000
+ DEMAND CHARGE       0.0000
+
+[TIMES]
+ DURATION            0:00:00
+ HYDRAULIC TIMESTEP  1:00:00
+ QUALITY TIMESTEP    0:06:00
+ REPORT TIMESTEP     1:00:00
+ REPORT START        0:00:00
+ PATTERN TIMESTEP    1:00:00
+ PATTERN START       0:00:00
+ RULE TIMESTEP       0:06:00
+ START CLOCKTIME     0:00:00
+ STATISTIC           NONE
+
+[OPTIONS]
+ UNITS               GPM
+ PRESSURE            PSI
+ HEADLOSS            H-W
+ UNBALANCED          STOP
+ QUALITY             NONE
+ DEMAND MULTIPLIER   1.0000
+ EMITTER EXPONENT    0.5000
+ BACKFLOW ALLOWED    YES
+ VISCOSITY           1.000000
+ DIFFUSIVITY         1.000000
+ SPECIFIC GRAVITY    1.000000
+ TRIALS              200
+ ACCURACY            0.00100000
+ TOLERANCE           0.01000000
+ CHECKFREQ           2
+ MAXCHECK            10
+ DAMPLIMIT           0.00000000
+
+[REPORT]
+ PAGESIZE            0
+ STATUS              NO
+ SUMMARY             YES
+ ENERGY              NO
+ MESSAGES            YES
+ NODES               NONE
+ LINKS               NONE
+ Elevation           NO
+ Demand              PRECISION 2
+ Head                PRECISION 2
+ Pressure            PRECISION 2
+ Quality             PRECISION 2
+ Length              NO
+ Diameter            NO
+ Flow                PRECISION 2
+ Velocity            PRECISION 2
+ Headloss            PRECISION 2
+ Quality             NO
+ State               NO
+ Setting             NO
+ Reaction            NO
+
+[TAGS]
+;;Object  	ID                             	Tag
+
+[COORDINATES]
+;;ID                             	X-Coord       	Y-Coord       
+
+[VERTICES]
+;;ID                             	X-Coord       	Y-Coord       
+
+[END]

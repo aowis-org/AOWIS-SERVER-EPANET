@@ -143,6 +143,11 @@ bool timelineHasSpeciesValue(const MultiSpeciesSimulationResultTimeline &timelin
     return false;
 }
 
+bool findMsxSpeciesConcentration(
+    const QList<MultiSpeciesResultValue> &values,
+    const QUuid &species_uuid,
+    double &concentration);
+
 // Exercises the raw vendored MSXENopen/MSXopen/MSXsolveH/MSXinit/MSXstep/
 // MSXgetqual/MSXclose/MSXENclose sequence directly, with none of AOWIS's own
 // adapter code involved. This is deliberately not a conformance or contract
@@ -230,7 +235,8 @@ void scenarioMsxVendorOpenInitStepClose(AowisEpanetTests::TestContext &context)
 
 // Proves the Lew-style handoff directly at AOWIS's internal boundary:
 // hydraulics are solved by the normal handle-based AOWIS EPANET executor,
-// persisted once, and EpanetMsxProject consumes that exact file through
+// persisted once together with the configured INP snapshot from that same
+// project, and EpanetMsxProject consumes the pair through MSXENopen +
 // MSXusehydfile. This keeps the internal handoff covered independently of
 // the public EpanetRunner integration scenarios below.
 void scenarioMsxAowisHydraulicHandoff(AowisEpanetTests::TestContext &context)
@@ -249,6 +255,7 @@ void scenarioMsxAowisHydraulicHandoff(AowisEpanetTests::TestContext &context)
     hydraulic_result = hydraulic_executor.run(std::move(hydraulic_result));
     context.expect(hydraulic_result.result_timeline.status.success, "AOWIS hydraulics must succeed before the MSX handoff");
     context.expect(hydraulic_executor.hasHydraulicFile(), "AOWIS hydraulic executor must persist the .hyd file requested for MSX");
+    context.expect(!hydraulic_executor.hydraulicInpText().trimmed().isEmpty(), "AOWIS hydraulic executor must capture the configured INP snapshot paired with the .hyd file");
     if (!hydraulic_result.result_timeline.status.success || !hydraulic_executor.hasHydraulicFile())
         return;
 
@@ -261,6 +268,7 @@ void scenarioMsxAowisHydraulicHandoff(AowisEpanetTests::TestContext &context)
     status = msx_project.run(
         network,
         MultiSpeciesRunOptions{},
+        hydraulic_executor.hydraulicInpText(),
         hydraulic_file_path,
         timeline,
         std::function<bool()>(),
@@ -271,6 +279,89 @@ void scenarioMsxAowisHydraulicHandoff(AowisEpanetTests::TestContext &context)
     context.expect(timeline.validity == MultiSpeciesSimulationResultValidity::Valid, "MSX hydraulic-handoff timeline must be Valid");
     context.expect(!timeline.results.isEmpty(), "MSX hydraulic-handoff timeline must contain quality timesteps");
     context.expect(timelineHasSpeciesValue(timeline), "MSX hydraulic-handoff results must contain at least one junction species value");
+}
+
+void scenarioMsxConfiguredInpRoughnessKc(AowisEpanetTests::TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    network.options_hydraulic.headloss_formula = HydraulicHeadlossFormula::ChezyManning;
+    constexpr double expected_roughness = 0.017;
+    for (HydraulicLinkPipe &pipe : network.links_pipes)
+        pipe.roughness_chezy_manning = expected_roughness;
+
+    EpanetPreparedProject prepared_project;
+    HydraulicSimulationStatus status = prepared_project.prepare(network);
+    context.expect(status.success, "Kc configured-INP fixture must prepare successfully");
+    if (!status.success)
+        return;
+
+    EpanetMultiQualityRunExecutor hydraulic_executor(prepared_project, true);
+    EpanetResultRun hydraulic_result;
+    hydraulic_result = hydraulic_executor.run(std::move(hydraulic_result));
+    context.expect(hydraulic_result.result_timeline.status.success, "Kc configured-INP fixture hydraulics must succeed");
+    context.expect(hydraulic_executor.hasHydraulicFile(), "Kc configured-INP fixture must persist reusable hydraulics");
+    context.expect(!hydraulic_executor.hydraulicInpText().trimmed().isEmpty(), "Kc configured-INP fixture must capture a configured INP snapshot");
+    if (!hydraulic_result.result_timeline.status.success
+        || !hydraulic_executor.hasHydraulicFile()
+        || hydraulic_executor.hydraulicInpText().trimmed().isEmpty())
+    {
+        return;
+    }
+
+    QTemporaryDir scratch_dir;
+    context.expect(scratch_dir.isValid(), "Kc configured-INP fixture must create a temporary directory");
+    if (!scratch_dir.isValid())
+        return;
+
+    const QString inp_path = scratch_dir.filePath(QStringLiteral("configured.inp"));
+    const QString rpt_path = scratch_dir.filePath(QStringLiteral("configured.rpt"));
+    const QString out_path = scratch_dir.filePath(QStringLiteral("configured.out"));
+
+    QFile inp_file(inp_path);
+    const bool inp_opened = inp_file.open(QIODevice::WriteOnly | QIODevice::Truncate);
+    context.expect(inp_opened, "Kc configured-INP fixture must write the captured INP snapshot");
+    if (!inp_opened)
+        return;
+    inp_file.write(hydraulic_executor.hydraulicInpText().toUtf8());
+    const bool inp_write_ok = inp_file.error() == QFileDevice::NoError;
+    inp_file.close();
+    context.expect(inp_write_ok, "Kc configured-INP fixture must write the complete captured INP snapshot");
+    if (!inp_write_ok)
+        return;
+
+    const QByteArray inp_path_native = QFile::encodeName(inp_path);
+    const QByteArray rpt_path_native = QFile::encodeName(rpt_path);
+    const QByteArray out_path_native = QFile::encodeName(out_path);
+    int error = MSXENopen(inp_path_native.constData(), rpt_path_native.constData(), out_path_native.constData());
+    context.expect(error == 0, "MSXENopen must accept the exact configured INP snapshot paired with the saved hydraulics: " + msxErrorMessage(error));
+    if (error != 0)
+        return;
+
+    const HydraulicLinkPipe &pipe = network.links_pipes.first();
+    const QByteArray pipe_id_utf8 = pipe.id.toUtf8();
+    int link_index = 0;
+    error = ENgetlinkindex(pipe_id_utf8.constData(), &link_index);
+    context.expect(error == 0 && link_index > 0, "MSX's legacy EPANET layer must resolve a pipe from the configured INP snapshot");
+
+    float backend_roughness = 0.0F;
+    if (error == 0 && link_index > 0)
+    {
+        error = ENgetlinkvalue(link_index, EN_ROUGHNESS, &backend_roughness);
+        context.expect(error == 0, "MSX's legacy EPANET layer must expose the configured pipe roughness used to initialize Kc");
+    }
+
+    MSXENclose();
+
+    if (error != 0 || link_index <= 0)
+        return;
+
+    const AowisEpanetTests::NumericTolerance tolerance{1.0e-7, 1.0e-6};
+    context.expectNear(
+        static_cast<double>(backend_roughness),
+        expected_roughness,
+        tolerance,
+        {0, "pipe", pipe.id.toStdString(), "Kc"},
+        "The configured INP snapshot opened by MSX must expose the hydraulically configured roughness rather than the construction-time placeholder 1.0");
 }
 
 NetworkHydraulic combinedQualityMsxNetwork()
@@ -679,6 +770,7 @@ void scenarioMsxBackendDiagnostics(AowisEpanetTests::TestContext &context)
     status = msx_project.run(
         network,
         MultiSpeciesRunOptions{},
+        hydraulic_executor.hydraulicInpText(),
         hydraulic_executor.hydraulicFilePath(),
         timeline,
         std::function<bool()>(),
@@ -742,6 +834,7 @@ void scenarioMsxCancellationPartial(AowisEpanetTests::TestContext &context)
     status = msx_project.run(
         network,
         MultiSpeciesRunOptions{},
+        hydraulic_executor.hydraulicInpText(),
         hydraulic_executor.hydraulicFilePath(),
         timeline,
         cancel_after_one_completed_step,
@@ -980,6 +1073,11 @@ void registerMsxIntegrationScenarios(ScenarioRegistry &registry)
         "Run a network with a real reaction model through EpanetRunner::run() and confirm multi_species_result comes back Valid with real, non-zero species concentrations.",
         {"contract", "quality"},
         &scenarioMsxIntegrationEndToEnd});
+    registry.add(ScenarioDefinition{
+        "contract-msx-configured-inp-roughness-kc",
+        "Open the exact configured INP snapshot through MSX's linked EPANET layer and require EN_ROUGHNESS to match the configured Chezy-Manning value used to initialize MSX Kc, proving the snapshot comes from the same configured project as the reusable hydraulics.",
+        {"contract", "hydraulic", "quality", "proof"},
+        &scenarioMsxConfiguredInpRoughnessKc});
     registry.add(ScenarioDefinition{
         "contract-msx-backend-diagnostics",
         "Corrupt an otherwise valid saved hydraulic file and require the MSXusehydfile failure to preserve EPANET-MSX backend code, text, operation, stage, validity, and diagnostic provenance.",

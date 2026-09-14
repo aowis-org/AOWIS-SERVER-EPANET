@@ -3,6 +3,7 @@
 #include "epanet_diagnostic_helpers.h"
 #include "epanet_hydraulic_run_configurator.h"
 #include "epanet_hydraulic_solver.h"
+#include "epanet_inp_exporter.h"
 #include "epanet_network_validator.h"
 #include "epanet_prepared_project.h"
 #include "epanet_quality_result_reader.h"
@@ -180,6 +181,11 @@ QString EpanetMultiQualityRunExecutor::hydraulicFilePath() const
     return this->hydraulic_file_path_;
 }
 
+QString EpanetMultiQualityRunExecutor::hydraulicInpText() const
+{
+    return this->hydraulic_inp_text_;
+}
+
 HydraulicSimulationStatus EpanetMultiQualityRunExecutor::saveHydraulics()
 {
     int error = EN_saveH(this->prepared_project_.project().handle());
@@ -227,6 +233,7 @@ HydraulicSimulationStatus EpanetMultiQualityRunExecutor::saveHydraulics()
             QString(),
             QStringLiteral("Failed to persist reusable EPANET hydraulic results"));
         this->hydraulic_file_path_.clear();
+        this->hydraulic_inp_text_.clear();
         this->hydraulic_artifact_directory_.reset();
         return status;
     }
@@ -234,6 +241,7 @@ HydraulicSimulationStatus EpanetMultiQualityRunExecutor::saveHydraulics()
     if (!hasHydraulicFile())
     {
         this->hydraulic_file_path_.clear();
+        this->hydraulic_inp_text_.clear();
         this->hydraulic_artifact_directory_.reset();
         return makeEpanetStatus(
             HydraulicSimulationStatusStage::SaveHydraulics,
@@ -241,6 +249,31 @@ HydraulicSimulationStatus EpanetMultiQualityRunExecutor::saveHydraulics()
             HydraulicSimulationStatusEntityType::HydraulicSolver,
             QString(),
             QStringLiteral("EPANET reported success while persisting hydraulics, but no reusable hydraulic file was created"));
+    }
+
+    HydraulicSimulationStatus status = retrieveEpanetInpText(
+        this->prepared_project_.project(),
+        this->prepared_project_.network(),
+        this->hydraulic_inp_text_);
+    if (!status.success)
+    {
+        this->hydraulic_file_path_.clear();
+        this->hydraulic_inp_text_.clear();
+        this->hydraulic_artifact_directory_.reset();
+        return status;
+    }
+
+    if (this->hydraulic_inp_text_.trimmed().isEmpty())
+    {
+        this->hydraulic_file_path_.clear();
+        this->hydraulic_inp_text_.clear();
+        this->hydraulic_artifact_directory_.reset();
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::SaveHydraulics,
+            HydraulicSimulationStatusOperation::SaveHydraulics,
+            HydraulicSimulationStatusEntityType::Project,
+            QString(),
+            QStringLiteral("EPANET produced an empty configured INP snapshot for reusable hydraulics"));
     }
 
     return makeEpanetSuccess();
@@ -251,6 +284,7 @@ EpanetResultRun EpanetMultiQualityRunExecutor::run(
     const std::function<bool()> &cancellation_requested)
 {
     this->hydraulic_file_path_.clear();
+    this->hydraulic_inp_text_.clear();
     this->hydraulic_artifact_directory_.reset();
     result.state = EpanetRunState::Running;
 

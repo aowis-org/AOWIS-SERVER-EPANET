@@ -10,13 +10,14 @@
 
 #include <QString>
 
-// Drives the vendored EPANET-MSX toolkit against a self-contained
-// temporary INP+MSX file pair generated from NetworkHydraulic, while
-// consuming hydraulics already solved by AOWIS/EPANET through a .hyd file.
-// MSXENopen is still required to give the legacy MSX API its network
-// topology and identifiers, but this class deliberately never calls
-// MSXsolveH: chemistry is advanced exclusively against the hydraulic
-// solution supplied by the caller through MSXusehydfile.
+// Drives the vendored EPANET-MSX toolkit against a temporary INP+MSX pair
+// while consuming hydraulics already solved by AOWIS/EPANET through a .hyd
+// file. The INP text must be the snapshot of the exact configured EPANET
+// project that produced the supplied .hyd file; this class deliberately does
+// not rebuild or reconfigure a second EPANET project. MSXENopen is still
+// required to give the legacy MSX API its topology/identifiers, but this
+// class never calls MSXsolveH: chemistry is advanced exclusively against the
+// caller-supplied hydraulic solution through MSXusehydfile.
 //
 // Unlike the rest of this adapter, MSX's API has no per-instance handle:
 // only one MSX project can be open in this process at a time. This class
@@ -29,6 +30,7 @@ public:
     HydraulicSimulationStatus run(
         const NetworkHydraulic &network,
         const MultiSpeciesRunOptions &run_options,
+        const QString &configured_inp_text,
         const QString &hydraulic_file_path,
         MultiSpeciesSimulationResultTimeline &timeline,
         const std::function<bool()> &cancellation_requested,

@@ -1,9 +1,7 @@
 #include "epanet_msx_project.h"
 
 #include "epanet_diagnostic_helpers.h"
-#include "epanet_inp_exporter.h"
 #include "epanet_msx_exporter.h"
-#include "epanet_prepared_project.h"
 #include "epanet_status_helpers.h"
 
 #include <epanetmsx.h>
@@ -318,6 +316,7 @@ HydraulicSimulationStatus readSpeciesValues(
 HydraulicSimulationStatus EpanetMsxProject::run(
     const NetworkHydraulic &network,
     const MultiSpeciesRunOptions &run_options,
+    const QString &configured_inp_text,
     const QString &hydraulic_file_path,
     MultiSpeciesSimulationResultTimeline &timeline,
     const std::function<bool()> &cancellation_requested,
@@ -352,29 +351,21 @@ HydraulicSimulationStatus EpanetMsxProject::run(
         return status;
     }
 
-    // Build the same AOWIS network through the normal handle-based pipeline
-    // only to obtain the native-generated INP topology that legacy MSX needs
-    // beside the caller-supplied .hyd file. This does not solve hydraulics.
-    // It is independent of MSX's process-global state, so it deliberately
-    // runs before the mutex below is acquired.
-    EpanetPreparedProject prepared_project;
-    HydraulicSimulationStatus status = prepared_project.prepare(network);
-    if (!status.success)
+    if (configured_inp_text.trimmed().isEmpty())
     {
-        failTimeline(timeline, status, MultiSpeciesSimulationResultValidity::Invalid);
-        return status;
-    }
-
-    QString inp_text;
-    status = retrieveEpanetInpText(prepared_project.project(), prepared_project.network(), inp_text);
-    if (!status.success)
-    {
+        const HydraulicSimulationStatus status = msxAdapterErrorStatus(
+            HydraulicSimulationStatusStage::RunQuality,
+            HydraulicSimulationStatusOperation::RunMultiSpecies,
+            HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
+            network.id,
+            network.uuid,
+            QStringLiteral("A configured EPANET INP snapshot matching the reusable hydraulic results is required for the multi-species run"));
         failTimeline(timeline, status, MultiSpeciesSimulationResultValidity::Invalid);
         return status;
     }
 
     QString msx_text;
-    status = retrieveEpanetMsxText(prepared_project.network(), run_options, msx_text);
+    HydraulicSimulationStatus status = retrieveEpanetMsxText(network, run_options, msx_text);
     if (!status.success)
     {
         failTimeline(timeline, status, MultiSpeciesSimulationResultValidity::Invalid);
@@ -400,7 +391,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     const QString rpt_path = scratch_dir.filePath(QStringLiteral("network.rpt"));
     const QString out_path = scratch_dir.filePath(QStringLiteral("network.out"));
 
-    if (!writeTextFile(inp_path, inp_text) || !writeTextFile(msx_path, msx_text))
+    if (!writeTextFile(inp_path, configured_inp_text) || !writeTextFile(msx_path, msx_text))
     {
         status = msxAdapterErrorStatus(
             HydraulicSimulationStatusStage::RunQuality,
@@ -498,7 +489,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     }
 
     QHash<QString, QUuid> species_uuid_by_id;
-    for (const MultiSpeciesSpecies &species : prepared_project.network().multi_species.species)
+    for (const MultiSpeciesSpecies &species : network.multi_species.species)
         species_uuid_by_id.insert(species.id, species.uuid);
 
     // The complete species set has already been loaded into MSX above. The
@@ -575,41 +566,41 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     QList<IndexedEntity> link_valves;
 
     status = resolveNodeIndices(
-        prepared_project.network().nodes_junctions,
+        network.nodes_junctions,
         node_junctions,
         HydraulicSimulationStatusEntityType::Junction);
     if (status.success)
     {
         status = resolveNodeIndices(
-            prepared_project.network().nodes_reservoirs,
+            network.nodes_reservoirs,
             node_reservoirs,
             HydraulicSimulationStatusEntityType::Reservoir);
     }
     if (status.success)
     {
         status = resolveNodeIndices(
-            prepared_project.network().nodes_tanks,
+            network.nodes_tanks,
             node_tanks,
             HydraulicSimulationStatusEntityType::Tank);
     }
     if (status.success)
     {
         status = resolveLinkIndices(
-            prepared_project.network().links_pipes,
+            network.links_pipes,
             link_pipes,
             HydraulicSimulationStatusEntityType::Pipe);
     }
     if (status.success)
     {
         status = resolveLinkIndices(
-            prepared_project.network().links_pumps,
+            network.links_pumps,
             link_pumps,
             HydraulicSimulationStatusEntityType::Pump);
     }
     if (status.success)
     {
         status = resolveLinkIndices(
-            prepared_project.network().links_valves,
+            network.links_valves,
             link_valves,
             HydraulicSimulationStatusEntityType::Valve);
     }

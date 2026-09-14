@@ -395,6 +395,7 @@ EpanetResultRun EpanetRunner::run(
             const HydraulicSimulationStatus multi_species_status = msx_project.run(
                 request.network,
                 request.multi_species_run.value(),
+                executor.hydraulicInpText(),
                 executor.hydraulicFilePath(),
                 multi_species_result.result_timeline,
                 cancellation_requested,

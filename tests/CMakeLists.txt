@@ -11,6 +11,7 @@ set(AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS
     contract-msx-export-rejects-unknown-species-selection
     contract-msx-export-rejects-broken-reaction-reference
     contract-msx-integration-end-to-end
+    contract-msx-configured-inp-roughness-kc
     contract-msx-backend-diagnostics
     contract-msx-cancellation-partial
     contract-msx-output-species-filter-coupled-chemistry
@@ -352,10 +353,10 @@ target_compile_definitions(aowis-server-epanet-conformance-tests
         AOWIS_EPANET_TEST_NET3_INP="${PROJECT_SOURCE_DIR}/external/epanet/example-networks/Net3.inp"
         AOWIS_EPANET_MSX_EXAMPLE_INP="${PROJECT_SOURCE_DIR}/external/epanet-msx/Examples/example.inp"
         AOWIS_EPANET_MSX_EXAMPLE_MSX="${PROJECT_SOURCE_DIR}/external/epanet-msx/Examples/example.msx"
-        AOWIS_EPANET_TEST_UPSTREAM_DEMAND_CATEGORIES_INP="${PROJECT_SOURCE_DIR}/external/epanet/tests/data/net1_dem_cat.inp"
-        AOWIS_EPANET_TEST_UPSTREAM_TANK_OVERFLOW_INP="${PROJECT_SOURCE_DIR}/external/epanet/tests/data/test_overflow.inp"
-        AOWIS_EPANET_TEST_UPSTREAM_NETWORK_BUILDER_INP="${PROJECT_SOURCE_DIR}/external/epanet/tests/data/net_builder.inp"
-        AOWIS_EPANET_TEST_UPSTREAM_NETWORK_BUILDER_SMALL_INP="${PROJECT_SOURCE_DIR}/external/epanet/tests/data/netbuilder_test2.inp"
+        AOWIS_EPANET_TEST_UPSTREAM_DEMAND_CATEGORIES_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/upstream_net1_dem_cat.inp"
+        AOWIS_EPANET_TEST_UPSTREAM_TANK_OVERFLOW_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/upstream_test_overflow.inp"
+        AOWIS_EPANET_TEST_UPSTREAM_NETWORK_BUILDER_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/upstream_net_builder.inp"
+        AOWIS_EPANET_TEST_UPSTREAM_NETWORK_BUILDER_SMALL_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/upstream_netbuilder_test2.inp"
         AOWIS_EPANET_TEST_IMPORT_GLOBAL_OPTIONS_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_global_options_us.inp"
         AOWIS_EPANET_TEST_IMPORT_CORE_TOPOLOGY_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_core_topology_us.inp"
         AOWIS_EPANET_TEST_IMPORT_PUMPS_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_patterns_curves_pumps_us.inp"
@@ -406,7 +407,8 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONTRACT_
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;quality;cancellation")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-standard-quality-failure-isolation")
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality;proof;negative")
-    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-standard-quality-isolated-equivalence")
+    elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-standard-quality-isolated-equivalence"
+           OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-configured-inp-roughness-kc")
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality;proof")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-integration-end-to-end"
            OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-with-standard-quality")

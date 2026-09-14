@@ -21,6 +21,7 @@ public:
 
     bool hasHydraulicFile() const;
     QString hydraulicFilePath() const;
+    QString hydraulicInpText() const;
 
     EpanetResultRun run(
         EpanetResultRun result,
@@ -33,6 +34,7 @@ private:
     bool persist_hydraulic_file_ = false;
     std::unique_ptr<QTemporaryDir> hydraulic_artifact_directory_;
     QString hydraulic_file_path_;
+    QString hydraulic_inp_text_;
 };
 
 #endif // AOWIS_EPANET_MULTI_QUALITY_RUN_EXECUTOR_H
