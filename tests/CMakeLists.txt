@@ -13,7 +13,12 @@ set(AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS
     contract-msx-export-rejects-broken-reaction-reference
     contract-msx-integration-end-to-end
     contract-msx-known-answer-fractional-microgram-decay
+    contract-msx-euler-rosenbrock-known-answer
+    contract-msx-coupling-modes-known-answer
+    contract-msx-initial-quality-precedence-runtime
+    contract-msx-mole-area-unit-canonical-roundtrip
     contract-msx-formula-equilibrium-known-answer
+    contract-msx-molecular-diffusivity-laminar-runtime
     contract-msx-fixed-dispersion-peclet-runtime
     contract-msx-parameter-term-overrides-known-answer
     contract-msx-mass-balance-final-summary
@@ -421,6 +426,11 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONTRACT_
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-standard-quality-isolated-equivalence"
            OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-configured-inp-roughness-kc"
            OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-known-answer-fractional-microgram-decay"
+           OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-euler-rosenbrock-known-answer"
+           OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-coupling-modes-known-answer"
+           OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-initial-quality-precedence-runtime"
+           OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-mole-area-unit-canonical-roundtrip"
+           OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-molecular-diffusivity-laminar-runtime"
            OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-wall-species-pipe-only-results")
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality;proof")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-integration-end-to-end"

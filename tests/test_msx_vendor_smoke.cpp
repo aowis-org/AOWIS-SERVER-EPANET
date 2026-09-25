@@ -1044,6 +1044,818 @@ void scenarioMsxIntegrationEndToEnd(AowisEpanetTests::TestContext &context)
 }
 
 
+
+bool runMsxSolverDecayFixture(
+    AowisEpanetTests::TestContext &context,
+    MultiSpeciesSolverMethod solver_method,
+    const std::string &solver_name,
+    double &final_tank_value)
+{
+    NetworkHydraulic network = cleanNet1();
+    network.duration_s = 1;
+    network.timestep_hydraulic_s = 1;
+    network.timestep_quality_s = 1;
+    network.timestep_report_s = 1;
+
+    for (HydraulicNodeJunction &junction : network.nodes_junctions)
+    {
+        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+            demand.base_demand_m3_per_h = 0.0;
+    }
+    for (HydraulicLinkPump &pump : network.links_pumps)
+        pump.initial_status = HydraulicLinkPumpInitialStatus::Off;
+
+    network.multi_species.options.rate_units = MultiSpeciesRateUnits::Seconds;
+    network.multi_species.options.solver_method = solver_method;
+    network.multi_species.options.timestep_s = 0.125;
+
+    MultiSpeciesSpecies species;
+    species.id = QStringLiteral("SOLVERDECAY");
+    species.uuid = QUuid::createUuid();
+    species.type = MultiSpeciesSpeciesType::Bulk;
+    species.units = MultiSpeciesUnits::Milligrams;
+    species.absolute_tolerance = 1.0e-12;
+    species.relative_tolerance = 1.0e-10;
+    network.multi_species.species.append(species);
+
+    MultiSpeciesConstant rate;
+    rate.id = QStringLiteral("K");
+    rate.uuid = QUuid::createUuid();
+    rate.value = std::log(2.0);
+    network.multi_species.constants.append(rate);
+
+    for (const MultiSpeciesReactionLocation location
+         : {MultiSpeciesReactionLocation::Pipe, MultiSpeciesReactionLocation::Tank})
+    {
+        MultiSpeciesReaction reaction;
+        reaction.uuid = QUuid::createUuid();
+        reaction.species_uuid = species.uuid;
+        reaction.location = location;
+        reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+        reaction.expression = QStringLiteral("-K*SOLVERDECAY");
+        network.multi_species.reactions.append(reaction);
+    }
+
+    MultiSpeciesGlobalInitialQuality initial;
+    initial.species_uuid = species.uuid;
+    initial.value = 1.0;
+    network.multi_species.initial_quality_global.append(initial);
+
+    const QUuid tank_uuid = network.nodes_tanks.first().uuid;
+
+    EpanetRunRequest request;
+    request.network = network;
+    request.multi_species_run = MultiSpeciesRunOptions{};
+
+    const EpanetResultRun result = EpanetRunner().run(request);
+
+    context.expect(
+        result.status.success,
+        solver_name + " MSX decay fixture must run successfully");
+    context.expect(
+        result.multi_species_result.has_value(),
+        solver_name + " MSX decay fixture must return multi-species results");
+    if (!result.multi_species_result.has_value())
+        return false;
+
+    const MultiSpeciesSimulationResultTimeline &timeline =
+        result.multi_species_result->result_timeline;
+    context.expect(
+        timeline.validity == MultiSpeciesSimulationResultValidity::Valid,
+        solver_name + " MSX decay timeline must be Valid");
+    context.expectEqual(
+        static_cast<std::int64_t>(timeline.results.size()),
+        std::int64_t{8},
+        {-1, "quality", solver_name, "solver_decay.timesteps"},
+        solver_name + " must preserve the configured 0.125-second MSX timestep");
+    if (timeline.results.size() != 8)
+        return false;
+
+    const MultiSpeciesSimulationResult &final_step = timeline.results.last();
+    for (const MultiSpeciesSimulationResultNodeTank &tank : final_step.nodes_tanks)
+    {
+        if (tank.uuid != tank_uuid)
+            continue;
+
+        const bool species_found = findMsxSpeciesConcentration(
+            tank.species_values,
+            species.uuid,
+            final_tank_value);
+        context.expect(
+            species_found,
+            solver_name + " final tank result must contain the fixture species");
+        return species_found;
+    }
+
+    context.expect(false, solver_name + " final result must contain the fixture tank");
+    return false;
+}
+
+
+bool runMsxCouplingFixture(
+    AowisEpanetTests::TestContext &context,
+    MultiSpeciesCouplingMethod coupling_method,
+    const std::string &coupling_name,
+    double &tank_rate_value,
+    double &tank_equilibrium_value,
+    double &pipe_rate_value,
+    double &pipe_equilibrium_value)
+{
+    NetworkHydraulic network = cleanNet1();
+    network.duration_s = 1;
+    network.timestep_hydraulic_s = 1;
+    network.timestep_quality_s = 1;
+    network.timestep_report_s = 1;
+
+    for (HydraulicNodeJunction &junction : network.nodes_junctions)
+    {
+        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+            demand.base_demand_m3_per_h = 0.0;
+    }
+    for (HydraulicLinkPump &pump : network.links_pumps)
+        pump.initial_status = HydraulicLinkPumpInitialStatus::Off;
+
+    network.multi_species.options.rate_units = MultiSpeciesRateUnits::Seconds;
+    network.multi_species.options.solver_method = MultiSpeciesSolverMethod::RungeKutta5;
+    network.multi_species.options.coupling_method = coupling_method;
+    network.multi_species.options.timestep_s = 1.0;
+
+    MultiSpeciesSpecies rate_species;
+    rate_species.id = QStringLiteral("A");
+    rate_species.uuid = QUuid::createUuid();
+    rate_species.type = MultiSpeciesSpeciesType::Bulk;
+    rate_species.units = MultiSpeciesUnits::Milligrams;
+    rate_species.absolute_tolerance = 1.0e-12;
+    rate_species.relative_tolerance = 1.0e-10;
+    network.multi_species.species.append(rate_species);
+
+    MultiSpeciesSpecies equilibrium_species;
+    equilibrium_species.id = QStringLiteral("C");
+    equilibrium_species.uuid = QUuid::createUuid();
+    equilibrium_species.type = MultiSpeciesSpeciesType::Bulk;
+    equilibrium_species.units = MultiSpeciesUnits::Milligrams;
+    equilibrium_species.absolute_tolerance = 1.0e-12;
+    equilibrium_species.relative_tolerance = 1.0e-10;
+    network.multi_species.species.append(equilibrium_species);
+
+    for (const MultiSpeciesReactionLocation location
+         : {MultiSpeciesReactionLocation::Pipe, MultiSpeciesReactionLocation::Tank})
+    {
+        MultiSpeciesReaction rate_reaction;
+        rate_reaction.uuid = QUuid::createUuid();
+        rate_reaction.species_uuid = rate_species.uuid;
+        rate_reaction.location = location;
+        rate_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+        rate_reaction.expression = QStringLiteral("-C*A");
+        network.multi_species.reactions.append(rate_reaction);
+
+        MultiSpeciesReaction equilibrium_reaction;
+        equilibrium_reaction.uuid = QUuid::createUuid();
+        equilibrium_reaction.species_uuid = equilibrium_species.uuid;
+        equilibrium_reaction.location = location;
+        equilibrium_reaction.expression_type = MultiSpeciesReactionExpressionType::Equilibrium;
+        equilibrium_reaction.expression = QStringLiteral("A-C");
+        network.multi_species.reactions.append(equilibrium_reaction);
+    }
+
+    MultiSpeciesGlobalInitialQuality rate_initial;
+    rate_initial.species_uuid = rate_species.uuid;
+    rate_initial.value = 1.0;
+    network.multi_species.initial_quality_global.append(rate_initial);
+
+    MultiSpeciesGlobalInitialQuality equilibrium_initial;
+    equilibrium_initial.species_uuid = equilibrium_species.uuid;
+    equilibrium_initial.value = 1.0;
+    network.multi_species.initial_quality_global.append(equilibrium_initial);
+
+    const QUuid tank_uuid = network.nodes_tanks.first().uuid;
+    const QUuid pipe_uuid = network.links_pipes.first().uuid;
+
+    EpanetRunRequest request;
+    request.network = network;
+    request.multi_species_run = MultiSpeciesRunOptions{};
+
+    const EpanetResultRun result = EpanetRunner().run(request);
+
+    context.expect(
+        result.status.success,
+        coupling_name + " coupling fixture must run successfully");
+    context.expect(
+        result.multi_species_result.has_value(),
+        coupling_name + " coupling fixture must return MSX results");
+    if (!result.multi_species_result.has_value())
+        return false;
+
+    const MultiSpeciesSimulationResultTimeline &timeline =
+        result.multi_species_result->result_timeline;
+    context.expect(
+        timeline.validity == MultiSpeciesSimulationResultValidity::Valid,
+        coupling_name + " coupling timeline must be Valid");
+    context.expectEqual(
+        static_cast<std::int64_t>(timeline.results.size()),
+        std::int64_t{1},
+        {-1, "quality", coupling_name, "coupling.timesteps"},
+        coupling_name + " must preserve the configured one-second MSX timestep");
+    if (timeline.results.size() != 1)
+        return false;
+
+    const MultiSpeciesSimulationResult &final_step = timeline.results.first();
+    bool tank_found = false;
+    bool tank_rate_found = false;
+    bool tank_equilibrium_found = false;
+    bool pipe_found = false;
+    bool pipe_rate_found = false;
+    bool pipe_equilibrium_found = false;
+
+    for (const MultiSpeciesSimulationResultNodeTank &tank : final_step.nodes_tanks)
+    {
+        if (tank.uuid != tank_uuid)
+            continue;
+
+        tank_found = true;
+        tank_rate_found = findMsxSpeciesConcentration(
+            tank.species_values,
+            rate_species.uuid,
+            tank_rate_value);
+        tank_equilibrium_found = findMsxSpeciesConcentration(
+            tank.species_values,
+            equilibrium_species.uuid,
+            tank_equilibrium_value);
+        break;
+    }
+
+    for (const MultiSpeciesSimulationResultLinkPipe &pipe : final_step.links_pipes)
+    {
+        if (pipe.uuid != pipe_uuid)
+            continue;
+
+        pipe_found = true;
+        pipe_rate_found = findMsxSpeciesConcentration(
+            pipe.species_values,
+            rate_species.uuid,
+            pipe_rate_value);
+        pipe_equilibrium_found = findMsxSpeciesConcentration(
+            pipe.species_values,
+            equilibrium_species.uuid,
+            pipe_equilibrium_value);
+        break;
+    }
+
+    context.expect(tank_found, coupling_name + " result must contain the fixture tank");
+    context.expect(tank_rate_found, coupling_name + " tank must contain RATE species A");
+    context.expect(tank_equilibrium_found, coupling_name + " tank must contain EQUIL species C");
+    context.expect(pipe_found, coupling_name + " result must contain the fixture pipe");
+    context.expect(pipe_rate_found, coupling_name + " pipe must contain RATE species A");
+    context.expect(pipe_equilibrium_found, coupling_name + " pipe must contain EQUIL species C");
+
+    return tank_found
+        && tank_rate_found
+        && tank_equilibrium_found
+        && pipe_found
+        && pipe_rate_found
+        && pipe_equilibrium_found;
+}
+
+
+
+NetworkHydraulic moleAreaRoundTripNetwork(MultiSpeciesAreaUnits area_units)
+{
+    NetworkHydraulic network = cleanNet1();
+    network.duration_s = 1;
+    network.timestep_hydraulic_s = 1;
+    network.timestep_quality_s = 1;
+    network.timestep_report_s = 1;
+
+    for (HydraulicNodeJunction &junction : network.nodes_junctions)
+    {
+        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+            demand.base_demand_m3_per_h = 0.0;
+    }
+    for (HydraulicLinkPump &pump : network.links_pumps)
+        pump.initial_status = HydraulicLinkPumpInitialStatus::Off;
+
+    network.multi_species.options.area_units = area_units;
+    network.multi_species.options.rate_units = MultiSpeciesRateUnits::Seconds;
+    network.multi_species.options.timestep_s = 1.0;
+
+    MultiSpeciesSpecies bulk_species;
+    bulk_species.id = QStringLiteral("BULKMOLE");
+    bulk_species.uuid = QUuid::createUuid();
+    bulk_species.type = MultiSpeciesSpeciesType::Bulk;
+    bulk_species.units = MultiSpeciesUnits::Moles;
+    bulk_species.absolute_tolerance = 1.0e-12;
+    bulk_species.relative_tolerance = 1.0e-10;
+    network.multi_species.species.append(bulk_species);
+
+    MultiSpeciesSpecies wall_species;
+    wall_species.id = QStringLiteral("WALLMOLE");
+    wall_species.uuid = QUuid::createUuid();
+    wall_species.type = MultiSpeciesSpeciesType::Wall;
+    wall_species.units = MultiSpeciesUnits::Moles;
+    wall_species.absolute_tolerance = 1.0e-12;
+    wall_species.relative_tolerance = 1.0e-10;
+    network.multi_species.species.append(wall_species);
+
+    MultiSpeciesReaction bulk_pipe_reaction;
+    bulk_pipe_reaction.uuid = QUuid::createUuid();
+    bulk_pipe_reaction.species_uuid = bulk_species.uuid;
+    bulk_pipe_reaction.location = MultiSpeciesReactionLocation::Pipe;
+    bulk_pipe_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+    bulk_pipe_reaction.expression = QStringLiteral("0");
+    network.multi_species.reactions.append(bulk_pipe_reaction);
+
+    MultiSpeciesReaction wall_pipe_reaction;
+    wall_pipe_reaction.uuid = QUuid::createUuid();
+    wall_pipe_reaction.species_uuid = wall_species.uuid;
+    wall_pipe_reaction.location = MultiSpeciesReactionLocation::Pipe;
+    wall_pipe_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+    wall_pipe_reaction.expression = QStringLiteral("0");
+    network.multi_species.reactions.append(wall_pipe_reaction);
+
+    MultiSpeciesReaction bulk_tank_reaction;
+    bulk_tank_reaction.uuid = QUuid::createUuid();
+    bulk_tank_reaction.species_uuid = bulk_species.uuid;
+    bulk_tank_reaction.location = MultiSpeciesReactionLocation::Tank;
+    bulk_tank_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+    bulk_tank_reaction.expression = QStringLiteral("0");
+    network.multi_species.reactions.append(bulk_tank_reaction);
+
+    MultiSpeciesGlobalInitialQuality bulk_initial;
+    bulk_initial.species_uuid = bulk_species.uuid;
+    bulk_initial.value = 2.75;
+    network.multi_species.initial_quality_global.append(bulk_initial);
+
+    MultiSpeciesPipeInitialQuality wall_initial;
+    wall_initial.pipe_uuid = network.links_pipes.first().uuid;
+    wall_initial.species_uuid = wall_species.uuid;
+    wall_initial.value = 4.5;
+    network.multi_species.initial_quality_pipes.append(wall_initial);
+
+    return network;
+}
+
+void verifyMoleAreaRoundTrip(
+    AowisEpanetTests::TestContext &context,
+    MultiSpeciesAreaUnits area_units,
+    const std::string &area_name)
+{
+    const NetworkHydraulic network = moleAreaRoundTripNetwork(area_units);
+    const MultiSpeciesSpecies &bulk_species = network.multi_species.species.at(0);
+    const MultiSpeciesSpecies &wall_species = network.multi_species.species.at(1);
+    const HydraulicNodeTank &tank = network.nodes_tanks.first();
+    const HydraulicLinkPipe &pipe = network.links_pipes.first();
+
+    EpanetRunRequest request;
+    request.network = network;
+    request.multi_species_run = MultiSpeciesRunOptions{};
+
+    const EpanetResultRun result = EpanetRunner().run(request);
+
+    context.expect(
+        result.status.success,
+        area_name + " MOLE canonical-roundtrip fixture must run successfully");
+    context.expect(
+        result.multi_species_result.has_value(),
+        area_name + " MOLE canonical-roundtrip fixture must return MSX results");
+    if (!result.multi_species_result.has_value())
+        return;
+
+    const MultiSpeciesSimulationResultTimeline &timeline =
+        result.multi_species_result->result_timeline;
+    context.expect(
+        timeline.validity == MultiSpeciesSimulationResultValidity::Valid,
+        area_name + " MOLE canonical-roundtrip timeline must be Valid");
+    context.expectEqual(
+        static_cast<std::int64_t>(timeline.results.size()),
+        std::int64_t{1},
+        {-1, "quality", area_name, "mole_area_roundtrip.timesteps"});
+    if (timeline.results.size() != 1)
+        return;
+
+    const MultiSpeciesSimulationResult &step = timeline.results.first();
+    const AowisEpanetTests::NumericTolerance tolerance{1.0e-10, 1.0e-8};
+
+    bool tank_found = false;
+    bool bulk_found = false;
+    double bulk_value = 0.0;
+
+    for (const MultiSpeciesSimulationResultNodeTank &result_tank : step.nodes_tanks)
+    {
+        if (result_tank.uuid != tank.uuid)
+            continue;
+
+        tank_found = true;
+        bulk_found = findMsxSpeciesConcentration(
+            result_tank.species_values,
+            bulk_species.uuid,
+            bulk_value);
+        break;
+    }
+
+    context.expect(tank_found, area_name + " result must contain the fixture tank");
+    context.expect(bulk_found, area_name + " tank must contain the MOLE bulk species");
+    if (bulk_found)
+    {
+        context.expectNear(
+            bulk_value,
+            2.75,
+            tolerance,
+            {
+                static_cast<std::int64_t>(step.time_elapsed_s * 1000.0),
+                "tank",
+                tank.id.toStdString(),
+                area_name + ".bulk_mmol_per_l"
+            },
+            "MOLE bulk concentration must round-trip through solver mol/L and return canonical mmol/L");
+    }
+
+    bool pipe_found = false;
+    bool wall_found = false;
+    double wall_value = 0.0;
+
+    for (const MultiSpeciesSimulationResultLinkPipe &result_pipe : step.links_pipes)
+    {
+        if (result_pipe.uuid != pipe.uuid)
+            continue;
+
+        pipe_found = true;
+        wall_found = findMsxSpeciesConcentration(
+            result_pipe.species_values,
+            wall_species.uuid,
+            wall_value);
+        break;
+    }
+
+    context.expect(pipe_found, area_name + " result must contain the fixture pipe");
+    context.expect(wall_found, area_name + " pipe must contain the MOLE wall species");
+    if (wall_found)
+    {
+        context.expectNear(
+            wall_value,
+            4.5,
+            tolerance,
+            {
+                static_cast<std::int64_t>(step.time_elapsed_s * 1000.0),
+                "pipe",
+                pipe.id.toStdString(),
+                area_name + ".wall_mmol_per_m2"
+            },
+            "MOLE wall density must round-trip through solver mol/area and return canonical mmol/m2");
+    }
+}
+
+void scenarioMsxMoleAreaUnitCanonicalRoundTrip(AowisEpanetTests::TestContext &context)
+{
+    verifyMoleAreaRoundTrip(
+        context,
+        MultiSpeciesAreaUnits::SquareFeet,
+        "FT2");
+    verifyMoleAreaRoundTrip(
+        context,
+        MultiSpeciesAreaUnits::SquareMetres,
+        "M2");
+    verifyMoleAreaRoundTrip(
+        context,
+        MultiSpeciesAreaUnits::SquareCentimetres,
+        "CM2");
+}
+
+void scenarioMsxInitialQualityPrecedenceRuntime(AowisEpanetTests::TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    network.duration_s = 1;
+    network.timestep_hydraulic_s = 1;
+    network.timestep_quality_s = 1;
+    network.timestep_report_s = 1;
+
+    for (HydraulicNodeJunction &junction : network.nodes_junctions)
+    {
+        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+            demand.base_demand_m3_per_h = 0.0;
+    }
+    for (HydraulicLinkPump &pump : network.links_pumps)
+        pump.initial_status = HydraulicLinkPumpInitialStatus::Off;
+
+    network.multi_species.options.rate_units = MultiSpeciesRateUnits::Seconds;
+    network.multi_species.options.timestep_s = 0.25;
+
+    MultiSpeciesSpecies species;
+    species.id = QStringLiteral("INITIAL");
+    species.uuid = QUuid::createUuid();
+    species.type = MultiSpeciesSpeciesType::Bulk;
+    species.units = MultiSpeciesUnits::Milligrams;
+    species.absolute_tolerance = 1.0e-12;
+    species.relative_tolerance = 1.0e-10;
+    network.multi_species.species.append(species);
+
+    for (const MultiSpeciesReactionLocation location
+         : {MultiSpeciesReactionLocation::Pipe, MultiSpeciesReactionLocation::Tank})
+    {
+        MultiSpeciesReaction reaction;
+        reaction.uuid = QUuid::createUuid();
+        reaction.species_uuid = species.uuid;
+        reaction.location = location;
+        reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+        reaction.expression = QStringLiteral("0");
+        network.multi_species.reactions.append(reaction);
+    }
+
+    MultiSpeciesGlobalInitialQuality global_initial;
+    global_initial.species_uuid = species.uuid;
+    global_initial.value = 1.0;
+    network.multi_species.initial_quality_global.append(global_initial);
+
+    const HydraulicNodeTank &overridden_tank = network.nodes_tanks.first();
+    MultiSpeciesNodeInitialQuality node_initial;
+    node_initial.node_uuid = overridden_tank.uuid;
+    node_initial.species_uuid = species.uuid;
+    node_initial.value = 2.0;
+    network.multi_species.initial_quality_nodes.append(node_initial);
+
+    const HydraulicLinkPipe &overridden_pipe = network.links_pipes.first();
+    const HydraulicLinkPipe &comparison_pipe = network.links_pipes.at(1);
+
+    MultiSpeciesPipeInitialQuality pipe_initial;
+    pipe_initial.pipe_uuid = overridden_pipe.uuid;
+    pipe_initial.species_uuid = species.uuid;
+    pipe_initial.value = 3.0;
+    network.multi_species.initial_quality_pipes.append(pipe_initial);
+
+    EpanetRunRequest request;
+    request.network = network;
+    request.multi_species_run = MultiSpeciesRunOptions{};
+
+    const EpanetResultRun result = EpanetRunner().run(request);
+
+    context.expect(
+        result.status.success,
+        "the MSX initial-quality precedence fixture must run successfully");
+    context.expect(
+        result.multi_species_result.has_value(),
+        "the MSX initial-quality precedence fixture must return multi-species results");
+    if (!result.multi_species_result.has_value())
+        return;
+
+    const MultiSpeciesSimulationResultTimeline &timeline =
+        result.multi_species_result->result_timeline;
+    context.expect(
+        timeline.validity == MultiSpeciesSimulationResultValidity::Valid,
+        "the MSX initial-quality precedence timeline must be Valid");
+    context.expectEqual(
+        static_cast<std::int64_t>(timeline.results.size()),
+        std::int64_t{4},
+        {-1, "quality", std::string(), "initial_quality.timesteps"},
+        "a one-second run at a 0.25-second MSX timestep must return four result steps");
+    if (timeline.results.size() != 4)
+        return;
+
+    const MultiSpeciesSimulationResult &final_step = timeline.results.last();
+    const AowisEpanetTests::NumericTolerance tolerance{1.0e-10, 1.0e-10};
+
+    bool found_tank = false;
+    bool found_tank_species = false;
+    double tank_value = 0.0;
+    for (const MultiSpeciesSimulationResultNodeTank &tank : final_step.nodes_tanks)
+    {
+        if (tank.uuid != overridden_tank.uuid)
+            continue;
+
+        found_tank = true;
+        found_tank_species = findMsxSpeciesConcentration(
+            tank.species_values,
+            species.uuid,
+            tank_value);
+        break;
+    }
+
+    context.expect(found_tank, "the initial-quality result must contain the overridden tank");
+    context.expect(
+        found_tank_species,
+        "the overridden tank must contain the initial-quality fixture species");
+    if (found_tank_species)
+    {
+        context.expectNear(
+            tank_value,
+            2.0,
+            tolerance,
+            {
+                static_cast<std::int64_t>(final_step.time_elapsed_s * 1000.0),
+                "tank",
+                overridden_tank.id.toStdString(),
+                "node_initial_quality"
+            },
+            "NODE initial quality must override GLOBAL initial quality for the selected tank");
+    }
+
+    bool found_overridden_pipe = false;
+    bool found_comparison_pipe = false;
+    bool found_overridden_species = false;
+    bool found_comparison_species = false;
+    double overridden_pipe_value = 0.0;
+    double comparison_pipe_value = 0.0;
+
+    for (const MultiSpeciesSimulationResultLinkPipe &pipe : final_step.links_pipes)
+    {
+        if (pipe.uuid == overridden_pipe.uuid)
+        {
+            found_overridden_pipe = true;
+            found_overridden_species = findMsxSpeciesConcentration(
+                pipe.species_values,
+                species.uuid,
+                overridden_pipe_value);
+        }
+        else if (pipe.uuid == comparison_pipe.uuid)
+        {
+            found_comparison_pipe = true;
+            found_comparison_species = findMsxSpeciesConcentration(
+                pipe.species_values,
+                species.uuid,
+                comparison_pipe_value);
+        }
+    }
+
+    context.expect(
+        found_overridden_pipe,
+        "the initial-quality result must contain the overridden pipe");
+    context.expect(
+        found_comparison_pipe,
+        "the initial-quality result must contain the comparison pipe");
+    context.expect(
+        found_overridden_species,
+        "the overridden pipe must contain the initial-quality fixture species");
+    context.expect(
+        found_comparison_species,
+        "the comparison pipe must contain the initial-quality fixture species");
+
+    if (found_overridden_species)
+    {
+        context.expectNear(
+            overridden_pipe_value,
+            3.0,
+            tolerance,
+            {
+                static_cast<std::int64_t>(final_step.time_elapsed_s * 1000.0),
+                "pipe",
+                overridden_pipe.id.toStdString(),
+                "link_initial_quality"
+            },
+            "LINK initial quality must override GLOBAL initial quality for the selected pipe");
+    }
+
+    if (found_comparison_species)
+    {
+        context.expectNear(
+            comparison_pipe_value,
+            1.0,
+            tolerance,
+            {
+                static_cast<std::int64_t>(final_step.time_elapsed_s * 1000.0),
+                "pipe",
+                comparison_pipe.id.toStdString(),
+                "global_initial_quality"
+            },
+            "an unoverridden pipe must retain the GLOBAL initial quality");
+    }
+}
+
+void scenarioMsxCouplingModesKnownAnswer(AowisEpanetTests::TestContext &context)
+{
+    double full_tank_rate = 0.0;
+    double full_tank_equilibrium = 0.0;
+    double full_pipe_rate = 0.0;
+    double full_pipe_equilibrium = 0.0;
+    double none_tank_rate = 0.0;
+    double none_tank_equilibrium = 0.0;
+    double none_pipe_rate = 0.0;
+    double none_pipe_equilibrium = 0.0;
+
+    const bool full_valid = runMsxCouplingFixture(
+        context,
+        MultiSpeciesCouplingMethod::Full,
+        "FULL",
+        full_tank_rate,
+        full_tank_equilibrium,
+        full_pipe_rate,
+        full_pipe_equilibrium);
+
+    const bool none_valid = runMsxCouplingFixture(
+        context,
+        MultiSpeciesCouplingMethod::None,
+        "NONE",
+        none_tank_rate,
+        none_tank_equilibrium,
+        none_pipe_rate,
+        none_pipe_equilibrium);
+
+    if (!full_valid || !none_valid)
+        return;
+
+    const AowisEpanetTests::NumericTolerance full_tolerance{2.0e-6, 2.0e-6};
+    const AowisEpanetTests::NumericTolerance none_tolerance{2.0e-6, 2.0e-6};
+    const double expected_none = std::exp(-1.0);
+
+    context.expectNear(
+        full_tank_rate,
+        0.5,
+        full_tolerance,
+        {1000, "tank", "2", "full_coupling_rate_species"},
+        "FULL coupling must continuously enforce C=A inside the tank ODE solve, giving A'=-A^2 and A(1)=0.5");
+    context.expectNear(
+        full_pipe_rate,
+        0.5,
+        full_tolerance,
+        {1000, "pipe", "10", "full_coupling_rate_species"},
+        "FULL coupling must continuously enforce C=A inside the pipe ODE solve, giving A'=-A^2 and A(1)=0.5");
+
+    context.expectNear(
+        none_tank_rate,
+        expected_none,
+        none_tolerance,
+        {1000, "tank", "2", "no_coupling_rate_species"},
+        "NONE coupling must hold the step-start equilibrium value C=1 during the tank ODE solve, giving A'=-A and A(1)=exp(-1)");
+    context.expectNear(
+        none_pipe_rate,
+        expected_none,
+        none_tolerance,
+        {1000, "pipe", "10", "no_coupling_rate_species"},
+        "NONE coupling must hold the step-start equilibrium value C=1 during the pipe ODE solve, giving A'=-A and A(1)=exp(-1)");
+
+    context.expectNear(
+        full_tank_equilibrium,
+        full_tank_rate,
+        AowisEpanetTests::NumericTolerance{2.0e-7, 0.0},
+        {1000, "tank", "2", "full_coupling_equilibrium_species"},
+        "the final FULL-coupling tank equilibrium solve must satisfy C=A");
+    context.expectNear(
+        full_pipe_equilibrium,
+        full_pipe_rate,
+        AowisEpanetTests::NumericTolerance{2.0e-7, 0.0},
+        {1000, "pipe", "10", "full_coupling_equilibrium_species"},
+        "the final FULL-coupling pipe equilibrium solve must satisfy C=A");
+    context.expectNear(
+        none_tank_equilibrium,
+        none_tank_rate,
+        AowisEpanetTests::NumericTolerance{2.0e-7, 0.0},
+        {1000, "tank", "2", "no_coupling_equilibrium_species"},
+        "the final NONE-coupling tank equilibrium solve must still satisfy C=A after the ODE step");
+    context.expectNear(
+        none_pipe_equilibrium,
+        none_pipe_rate,
+        AowisEpanetTests::NumericTolerance{2.0e-7, 0.0},
+        {1000, "pipe", "10", "no_coupling_equilibrium_species"},
+        "the final NONE-coupling pipe equilibrium solve must still satisfy C=A after the ODE step");
+
+    context.expect(
+        full_tank_rate > none_tank_rate + 0.1,
+        "FULL and NONE tank coupling modes must be numerically distinct for the coupled DAE fixture");
+    context.expect(
+        full_pipe_rate > none_pipe_rate + 0.1,
+        "FULL and NONE pipe coupling modes must be numerically distinct for the coupled DAE fixture");
+}
+
+void scenarioMsxEulerRosenbrockKnownAnswer(AowisEpanetTests::TestContext &context)
+{
+    double euler_value = 0.0;
+    double rosenbrock_value = 0.0;
+
+    const bool euler_valid = runMsxSolverDecayFixture(
+        context,
+        MultiSpeciesSolverMethod::Euler,
+        "Euler",
+        euler_value);
+    const bool rosenbrock_valid = runMsxSolverDecayFixture(
+        context,
+        MultiSpeciesSolverMethod::Rosenbrock2,
+        "Rosenbrock2",
+        rosenbrock_value);
+
+    if (!euler_valid || !rosenbrock_valid)
+        return;
+
+    const double rate_per_s = std::log(2.0);
+    const double timestep_s = 0.125;
+    const double expected_euler =
+        std::pow(1.0 - rate_per_s * timestep_s, 8.0);
+
+    context.expectNear(
+        euler_value,
+        expected_euler,
+        AowisEpanetTests::NumericTolerance{1.0e-9, 1.0e-8},
+        {1000, "tank", "2", "euler_first_order_decay"},
+        "Euler must execute eight explicit 0.125-second updates rather than silently using the RK5 or ROS2 path");
+
+    context.expectNear(
+        rosenbrock_value,
+        0.5,
+        AowisEpanetTests::NumericTolerance{1.0e-7, 1.0e-6},
+        {1000, "tank", "2", "rosenbrock_first_order_decay"},
+        "Rosenbrock2 must track the analytical one-second half-life");
+
+    context.expect(
+        std::abs(rosenbrock_value - 0.5) < std::abs(euler_value - 0.5),
+        "Rosenbrock2 must be measurably closer to the analytical half-life than the deliberately coarse explicit Euler integration");
+}
+
 void scenarioMsxKnownAnswerFractionalMicrogramDecay(AowisEpanetTests::TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
@@ -1262,6 +2074,179 @@ NetworkHydraulic parameterTermOverrideNetwork(bool pipe_override)
 const MultiSpeciesSimulationResultNodeJunction *findMsxJunctionResult(
     const MultiSpeciesSimulationResult &step,
     const QString &id);
+
+
+NetworkHydraulic molecularDiffusivityLaminarNetwork(bool enable_molecular_diffusivity)
+{
+    NetworkHydraulic network;
+    network.id = QStringLiteral("msx-molecular-diffusivity-laminar");
+    network.uuid = QUuid::createUuid();
+    network.duration_s = 18000;
+    network.timestep_hydraulic_s = 1800;
+    network.timestep_quality_s = 300;
+    network.timestep_report_s = 1800;
+
+    HydraulicNodeReservoir reservoir;
+    reservoir.id = QStringLiteral("R1");
+    reservoir.uuid = QUuid::createUuid();
+    reservoir.hydraulic_head_m = 20.0;
+
+    HydraulicNodeJunction junction;
+    junction.id = QStringLiteral("J1");
+    junction.uuid = QUuid::createUuid();
+    junction.elevation_m = 0.0;
+
+    HydraulicNodeJunctionDemand demand;
+    demand.base_demand_m3_per_h = 0.036;
+    junction.demands.append(demand);
+
+    HydraulicLinkPipe pipe;
+    pipe.id = QStringLiteral("P1");
+    pipe.uuid = QUuid::createUuid();
+    pipe.node_uuid_from = reservoir.uuid;
+    pipe.node_uuid_to = junction.uuid;
+    pipe.length_calculated_m = 100.0;
+    pipe.diameter_mm = 100.0;
+    pipe.roughness_hazen_williams = 130.0;
+
+    network.nodes_reservoirs.append(reservoir);
+    network.nodes_junctions.append(junction);
+    network.links_pipes.append(pipe);
+
+    network.multi_species.options.rate_units = MultiSpeciesRateUnits::Seconds;
+    network.multi_species.options.timestep_s = 300.0;
+    network.multi_species.options.peclet_number_threshold = 1.0e9;
+    network.multi_species.options.maximum_segments = 200;
+
+    MultiSpeciesSpecies species;
+    species.id = QStringLiteral("MD");
+    species.uuid = QUuid::createUuid();
+    species.type = MultiSpeciesSpeciesType::Bulk;
+    species.units = MultiSpeciesUnits::Milligrams;
+    species.absolute_tolerance = 1.0e-12;
+    species.relative_tolerance = 1.0e-10;
+    if (enable_molecular_diffusivity)
+        species.molecular_diffusivity_m2_per_s = 1.0e-9;
+    network.multi_species.species.append(species);
+
+    MultiSpeciesReaction pipe_reaction;
+    pipe_reaction.uuid = QUuid::createUuid();
+    pipe_reaction.species_uuid = species.uuid;
+    pipe_reaction.location = MultiSpeciesReactionLocation::Pipe;
+    pipe_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+    pipe_reaction.expression = QStringLiteral("0");
+    network.multi_species.reactions.append(pipe_reaction);
+
+    MultiSpeciesReaction tank_reaction;
+    tank_reaction.uuid = QUuid::createUuid();
+    tank_reaction.species_uuid = species.uuid;
+    tank_reaction.location = MultiSpeciesReactionLocation::Tank;
+    tank_reaction.expression_type = MultiSpeciesReactionExpressionType::Rate;
+    tank_reaction.expression = QStringLiteral("0");
+    network.multi_species.reactions.append(tank_reaction);
+
+    MultiSpeciesGlobalInitialQuality global_initial;
+    global_initial.species_uuid = species.uuid;
+    global_initial.value = 0.0;
+    network.multi_species.initial_quality_global.append(global_initial);
+
+    MultiSpeciesNodeInitialQuality reservoir_initial;
+    reservoir_initial.node_uuid = reservoir.uuid;
+    reservoir_initial.species_uuid = species.uuid;
+    reservoir_initial.value = 1.0;
+    network.multi_species.initial_quality_nodes.append(reservoir_initial);
+
+    return network;
+}
+
+bool finalMolecularDiffusivityPipeValue(
+    AowisEpanetTests::TestContext &context,
+    bool enable_molecular_diffusivity,
+    const std::string &case_name,
+    double &value)
+{
+    const NetworkHydraulic network =
+        molecularDiffusivityLaminarNetwork(enable_molecular_diffusivity);
+    const QUuid species_uuid = network.multi_species.species.first().uuid;
+    const HydraulicLinkPipe &pipe = network.links_pipes.first();
+
+    EpanetRunRequest request;
+    request.network = network;
+    request.multi_species_run = MultiSpeciesRunOptions{};
+
+    const EpanetResultRun result = EpanetRunner().run(request);
+
+    context.expect(
+        result.status.success,
+        case_name + " molecular-diffusivity fixture must run successfully");
+    context.expect(
+        result.multi_species_result.has_value(),
+        case_name + " molecular-diffusivity fixture must return MSX results");
+    if (!result.multi_species_result.has_value())
+        return false;
+
+    const MultiSpeciesSimulationResultTimeline &timeline =
+        result.multi_species_result->result_timeline;
+    context.expect(
+        timeline.validity == MultiSpeciesSimulationResultValidity::Valid,
+        case_name + " molecular-diffusivity timeline must be Valid");
+    context.expect(
+        !timeline.results.isEmpty(),
+        case_name + " molecular-diffusivity timeline must contain results");
+    if (timeline.results.isEmpty())
+        return false;
+
+    const MultiSpeciesSimulationResult &final_step = timeline.results.last();
+    for (const MultiSpeciesSimulationResultLinkPipe &result_pipe : final_step.links_pipes)
+    {
+        if (result_pipe.uuid != pipe.uuid)
+            continue;
+
+        const bool species_found = findMsxSpeciesConcentration(
+            result_pipe.species_values,
+            species_uuid,
+            value);
+        context.expect(
+            species_found,
+            case_name + " final pipe result must contain the molecular-diffusivity species");
+        return species_found;
+    }
+
+    context.expect(
+        false,
+        case_name + " final result must contain the laminar fixture pipe");
+    return false;
+}
+
+void scenarioMsxMolecularDiffusivityLaminarRuntime(AowisEpanetTests::TestContext &context)
+{
+    double advective_only_value = 0.0;
+    double molecular_dispersion_value = 0.0;
+
+    const bool advective_valid = finalMolecularDiffusivityPipeValue(
+        context,
+        false,
+        "advective-only",
+        advective_only_value);
+    const bool molecular_valid = finalMolecularDiffusivityPipeValue(
+        context,
+        true,
+        "molecular-dispersion",
+        molecular_dispersion_value);
+
+    if (!advective_valid || !molecular_valid)
+        return;
+
+    context.expect(
+        advective_only_value > 0.0 && advective_only_value < 0.5,
+        "the five-hour laminar advective-only run must partially fill the 100 m pipe but remain well short of full source concentration");
+    context.expect(
+        molecular_dispersion_value > advective_only_value + 0.05,
+        "enabling canonical molecular diffusivity must activate computed longitudinal dispersion and measurably increase the pipe-average concentration");
+    context.expect(
+        molecular_dispersion_value < 1.0,
+        "the laminar molecular-dispersion response must remain below the 1 mg/L reservoir boundary concentration");
+}
 
 NetworkHydraulic fixedDispersionPecletNetwork(double peclet_limit)
 {
@@ -2803,10 +3788,35 @@ void registerMsxIntegrationScenarios(ScenarioRegistry &registry)
         {"contract", "quality"},
         &scenarioMsxIntegrationEndToEnd});
     registry.add(ScenarioDefinition{
+        "contract-msx-mole-area-unit-canonical-roundtrip",
+        "Execute MOLE bulk and WALL species through FT2, M2, and CM2 area modes and require all solver-native mol/L and mol/area values to round-trip back to canonical AOWIS mmol/L and mmol/m2.",
+        {"contract", "hydraulic", "quality", "proof"},
+        &scenarioMsxMoleAreaUnitCanonicalRoundTrip});
+    registry.add(ScenarioDefinition{
+        "contract-msx-initial-quality-precedence-runtime",
+        "Execute GLOBAL, NODE, and LINK MSX initial-quality assignments in one inert no-flow fixture and prove NODE/LINK overrides take precedence while an unaffected pipe retains the GLOBAL value.",
+        {"contract", "quality", "proof"},
+        &scenarioMsxInitialQualityPrecedenceRuntime});
+    registry.add(ScenarioDefinition{
+        "contract-msx-coupling-modes-known-answer",
+        "Execute FULL and NONE DAE coupling in both pipes and tanks with RATE A'=-C*A and EQUIL A-C=0; require the analytically distinct one-second solutions A=0.5 and A=exp(-1).",
+        {"contract", "hydraulic", "quality", "proof"},
+        &scenarioMsxCouplingModesKnownAnswer});
+    registry.add(ScenarioDefinition{
+        "contract-msx-euler-rosenbrock-known-answer",
+        "Execute the two previously untested MSX ODE integrators: require Euler to match its exact eight-step discrete first-order decay and Rosenbrock2 to match the analytical one-second half-life.",
+        {"contract", "quality", "proof"},
+        &scenarioMsxEulerRosenbrockKnownAnswer});
+    registry.add(ScenarioDefinition{
         "contract-msx-known-answer-fractional-microgram-decay",
         "Run an isolated tank with a microgram-backed first-order species at 0.125-second MSX steps and compare every returned canonical mg/L value against the analytical exponential-decay solution.",
         {"contract", "hydraulic", "quality", "proof"},
         &scenarioMsxKnownAnswerFractionalMicrogramDecay});
+    registry.add(ScenarioDefinition{
+        "contract-msx-molecular-diffusivity-laminar-runtime",
+        "Execute canonical molecular diffusivity in a deliberately laminar one-pipe network and prove the computed-dispersion branch measurably increases pipe-average transport beyond the identical advective-only run.",
+        {"contract", "hydraulic", "quality", "proof"},
+        &scenarioMsxMolecularDiffusivityLaminarRuntime});
     registry.add(ScenarioDefinition{
         "contract-msx-fixed-dispersion-peclet-runtime",
         "Run the same canonical fixed longitudinal dispersion with a restrictive and permissive Peclet threshold and prove the threshold controls early downstream dispersive transport before the advective front arrives.",
