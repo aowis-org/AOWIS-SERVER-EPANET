@@ -1134,13 +1134,31 @@ void scenarioMsxExportBasicSections(TestContext &context)
     NetworkHydraulic network = cleanNet1();
     const HydraulicNodeJunction &junction = network.nodes_junctions.first();
     const HydraulicLinkPipe &pipe = network.links_pipes.first();
+    network.multi_species.options.timestep_s = 0.125;
+    network.multi_species.options.maximum_segments = 750;
+    network.multi_species.options.peclet_number_threshold = 250.0;
 
     MultiSpeciesSpecies chlorine;
     chlorine.id = QStringLiteral("CL2");
     chlorine.uuid = QUuid::createUuid();
     chlorine.type = MultiSpeciesSpeciesType::Bulk;
     chlorine.units = MultiSpeciesUnits::Milligrams;
+    chlorine.molecular_diffusivity_m2_per_s = 1.198449216e-9;
     network.multi_species.species.append(chlorine);
+
+    MultiSpeciesSpecies tracer;
+    tracer.id = QStringLiteral("TR");
+    tracer.uuid = QUuid::createUuid();
+    tracer.type = MultiSpeciesSpeciesType::Bulk;
+    tracer.units = MultiSpeciesUnits::Millimoles;
+    network.multi_species.species.append(tracer);
+
+    MultiSpeciesSpecies microgram_species;
+    microgram_species.id = QStringLiteral("UGS");
+    microgram_species.uuid = QUuid::createUuid();
+    microgram_species.type = MultiSpeciesSpeciesType::Bulk;
+    microgram_species.units = MultiSpeciesUnits::Micrograms;
+    network.multi_species.species.append(microgram_species);
 
     MultiSpeciesConstant kb;
     kb.id = QStringLiteral("Kb");
@@ -1180,19 +1198,31 @@ void scenarioMsxExportBasicSections(TestContext &context)
     source.node_uuid = junction.uuid;
     source.species_uuid = chlorine.uuid;
     source.type = MultiSpeciesSourceType::Concentration;
-    source.concentration = 1.2;
+    source.value = 1.2;
     source.pattern_uuid = pattern.uuid;
     network.multi_species.sources.append(source);
 
     MultiSpeciesGlobalInitialQuality global_initial;
     global_initial.species_uuid = chlorine.uuid;
-    global_initial.concentration = 0.8;
+    global_initial.value = 0.8;
     network.multi_species.initial_quality_global.append(global_initial);
+
+    MultiSpeciesGlobalInitialQuality microgram_initial;
+    microgram_initial.species_uuid = microgram_species.uuid;
+    microgram_initial.value = 0.002;
+    network.multi_species.initial_quality_global.append(microgram_initial);
+
+    MultiSpeciesNodeSource microgram_source;
+    microgram_source.node_uuid = junction.uuid;
+    microgram_source.species_uuid = microgram_species.uuid;
+    microgram_source.type = MultiSpeciesSourceType::Mass;
+    microgram_source.value = 0.003;
+    network.multi_species.sources.append(microgram_source);
 
     MultiSpeciesPipeInitialQuality pipe_initial;
     pipe_initial.pipe_uuid = pipe.uuid;
     pipe_initial.species_uuid = chlorine.uuid;
-    pipe_initial.concentration = 0.9;
+    pipe_initial.value = 0.9;
     network.multi_species.initial_quality_pipes.append(pipe_initial);
 
     MultiSpeciesParameter param;
@@ -1213,12 +1243,20 @@ void scenarioMsxExportBasicSections(TestContext &context)
     context.expect(status.success, "a well-formed multi-species model must export successfully");
     context.expect(msx_text.contains(QStringLiteral("[SPECIES]")), "export must contain a [SPECIES] section");
     context.expect(msx_text.contains(QStringLiteral("BULK CL2 MG")), "export must declare the bulk species with its units");
+    context.expect(msx_text.contains(QStringLiteral("BULK TR MMOL")), "export must support EPANET-MSX millimole species units");
+    context.expect(msx_text.contains(QStringLiteral("TIMESTEP 0.125")), "export must preserve fractional-second MSX timesteps");
+    context.expect(msx_text.contains(QStringLiteral("SEGMENTS 750")), "export must write the MSX maximum segment count");
+    context.expect(msx_text.contains(QStringLiteral("PECLET 250")), "export must write the MSX Peclet-number threshold");
+    context.expect(msx_text.contains(QStringLiteral("[DIFFUSIVITY]")), "export must write a [DIFFUSIVITY] section when dispersion is configured");
+    context.expect(msx_text.contains(QStringLiteral("CL2 1")), "export must convert canonical molecular diffusivity to the MSX relative diffusivity representation");
     context.expect(msx_text.contains(QStringLiteral("CONSTANT Kb 0.5")), "export must declare the constant coefficient");
     context.expect(msx_text.contains(QStringLiteral("T1 Kb * CL2")), "export must declare the term expression");
     context.expect(msx_text.contains(QStringLiteral("RATE CL2 -T1")), "export must declare the pipe reaction under [PIPES]");
     context.expect(msx_text.contains(QStringLiteral("RATE CL2 -Kb * CL2")), "export must declare the tank reaction under [TANKS]");
     context.expect(msx_text.contains(QStringLiteral("CONC %1 CL2 1.2 SRC1").arg(junction.id)), "export must declare the node source with its pattern");
     context.expect(msx_text.contains(QStringLiteral("GLOBAL CL2 0.8")), "export must declare global initial quality");
+    context.expect(msx_text.contains(QStringLiteral("GLOBAL UGS 2")), "export must convert canonical mg/L input to configured microgram solver units");
+    context.expect(msx_text.contains(QStringLiteral("MASS %1 UGS 3").arg(junction.id)), "export must convert canonical mg/min source strength to configured microgram solver units");
     context.expect(msx_text.contains(QStringLiteral("LINK %1 CL2 0.9").arg(pipe.id)), "export must declare pipe initial quality");
     context.expect(msx_text.contains(QStringLiteral("PIPE %1 Kw 2.5").arg(pipe.id)), "export must declare the per-pipe parameter override");
     context.expect(msx_text.contains(QStringLiteral("SRC1 1 1 0.5")), "export must declare the source pattern's multipliers");
@@ -1265,14 +1303,14 @@ void scenarioMsxExportSpeciesSelection(TestContext &context)
     chlorine_source.node_uuid = junction.uuid;
     chlorine_source.species_uuid = chlorine.uuid;
     chlorine_source.type = MultiSpeciesSourceType::Concentration;
-    chlorine_source.concentration = 1.0;
+    chlorine_source.value = 1.0;
     network.multi_species.sources.append(chlorine_source);
 
     MultiSpeciesNodeSource fluoride_source;
     fluoride_source.node_uuid = junction.uuid;
     fluoride_source.species_uuid = fluoride.uuid;
     fluoride_source.type = MultiSpeciesSourceType::Concentration;
-    fluoride_source.concentration = 0.7;
+    fluoride_source.value = 0.7;
     network.multi_species.sources.append(fluoride_source);
 
     MultiSpeciesConstant shared_constant;
@@ -1282,7 +1320,7 @@ void scenarioMsxExportSpeciesSelection(TestContext &context)
     network.multi_species.constants.append(shared_constant);
 
     MultiSpeciesRunOptions run_options;
-    run_options.species_uuids.append(chlorine.uuid);
+    run_options.output_species_uuids.append(chlorine.uuid);
 
     QString msx_text;
     const HydraulicSimulationStatus status = retrieveEpanetMsxText(network, run_options, msx_text);
@@ -1307,7 +1345,7 @@ void scenarioMsxExportRejectsUnknownSpeciesSelection(TestContext &context)
     network.multi_species.species.append(chlorine);
 
     MultiSpeciesRunOptions run_options;
-    run_options.species_uuids.append(QUuid::createUuid());
+    run_options.output_species_uuids.append(QUuid::createUuid());
 
     QString msx_text;
     const HydraulicSimulationStatus status = retrieveEpanetMsxText(network, run_options, msx_text);

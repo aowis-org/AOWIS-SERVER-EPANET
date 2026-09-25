@@ -438,12 +438,28 @@ void validateNumerics(
 {
     const NetworkMultiSpecies &model = network.multi_species;
 
-    if (model.options.timestep_s == 0)
+    if (!std::isfinite(model.options.timestep_s) || model.options.timestep_s < 0.001)
     {
         failures.append(msxValidationFailure(
             network,
-            QStringLiteral("Multi-species timestep must be positive"),
+            QStringLiteral("Multi-species timestep must be finite and at least 0.001 seconds"),
             {QStringLiteral("Field: multi_species.options.timestep_s")}));
+    }
+
+    if (!std::isfinite(model.options.peclet_number_threshold) || model.options.peclet_number_threshold < 1.0)
+    {
+        failures.append(msxValidationFailure(
+            network,
+            QStringLiteral("Multi-species Peclet-number threshold must be finite and at least 1"),
+            {QStringLiteral("Field: multi_species.options.peclet_number_threshold")}));
+    }
+
+    if (model.options.maximum_segments < 50)
+    {
+        failures.append(msxValidationFailure(
+            network,
+            QStringLiteral("Multi-species maximum segment count must be at least 50"),
+            {QStringLiteral("Field: multi_species.options.maximum_segments")}));
     }
 
     appendFailure(failures, validateFiniteValue(network, model.options.default_absolute_tolerance, QStringLiteral("multi_species.options.default_absolute_tolerance"), true));
@@ -454,6 +470,39 @@ void validateNumerics(
         const MultiSpeciesSpecies &species = model.species.at(index);
         appendFailure(failures, validateFiniteValue(network, species.absolute_tolerance, QStringLiteral("multi_species.species[%1].absolute_tolerance").arg(index), true));
         appendFailure(failures, validateFiniteValue(network, species.relative_tolerance, QStringLiteral("multi_species.species[%1].relative_tolerance").arg(index), true));
+        if (species.molecular_diffusivity_m2_per_s.has_value())
+        {
+            appendFailure(failures, validateFiniteValue(
+                network,
+                species.molecular_diffusivity_m2_per_s.value(),
+                QStringLiteral("multi_species.species[%1].molecular_diffusivity_m2_per_s").arg(index),
+                true));
+        }
+        if (species.longitudinal_dispersion_coefficient_m2_per_s.has_value())
+        {
+            appendFailure(failures, validateFiniteValue(
+                network,
+                species.longitudinal_dispersion_coefficient_m2_per_s.value(),
+                QStringLiteral("multi_species.species[%1].longitudinal_dispersion_coefficient_m2_per_s").arg(index),
+                true));
+        }
+        if (species.type == MultiSpeciesSpeciesType::Wall
+            && (species.molecular_diffusivity_m2_per_s.has_value()
+                || species.longitudinal_dispersion_coefficient_m2_per_s.has_value()))
+        {
+            failures.append(msxValidationFailure(
+                network,
+                QStringLiteral("Multi-species dispersion coefficients are valid only for bulk species"),
+                {QStringLiteral("Species: %1").arg(species.id)}));
+        }
+        if (species.molecular_diffusivity_m2_per_s.has_value()
+            && species.longitudinal_dispersion_coefficient_m2_per_s.has_value())
+        {
+            failures.append(msxValidationFailure(
+                network,
+                QStringLiteral("Multi-species species cannot define both molecular diffusivity and fixed longitudinal dispersion"),
+                {QStringLiteral("Species: %1").arg(species.id)}));
+        }
     }
 
     for (int index = 0; index < model.constants.size(); index++)
@@ -486,17 +535,16 @@ void validateNumerics(
     }
 
     for (int index = 0; index < model.initial_quality_global.size(); index++)
-        appendFailure(failures, validateFiniteValue(network, model.initial_quality_global.at(index).concentration, QStringLiteral("multi_species.initial_quality_global[%1].concentration").arg(index), true));
+        appendFailure(failures, validateFiniteValue(network, model.initial_quality_global.at(index).value, QStringLiteral("multi_species.initial_quality_global[%1].value").arg(index), true));
     for (int index = 0; index < model.initial_quality_nodes.size(); index++)
-        appendFailure(failures, validateFiniteValue(network, model.initial_quality_nodes.at(index).concentration, QStringLiteral("multi_species.initial_quality_nodes[%1].concentration").arg(index), true));
+        appendFailure(failures, validateFiniteValue(network, model.initial_quality_nodes.at(index).value, QStringLiteral("multi_species.initial_quality_nodes[%1].value").arg(index), true));
     for (int index = 0; index < model.initial_quality_pipes.size(); index++)
-        appendFailure(failures, validateFiniteValue(network, model.initial_quality_pipes.at(index).concentration, QStringLiteral("multi_species.initial_quality_pipes[%1].concentration").arg(index), true));
+        appendFailure(failures, validateFiniteValue(network, model.initial_quality_pipes.at(index).value, QStringLiteral("multi_species.initial_quality_pipes[%1].value").arg(index), true));
 
     for (int index = 0; index < model.sources.size(); index++)
     {
         const MultiSpeciesNodeSource &source = model.sources.at(index);
-        appendFailure(failures, validateFiniteValue(network, source.concentration, QStringLiteral("multi_species.sources[%1].concentration").arg(index), true));
-        appendFailure(failures, validateFiniteValue(network, source.mass_flow_per_min, QStringLiteral("multi_species.sources[%1].mass_flow_per_min").arg(index), true));
+        appendFailure(failures, validateFiniteValue(network, source.value, QStringLiteral("multi_species.sources[%1].value").arg(index), true));
     }
 }
 
@@ -842,7 +890,7 @@ HydraulicSimulationStatus validateEpanetMultiSpeciesRun(
             QStringLiteral("multi_species_run requires a multi-species model with at least one species")));
     }
 
-    for (const QUuid &species_uuid : run_options.species_uuids)
+    for (const QUuid &species_uuid : run_options.output_species_uuids)
     {
         if (species_uuid.isNull())
         {

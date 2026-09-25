@@ -2,6 +2,7 @@
 
 #include "epanet_status_helpers.h"
 #include "epanet_msx_validator.h"
+#include "epanet_msx_units.h"
 
 #include <QHash>
 #include <QStringList>
@@ -88,6 +89,8 @@ QString speciesUnitsToken(MultiSpeciesUnits value)
         return QStringLiteral("UG");
     case MultiSpeciesUnits::Moles:
         return QStringLiteral("MOLE");
+    case MultiSpeciesUnits::Millimoles:
+        return QStringLiteral("MMOL");
     }
     return QStringLiteral("MG");
 }
@@ -165,6 +168,7 @@ struct MsxLookups
     QHash<QUuid, QString> constant_ids;
     QHash<QUuid, QString> parameter_ids;
     QHash<QUuid, QString> pattern_ids;
+    QHash<QUuid, MultiSpeciesSpecies> species_by_uuid;
 };
 
 MsxLookups buildLookups(const NetworkHydraulic &network)
@@ -177,6 +181,8 @@ MsxLookups buildLookups(const NetworkHydraulic &network)
     lookups.constant_ids = idsByUuid(network.multi_species.constants);
     lookups.parameter_ids = idsByUuid(network.multi_species.parameters);
     lookups.pattern_ids = idsByUuid(network.multi_species.patterns);
+    for (const MultiSpeciesSpecies &species : network.multi_species.species)
+        lookups.species_by_uuid.insert(species.uuid, species);
     return lookups;
 }
 
@@ -224,7 +230,9 @@ void appendOptionsSection(QStringList &lines, const MultiSpeciesOptions &options
     lines.append(QStringLiteral("RATE_UNITS %1").arg(rateUnitsToken(options.rate_units)));
     lines.append(QStringLiteral("SOLVER %1").arg(solverMethodToken(options.solver_method)));
     lines.append(QStringLiteral("COUPLING %1").arg(couplingMethodToken(options.coupling_method)));
-    lines.append(QStringLiteral("TIMESTEP %1").arg(options.timestep_s));
+    lines.append(QStringLiteral("TIMESTEP %1").arg(mapNumber(options.timestep_s)));
+    lines.append(QStringLiteral("SEGMENTS %1").arg(options.maximum_segments));
+    lines.append(QStringLiteral("PECLET %1").arg(mapNumber(options.peclet_number_threshold)));
     lines.append(QStringLiteral("ATOL %1").arg(mapNumber(options.default_absolute_tolerance)));
     lines.append(QStringLiteral("RTOL %1").arg(mapNumber(options.default_relative_tolerance)));
     lines.append(QString());
@@ -319,9 +327,8 @@ HydraulicSimulationStatus appendSourcesSection(
         if (!status.success)
             return status;
 
-        const double strength = source.type == MultiSpeciesSourceType::Mass
-            ? source.mass_flow_per_min
-            : source.concentration;
+        const MultiSpeciesSpecies species = lookups.species_by_uuid.value(source.species_uuid);
+        const double strength = EpanetMsxUnits::bulkSourceValueToSolver(source.value, species.units);
 
         QString line = QStringLiteral("%1 %2 %3 %4")
             .arg(sourceTypeToken(source.type), node_id, species_id, mapNumber(strength));
@@ -356,7 +363,10 @@ HydraulicSimulationStatus appendQualitySection(
             lookups.species_ids, initial.species_uuid, network, QStringLiteral("initial-quality species"), species_id);
         if (!status.success)
             return status;
-        lines.append(QStringLiteral("GLOBAL %1 %2").arg(species_id, mapNumber(initial.concentration)));
+        const MultiSpeciesSpecies species = lookups.species_by_uuid.value(initial.species_uuid);
+        const double value = EpanetMsxUnits::speciesValueToSolver(
+            initial.value, species.type, species.units, network.multi_species.options.area_units);
+        lines.append(QStringLiteral("GLOBAL %1 %2").arg(species_id, mapNumber(value)));
     }
 
     for (const MultiSpeciesNodeInitialQuality &initial : network.multi_species.initial_quality_nodes)
@@ -371,7 +381,10 @@ HydraulicSimulationStatus appendQualitySection(
             lookups.node_ids, initial.node_uuid, network, QStringLiteral("initial-quality node"), node_id);
         if (!status.success)
             return status;
-        lines.append(QStringLiteral("NODE %1 %2 %3").arg(node_id, species_id, mapNumber(initial.concentration)));
+        const MultiSpeciesSpecies species = lookups.species_by_uuid.value(initial.species_uuid);
+        const double value = EpanetMsxUnits::speciesValueToSolver(
+            initial.value, species.type, species.units, network.multi_species.options.area_units);
+        lines.append(QStringLiteral("NODE %1 %2 %3").arg(node_id, species_id, mapNumber(value)));
     }
 
     for (const MultiSpeciesPipeInitialQuality &initial : network.multi_species.initial_quality_pipes)
@@ -386,7 +399,10 @@ HydraulicSimulationStatus appendQualitySection(
             lookups.pipe_ids, initial.pipe_uuid, network, QStringLiteral("initial-quality pipe"), pipe_id);
         if (!status.success)
             return status;
-        lines.append(QStringLiteral("LINK %1 %2 %3").arg(pipe_id, species_id, mapNumber(initial.concentration)));
+        const MultiSpeciesSpecies species = lookups.species_by_uuid.value(initial.species_uuid);
+        const double value = EpanetMsxUnits::speciesValueToSolver(
+            initial.value, species.type, species.units, network.multi_species.options.area_units);
+        lines.append(QStringLiteral("LINK %1 %2 %3").arg(pipe_id, species_id, mapNumber(value)));
     }
 
     lines.append(QString());
@@ -432,6 +448,43 @@ HydraulicSimulationStatus appendParametersSection(
 
     lines.append(QString());
     return makeEpanetSuccess();
+}
+
+void appendDiffusivitySection(QStringList &lines, const NetworkMultiSpecies &model)
+{
+    bool has_values = false;
+    for (const MultiSpeciesSpecies &species : model.species)
+    {
+        if (species.molecular_diffusivity_m2_per_s.has_value()
+            || species.longitudinal_dispersion_coefficient_m2_per_s.has_value())
+        {
+            has_values = true;
+            break;
+        }
+    }
+
+    if (!has_values)
+        return;
+
+    lines.append(QStringLiteral("[DIFFUSIVITY]"));
+    for (const MultiSpeciesSpecies &species : model.species)
+    {
+        if (species.molecular_diffusivity_m2_per_s.has_value())
+        {
+            lines.append(QStringLiteral("%1 %2").arg(
+                species.id,
+                mapNumber(EpanetMsxUnits::diffusivityToSolverRatio(
+                    species.molecular_diffusivity_m2_per_s.value()))));
+        }
+        if (species.longitudinal_dispersion_coefficient_m2_per_s.has_value())
+        {
+            lines.append(QStringLiteral("%1 %2 FIXED").arg(
+                species.id,
+                mapNumber(EpanetMsxUnits::diffusivityToSolverRatio(
+                    species.longitudinal_dispersion_coefficient_m2_per_s.value()))));
+        }
+    }
+    lines.append(QString());
 }
 
 void appendPatternsSection(QStringList &lines, const NetworkMultiSpecies &model)
@@ -494,6 +547,7 @@ HydraulicSimulationStatus retrieveEpanetMsxText(
         return status;
 
     appendPatternsSection(lines, network.multi_species);
+    appendDiffusivitySection(lines, network.multi_species);
     lines.append(QStringLiteral("[END]"));
 
     msx_text = lines.join(QLatin1Char('\n'));

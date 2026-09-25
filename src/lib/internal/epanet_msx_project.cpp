@@ -2,6 +2,7 @@
 
 #include "epanet_diagnostic_helpers.h"
 #include "epanet_msx_exporter.h"
+#include "epanet_msx_units.h"
 #include "epanet_status_helpers.h"
 
 #include <epanetmsx.h>
@@ -187,6 +188,8 @@ struct IndexedSpecies
     QString id;
     QUuid uuid;
     int index = 0;
+    MultiSpeciesSpeciesType type = MultiSpeciesSpeciesType::Bulk;
+    MultiSpeciesUnits units = MultiSpeciesUnits::Milligrams;
 };
 
 template<typename Entity>
@@ -261,6 +264,7 @@ HydraulicSimulationStatus readSpeciesValues(
     HydraulicSimulationStatusOperation operation,
     double simulation_time_s,
     const QList<IndexedSpecies> &species_by_index,
+    MultiSpeciesAreaUnits area_units,
     QList<MultiSpeciesResultValue> &values)
 {
     for (const IndexedSpecies &species : species_by_index)
@@ -306,7 +310,9 @@ HydraulicSimulationStatus readSpeciesValues(
             return status;
         }
 
-        values.append(MultiSpeciesResultValue{species.uuid, value});
+        const double canonical_value = EpanetMsxUnits::speciesValueFromSolver(
+            value, species.type, species.units, area_units);
+        values.append(MultiSpeciesResultValue{species.uuid, canonical_value});
     }
 
     return msxSuccessStatus();
@@ -489,8 +495,14 @@ HydraulicSimulationStatus EpanetMsxProject::run(
     }
 
     QHash<QString, QUuid> species_uuid_by_id;
+    QHash<QUuid, MultiSpeciesSpeciesType> species_type_by_uuid;
+    QHash<QUuid, MultiSpeciesUnits> species_units_by_uuid;
     for (const MultiSpeciesSpecies &species : network.multi_species.species)
+    {
         species_uuid_by_id.insert(species.id, species.uuid);
+        species_type_by_uuid.insert(species.uuid, species.type);
+        species_units_by_uuid.insert(species.uuid, species.units);
+    }
 
     // The complete species set has already been loaded into MSX above. The
     // run option only controls which species we read back into AOWIS results;
@@ -554,8 +566,15 @@ HydraulicSimulationStatus EpanetMsxProject::run(
             return status;
         }
 
-        if (run_options.species_uuids.isEmpty() || run_options.species_uuids.contains(species_uuid))
-            species_by_index.append(IndexedSpecies{species_id, species_uuid, species_index});
+        if (run_options.output_species_uuids.isEmpty() || run_options.output_species_uuids.contains(species_uuid))
+        {
+            species_by_index.append(IndexedSpecies{
+                species_id,
+                species_uuid,
+                species_index,
+                species_type_by_uuid.value(species_uuid),
+                species_units_by_uuid.value(species_uuid)});
+        }
     }
 
     QList<IndexedEntity> node_junctions;
@@ -703,7 +722,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
         previous_t = t;
 
         MultiSpeciesSimulationResult result;
-        result.time_elapsed_s = static_cast<quint64>(t);
+        result.time_elapsed_s = t;
         result.status = msxSuccessStatus();
 
         bool result_read_failed = false;
@@ -721,6 +740,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                 HydraulicSimulationStatusOperation::ReadNodeResult,
                 t,
                 species_by_index,
+                network.multi_species.options.area_units,
                 node_result.species_values);
             if (!status.success)
             {
@@ -750,6 +770,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                     HydraulicSimulationStatusOperation::ReadNodeResult,
                     t,
                     species_by_index,
+                    network.multi_species.options.area_units,
                     node_result.species_values);
                 if (!status.success)
                 {
@@ -780,6 +801,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                     HydraulicSimulationStatusOperation::ReadNodeResult,
                     t,
                     species_by_index,
+                    network.multi_species.options.area_units,
                     node_result.species_values);
                 if (!status.success)
                 {
@@ -810,6 +832,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                     HydraulicSimulationStatusOperation::ReadLinkResult,
                     t,
                     species_by_index,
+                    network.multi_species.options.area_units,
                     link_result.species_values);
                 if (!status.success)
                 {
@@ -840,6 +863,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                     HydraulicSimulationStatusOperation::ReadLinkResult,
                     t,
                     species_by_index,
+                    network.multi_species.options.area_units,
                     link_result.species_values);
                 if (!status.success)
                 {
@@ -870,6 +894,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                     HydraulicSimulationStatusOperation::ReadLinkResult,
                     t,
                     species_by_index,
+                    network.multi_species.options.area_units,
                     link_result.species_values);
                 if (!status.success)
                 {

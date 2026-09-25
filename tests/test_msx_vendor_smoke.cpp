@@ -72,7 +72,7 @@ void addSimpleChlorineMsxModel(NetworkHydraulic &network)
     MultiSpeciesNodeInitialQuality initial_quality;
     initial_quality.node_uuid = source_node.uuid;
     initial_quality.species_uuid = chlorine.uuid;
-    initial_quality.concentration = 1.0;
+    initial_quality.value = 1.0;
     network.multi_species.initial_quality_nodes.append(initial_quality);
 }
 
@@ -119,12 +119,12 @@ std::pair<QUuid, QUuid> addCoupledTwoSpeciesMsxModel(NetworkHydraulic &network)
 
     MultiSpeciesGlobalInitialQuality species_one_initial;
     species_one_initial.species_uuid = species_one.uuid;
-    species_one_initial.concentration = 1.0;
+    species_one_initial.value = 1.0;
     network.multi_species.initial_quality_global.append(species_one_initial);
 
     MultiSpeciesGlobalInitialQuality species_two_initial;
     species_two_initial.species_uuid = species_two.uuid;
-    species_two_initial.concentration = 2.0;
+    species_two_initial.value = 2.0;
     network.multi_species.initial_quality_global.append(species_two_initial);
 
     return std::make_pair(species_one.uuid, species_two.uuid);
@@ -496,8 +496,8 @@ void compareMsxSpeciesValues(
             actual_value.species_uuid == expected_value.species_uuid,
             "combined and isolated MSX species UUIDs must match");
         context.expectNear(
-            actual_value.concentration,
-            expected_value.concentration,
+            actual_value.value,
+            expected_value.value,
             tolerance,
             {time_s, entity_type, entity_id, "concentration"});
     }
@@ -512,7 +512,7 @@ bool findMsxSpeciesConcentration(
     {
         if (value.species_uuid == species_uuid)
         {
-            concentration = value.concentration;
+            concentration = value.value;
             return true;
         }
     }
@@ -694,7 +694,7 @@ void scenarioMsxIntegrationEndToEnd(AowisEpanetTests::TestContext &context)
     MultiSpeciesNodeInitialQuality initial_quality;
     initial_quality.node_uuid = source_node.uuid;
     initial_quality.species_uuid = chlorine.uuid;
-    initial_quality.concentration = 1.0;
+    initial_quality.value = 1.0;
     network.multi_species.initial_quality_nodes.append(initial_quality);
 
     EpanetRunRequest request;
@@ -727,7 +727,7 @@ void scenarioMsxIntegrationEndToEnd(AowisEpanetTests::TestContext &context)
                 for (const MultiSpeciesResultValue &value : junction_result.species_values)
                 {
                     found_species_value = true;
-                    if (value.concentration > 0.0)
+                    if (value.value > 0.0)
                         found_nonzero_concentration = true;
                 }
             }
@@ -859,7 +859,7 @@ void scenarioMsxOutputSpeciesFilterPreservesCoupledChemistry(AowisEpanetTests::T
     full_request.multi_species_run = MultiSpeciesRunOptions{};
 
     MultiSpeciesRunOptions filtered_options;
-    filtered_options.species_uuids.append(species.first);
+    filtered_options.output_species_uuids.append(species.first);
 
     EpanetRunRequest filtered_request;
     filtered_request.network = network;

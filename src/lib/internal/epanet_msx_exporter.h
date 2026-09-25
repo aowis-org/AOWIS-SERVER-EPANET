@@ -19,11 +19,11 @@ struct NetworkHydraulic;
 // requires the vendored EPANETMSX submodule this repository does not have
 // yet.
 //
-// run_options.species_uuids is validated here but never used to prune the
+// run_options.output_species_uuids is validated here but never used to prune the
 // generated reaction model. MSX chemistry is coupled: an output species can
 // reference another species in an expression, so removing an unrequested
 // species would change or invalidate the chemistry. EpanetMsxProject applies
-// species_uuids only when reading results after the complete model is loaded
+// output_species_uuids only when reading results after the complete model is loaded
 // and solved. An empty list means return every species.
 HydraulicSimulationStatus retrieveEpanetMsxText(
     const NetworkHydraulic &network,

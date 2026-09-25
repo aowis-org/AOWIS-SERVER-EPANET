@@ -87,6 +87,7 @@ void scenarioMsxValidationReferencesAssignments(TestContext &context)
 
     MultiSpeciesSpecies bulk = species(QStringLiteral("S1"));
     MultiSpeciesSpecies wall = species(QStringLiteral("W1"), MultiSpeciesSpeciesType::Wall);
+    wall.molecular_diffusivity_m2_per_s = 1.0e-9;
     network.multi_species.species.append(bulk);
     network.multi_species.species.append(wall);
 
@@ -131,19 +132,19 @@ void scenarioMsxValidationReferencesAssignments(TestContext &context)
     MultiSpeciesNodeInitialQuality wall_initial;
     wall_initial.node_uuid = junction.uuid;
     wall_initial.species_uuid = wall.uuid;
-    wall_initial.concentration = 1.0;
+    wall_initial.value = 1.0;
     network.multi_species.initial_quality_nodes.append(wall_initial);
 
     MultiSpeciesNodeSource wall_source;
     wall_source.node_uuid = junction.uuid;
     wall_source.species_uuid = wall.uuid;
-    wall_source.concentration = 1.0;
+    wall_source.value = 1.0;
     network.multi_species.sources.append(wall_source);
 
     MultiSpeciesNodeSource duplicate_source;
     duplicate_source.node_uuid = junction.uuid;
     duplicate_source.species_uuid = wall.uuid;
-    duplicate_source.concentration = 2.0;
+    duplicate_source.value = 2.0;
     network.multi_species.sources.append(duplicate_source);
 
     QList<HydraulicSimulationStatus> failures;
@@ -157,15 +158,20 @@ void scenarioMsxValidationReferencesAssignments(TestContext &context)
     context.expect(failuresContain(failures, QStringLiteral("Wall species cannot define node initial quality")), "node initial quality for wall species must be rejected instead of being silently ignored by MSX");
     context.expect(failuresContain(failures, QStringLiteral("Wall species cannot define a node source")), "wall-species node sources must be rejected instead of being silently ignored by MSX");
     context.expect(failuresContain(failures, QStringLiteral("source is duplicated")), "duplicate node/species sources must be rejected instead of last-write-wins behavior");
+    context.expect(failuresContain(failures, QStringLiteral("only for bulk species")), "wall species must reject dispersion coefficients that EPANET-MSX would ignore");
 }
 
 void scenarioMsxValidationNumericsExpressions(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
     MultiSpeciesSpecies s1 = species(QStringLiteral("S1"));
+    s1.molecular_diffusivity_m2_per_s = 1.0e-9;
+    s1.longitudinal_dispersion_coefficient_m2_per_s = 2.0e-6;
     network.multi_species.species.append(s1);
 
     network.multi_species.options.timestep_s = 0;
+    network.multi_species.options.peclet_number_threshold = 0.5;
+    network.multi_species.options.maximum_segments = 49;
     network.multi_species.options.default_absolute_tolerance = std::numeric_limits<double>::quiet_NaN();
 
     MultiSpeciesConstant constant;
@@ -209,7 +215,10 @@ void scenarioMsxValidationNumericsExpressions(TestContext &context)
     const HydraulicSimulationStatus status = validateEpanetMultiSpeciesModel(network, &failures);
 
     context.expect(!status.success, "invalid MSX numerics and expression dependencies must fail model validation");
-    context.expect(failuresContain(failures, QStringLiteral("timestep must be positive")), "MSX timestep zero must be rejected before file generation");
+    context.expect(failuresContain(failures, QStringLiteral("timestep must be finite and at least 0.001 seconds")), "MSX timestep zero must be rejected before file generation");
+    context.expect(failuresContain(failures, QStringLiteral("Peclet-number threshold")), "MSX Peclet thresholds below the backend minimum must be rejected before export");
+    context.expect(failuresContain(failures, QStringLiteral("maximum segment count")), "MSX segment counts below the backend minimum must be rejected before export");
+    context.expect(failuresContain(failures, QStringLiteral("both molecular diffusivity and fixed longitudinal dispersion")), "a species must not configure mutually exclusive dispersion modes simultaneously");
     context.expect(failuresContain(failures, QStringLiteral("invalid numeric")), "non-finite MSX numeric fields must be rejected");
     context.expect(failuresContain(failures, QStringLiteral("at least one multiplier")), "empty MSX patterns must be rejected because they cannot be serialized as a real pattern");
     context.expect(failuresContain(failures, QStringLiteral("unknown expression symbol")), "unknown reaction/term symbols must be diagnosed at the AOWIS boundary");
