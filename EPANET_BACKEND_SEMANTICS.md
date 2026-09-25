@@ -80,6 +80,12 @@ FAVAD leakage and control inputs are implemented in the builder path. Pipe fixed
 
 The bundled EPANET 2.3 headers expose `EN_R_POWER`, but its rule parser rejects pump `POWER` premises and its rule evaluator does not implement them. The adapter therefore rejects structured pump-power premises explicitly instead of forwarding a rule that cannot execute. Other implemented simple and rule-based controls are passed to EPANET normally.
 
+## EPANET-MSX pipe versus generic-link semantics
+
+EPANET-MSX internally indexes every hydraulic edge through EPANET's generic link table. Its `[QUALITY] LINK` parser and the historically named `[PARAMETERS] PIPE` parser both resolve object IDs through `ENgetlinkindex()`, so the native parser will accept pump and valve IDs in those records. That parser permissiveness does not make pumps or valves reaction-bearing pipes. EPANET exposes pumps and valves with zero length; EPANET-MSX therefore creates no transport-volume segments for them and explicitly skips zero-length links when evaluating pipe reactions. `MSXgetqual(MSX_LINK, ...)` consequently falls back to the mean quality of the two endpoint nodes when a link has no quality segments.
+
+AOWIS therefore keeps multi-species link initial conditions and link-local reaction-parameter overrides as pipe-specific model concepts (`MultiSpeciesPipeInitialQuality` and `MultiSpeciesParameterOverridePipe`). The EPANET-MSX adapter MUST NOT broaden those inputs to pumps or valves merely because the backend parser accepts their generic link IDs. Pump and valve species results may still be exposed as backend link results; they represent the solver's zero-volume/pass-through link value rather than a pipe reaction volume.
+
 ## Water-quality input translation
 
 The adapter maps the typed AOWIS water-quality configuration into the live EPANET project for the requested quality analysis. The adapter configures `None`, chemical, water-age, and source-trace analysis modes; canonical chemical units are `mg/L`. Initial node quality is selected from the quantity-specific Model field for the active analysis mode. Chemical concentration, mass-booster, flow-paced, and setpoint sources map to the corresponding EPANET source type, including optional source patterns. Tank mixing model/fraction, quality tolerance, relative diffusivity, quality timestep, reaction orders, limiting concentration, and pipe/tank reaction coefficients are also mapped. Source-trace node UUIDs and source-pattern UUIDs are resolved only after the referenced EPANET nodes/patterns exist.

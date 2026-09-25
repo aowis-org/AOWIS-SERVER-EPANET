@@ -71,6 +71,7 @@ set(AOWIS_SERVER_EPANET_INTERNAL_HEADERS
     src/lib/internal/epanet_hydraulic_solver.h
     src/lib/internal/epanet_inp_exporter.h
     src/lib/internal/epanet_msx_exporter.h
+    src/lib/internal/epanet_msx_mass_balance_bridge.h
     src/lib/internal/epanet_msx_project.h
     src/lib/internal/epanet_msx_validator.h
     src/lib/internal/epanet_inp_geometry_importer.h

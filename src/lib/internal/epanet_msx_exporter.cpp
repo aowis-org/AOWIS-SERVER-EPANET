@@ -233,8 +233,6 @@ void appendOptionsSection(QStringList &lines, const MultiSpeciesOptions &options
     lines.append(QStringLiteral("TIMESTEP %1").arg(mapNumber(options.timestep_s)));
     lines.append(QStringLiteral("SEGMENTS %1").arg(options.maximum_segments));
     lines.append(QStringLiteral("PECLET %1").arg(mapNumber(options.peclet_number_threshold)));
-    lines.append(QStringLiteral("ATOL %1").arg(mapNumber(options.default_absolute_tolerance)));
-    lines.append(QStringLiteral("RTOL %1").arg(mapNumber(options.default_relative_tolerance)));
     lines.append(QString());
 }
 
@@ -242,19 +240,30 @@ void appendSpeciesSection(
     QStringList &lines,
     const NetworkHydraulic &network)
 {
+    const MultiSpeciesOptions &options = network.multi_species.options;
+
     lines.append(QStringLiteral("[SPECIES]"));
     for (const MultiSpeciesSpecies &species : network.multi_species.species)
     {
-        QString line = QStringLiteral("%1 %2 %3")
-            .arg(speciesTypeToken(species.type), species.id, speciesUnitsToken(species.units));
-        // Omitting the trailing tolerance pair means MSX applies the
-        // [OPTIONS] ATOL/RTOL default, matching this species' own
-        // absolute_tolerance/relative_tolerance being left at zero.
-        if (species.absolute_tolerance > 0.0 || species.relative_tolerance > 0.0)
-        {
-            line += QStringLiteral(" %1 %2")
-                .arg(mapNumber(species.absolute_tolerance), mapNumber(species.relative_tolerance));
-        }
+        const double canonical_absolute_tolerance = species.absolute_tolerance > 0.0
+            ? species.absolute_tolerance
+            : options.default_absolute_tolerance;
+        const double relative_tolerance = species.relative_tolerance > 0.0
+            ? species.relative_tolerance
+            : options.default_relative_tolerance;
+        const double solver_absolute_tolerance = EpanetMsxUnits::speciesValueToSolver(
+            canonical_absolute_tolerance,
+            species.type,
+            species.units,
+            options.area_units);
+
+        const QString line = QStringLiteral("%1 %2 %3 %4 %5")
+            .arg(
+                speciesTypeToken(species.type),
+                species.id,
+                speciesUnitsToken(species.units),
+                mapNumber(solver_absolute_tolerance),
+                mapNumber(relative_tolerance));
         lines.append(line);
     }
     lines.append(QString());

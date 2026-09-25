@@ -2,6 +2,7 @@
 
 #include "epanet_diagnostic_helpers.h"
 #include "epanet_msx_exporter.h"
+#include "epanet_msx_mass_balance_bridge.h"
 #include "epanet_msx_units.h"
 #include "epanet_status_helpers.h"
 
@@ -265,10 +266,13 @@ HydraulicSimulationStatus readSpeciesValues(
     double simulation_time_s,
     const QList<IndexedSpecies> &species_by_index,
     MultiSpeciesAreaUnits area_units,
+    bool include_wall_species,
     QList<MultiSpeciesResultValue> &values)
 {
     for (const IndexedSpecies &species : species_by_index)
     {
+        if (!include_wall_species && species.type == MultiSpeciesSpeciesType::Wall)
+            continue;
         double value = 0.0;
         const int error = MSXgetqual(msx_entity_type, entity.index, species.index, &value);
         if (error != 0)
@@ -632,7 +636,12 @@ HydraulicSimulationStatus EpanetMsxProject::run(
         return status;
     }
 
-    error = MSXinit(0);
+    // EPANET-MSX finalizes its per-species mass-balance ratios only when
+    // result saving is enabled. The output file lives in the run's temporary
+    // directory; AOWIS reads normal timestep values directly through the
+    // toolkit and uses the saved-result path only to make the backend's
+    // already-computed final mass-balance statistics available.
+    error = MSXinit(1);
     if (error != 0)
     {
         status = msxSolverErrorStatus(
@@ -741,6 +750,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                 t,
                 species_by_index,
                 network.multi_species.options.area_units,
+                false,
                 node_result.species_values);
             if (!status.success)
             {
@@ -771,6 +781,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                     t,
                     species_by_index,
                     network.multi_species.options.area_units,
+                    false,
                     node_result.species_values);
                 if (!status.success)
                 {
@@ -802,6 +813,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                     t,
                     species_by_index,
                     network.multi_species.options.area_units,
+                    false,
                     node_result.species_values);
                 if (!status.success)
                 {
@@ -833,6 +845,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                     t,
                     species_by_index,
                     network.multi_species.options.area_units,
+                    true,
                     link_result.species_values);
                 if (!status.success)
                 {
@@ -864,6 +877,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                     t,
                     species_by_index,
                     network.multi_species.options.area_units,
+                    false,
                     link_result.species_values);
                 if (!status.success)
                 {
@@ -895,6 +909,7 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                     t,
                     species_by_index,
                     network.multi_species.options.area_units,
+                    false,
                     link_result.species_values);
                 if (!status.success)
                 {
@@ -907,6 +922,46 @@ HydraulicSimulationStatus EpanetMsxProject::run(
                     break;
                 }
                 result.links_valves.append(link_result);
+            }
+        }
+
+        if (!result_read_failed && tleft <= 0.0)
+        {
+            for (const IndexedSpecies &species : species_by_index)
+            {
+                double mass_balance_ratio = 0.0;
+                const int bridge_error = aowisMsxGetMassBalanceRatio(
+                    species.index,
+                    &mass_balance_ratio);
+                if (bridge_error != 0 || !qIsFinite(mass_balance_ratio))
+                {
+                    status = msxAdapterErrorStatus(
+                        HydraulicSimulationStatusStage::ReadStatistics,
+                        HydraulicSimulationStatusOperation::ReadStatistic,
+                        HydraulicSimulationStatusEntityType::MultiSpeciesSolver,
+                        network.id,
+                        network.uuid,
+                        QStringLiteral("Failed to read the EPANET-MSX species mass-balance ratio"));
+                    status.backend_operation = QStringLiteral("aowisMsxGetMassBalanceRatio");
+                    status.property = HydraulicSimulationStatusProperty::Quality;
+                    status.details.append(QStringLiteral("Species: %1").arg(species.id));
+                    status.details.append(QStringLiteral("Species UUID: %1").arg(
+                        species.uuid.toString(QUuid::WithoutBraces)));
+                    status.details.append(QStringLiteral("MSX species index: %1").arg(species.index));
+                    status.details.append(QStringLiteral("Bridge status: %1").arg(bridge_error));
+                    status.details.append(QStringLiteral("Mass-balance ratio: %1").arg(
+                        mass_balance_ratio, 0, 'g', 17));
+                    appendMsxFailure(
+                        timeline,
+                        status,
+                        first_failure,
+                        HydraulicSimulationDiagnosticSeverity::Error);
+                    result_read_failed = true;
+                    break;
+                }
+
+                result.statistics.mass_balance_ratios.append(
+                    MultiSpeciesMassBalanceRatio{species.uuid, mass_balance_ratio});
             }
         }
 

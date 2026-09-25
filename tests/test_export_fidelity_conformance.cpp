@@ -1268,6 +1268,79 @@ void scenarioMsxExportBasicSections(TestContext &context)
     context.expect(species_index >= 0 && pipes_index > species_index && sources_index > pipes_index, "sections must appear in the documented MSX order");
 }
 
+void scenarioMsxExportCanonicalSpeciesTolerances(TestContext &context)
+{
+    NetworkHydraulic network = cleanNet1();
+    network.multi_species.options.area_units = MultiSpeciesAreaUnits::SquareFeet;
+    network.multi_species.options.default_absolute_tolerance = 0.01;
+    network.multi_species.options.default_relative_tolerance = 0.001;
+
+    MultiSpeciesSpecies milligram_default;
+    milligram_default.id = QStringLiteral("MGDEF");
+    milligram_default.uuid = QUuid::createUuid();
+    milligram_default.type = MultiSpeciesSpeciesType::Bulk;
+    milligram_default.units = MultiSpeciesUnits::Milligrams;
+    network.multi_species.species.append(milligram_default);
+
+    MultiSpeciesSpecies microgram_default;
+    microgram_default.id = QStringLiteral("UGDEF");
+    microgram_default.uuid = QUuid::createUuid();
+    microgram_default.type = MultiSpeciesSpeciesType::Bulk;
+    microgram_default.units = MultiSpeciesUnits::Micrograms;
+    network.multi_species.species.append(microgram_default);
+
+    MultiSpeciesSpecies mole_default;
+    mole_default.id = QStringLiteral("MOLDEF");
+    mole_default.uuid = QUuid::createUuid();
+    mole_default.type = MultiSpeciesSpeciesType::Bulk;
+    mole_default.units = MultiSpeciesUnits::Moles;
+    network.multi_species.species.append(mole_default);
+
+    MultiSpeciesSpecies millimole_default;
+    millimole_default.id = QStringLiteral("MMDEF");
+    millimole_default.uuid = QUuid::createUuid();
+    millimole_default.type = MultiSpeciesSpeciesType::Bulk;
+    millimole_default.units = MultiSpeciesUnits::Millimoles;
+    network.multi_species.species.append(millimole_default);
+
+    MultiSpeciesSpecies wall_microgram_default;
+    wall_microgram_default.id = QStringLiteral("UWALL");
+    wall_microgram_default.uuid = QUuid::createUuid();
+    wall_microgram_default.type = MultiSpeciesSpeciesType::Wall;
+    wall_microgram_default.units = MultiSpeciesUnits::Micrograms;
+    network.multi_species.species.append(wall_microgram_default);
+
+    MultiSpeciesSpecies microgram_absolute_override;
+    microgram_absolute_override.id = QStringLiteral("UGABS");
+    microgram_absolute_override.uuid = QUuid::createUuid();
+    microgram_absolute_override.type = MultiSpeciesSpeciesType::Bulk;
+    microgram_absolute_override.units = MultiSpeciesUnits::Micrograms;
+    microgram_absolute_override.absolute_tolerance = 0.002;
+    network.multi_species.species.append(microgram_absolute_override);
+
+    MultiSpeciesSpecies relative_override;
+    relative_override.id = QStringLiteral("MGREL");
+    relative_override.uuid = QUuid::createUuid();
+    relative_override.type = MultiSpeciesSpeciesType::Bulk;
+    relative_override.units = MultiSpeciesUnits::Milligrams;
+    relative_override.relative_tolerance = 0.004;
+    network.multi_species.species.append(relative_override);
+
+    QString msx_text;
+    const HydraulicSimulationStatus status = retrieveEpanetMsxText(network, MultiSpeciesRunOptions{}, msx_text);
+
+    context.expect(status.success, "canonical multi-species tolerances must export successfully");
+    context.expect(!msx_text.contains(QStringLiteral("\nATOL ")), "export must not map the canonical AOWIS absolute default to MSX's raw global ATOL option");
+    context.expect(!msx_text.contains(QStringLiteral("\nRTOL ")), "export must materialize relative tolerance per species instead of relying on the MSX global RTOL option");
+    context.expect(msx_text.contains(QStringLiteral("BULK MGDEF MG 0.01 0.001")), "milligram bulk species must receive the canonical defaults unchanged");
+    context.expect(msx_text.contains(QStringLiteral("BULK UGDEF UG 10 0.001")), "microgram bulk species must receive the absolute default converted from canonical mg/L");
+    context.expect(msx_text.contains(QStringLiteral("BULK MOLDEF MOLE 1e-05 0.001")), "mole bulk species must receive the absolute default converted from canonical mmol/L");
+    context.expect(msx_text.contains(QStringLiteral("BULK MMDEF MMOL 0.01 0.001")), "millimole bulk species must receive the canonical amount-concentration default unchanged");
+    context.expect(msx_text.contains(QStringLiteral("WALL UWALL UG 0.9290304 0.001")), "wall-species absolute tolerance must include both mass and configured area-unit conversion");
+    context.expect(msx_text.contains(QStringLiteral("BULK UGABS UG 2 0.001")), "a species absolute override must be converted while independently inheriting the default relative tolerance");
+    context.expect(msx_text.contains(QStringLiteral("BULK MGREL MG 0.01 0.004")), "a species relative override must independently inherit the default canonical absolute tolerance");
+}
+
 void scenarioMsxExportSpeciesSelection(TestContext &context)
 {
     NetworkHydraulic network = cleanNet1();
@@ -1452,6 +1525,11 @@ void registerExportFidelityScenarios(ScenarioRegistry &registry)
         "Format a multi-species reaction model into MSX 2.0 sections in the documented order.",
         {"contract", "quality"},
         &scenarioMsxExportBasicSections});
+    registry.add(ScenarioDefinition{
+        "contract-msx-export-canonical-species-tolerances",
+        "Convert canonical AOWIS absolute tolerances into explicit per-species MSX units while keeping relative tolerances dimensionless.",
+        {"contract", "quality"},
+        &scenarioMsxExportCanonicalSpeciesTolerances});
     registry.add(ScenarioDefinition{
         "contract-msx-export-species-selection",
         "Validate a requested output-species subset without pruning any species, reactions, sources, or initial quality from the MSX chemistry model.",

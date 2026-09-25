@@ -7,14 +7,23 @@ set(AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS
     contract-quality-model-boundary
     contract-multi-quality-run-envelope
     contract-msx-export-basic-sections
+    contract-msx-export-canonical-species-tolerances
     contract-msx-export-species-selection
     contract-msx-export-rejects-unknown-species-selection
     contract-msx-export-rejects-broken-reaction-reference
     contract-msx-integration-end-to-end
+    contract-msx-known-answer-fractional-microgram-decay
+    contract-msx-formula-equilibrium-known-answer
+    contract-msx-fixed-dispersion-peclet-runtime
+    contract-msx-parameter-term-overrides-known-answer
+    contract-msx-mass-balance-final-summary
+    contract-msx-wall-species-pipe-only-results
     contract-msx-configured-inp-roughness-kc
     contract-msx-backend-diagnostics
     contract-msx-cancellation-partial
     contract-msx-output-species-filter-coupled-chemistry
+    contract-msx-patterned-mass-source-canonical-units
+    contract-msx-remaining-source-modes-canonical-units
     contract-msx-validation-identities
     contract-msx-validation-references-assignments
     contract-msx-validation-numerics-expressions
@@ -271,6 +280,8 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
 set(AOWIS_SERVER_EPANET_MSX_VENDOR_TEST_SCENARIOS
     proof-msx-vendor-open-init-step-close
     proof-msx-aowis-hydraulic-handoff
+    proof-msx-nonpipe-link-parser-aliases
+    proof-msx-zero-volume-link-quality-semantics
 )
 
 set(AOWIS_SERVER_EPANET_TEST_SCENARIOS
@@ -408,7 +419,9 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONTRACT_
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-standard-quality-failure-isolation")
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality;proof;negative")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-standard-quality-isolated-equivalence"
-           OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-configured-inp-roughness-kc")
+           OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-configured-inp-roughness-kc"
+           OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-known-answer-fractional-microgram-decay"
+           OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-wall-species-pipe-only-results")
         set(AOWIS_SERVER_EPANET_CONTRACT_LABELS "contract;hydraulic;quality;proof")
     elseif(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-integration-end-to-end"
            OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "contract-msx-with-standard-quality")
@@ -427,7 +440,8 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONTRACT_
 endforeach()
 
 foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_MSX_VENDOR_TEST_SCENARIOS)
-    if(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "proof-msx-aowis-hydraulic-handoff")
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "proof-msx-aowis-hydraulic-handoff"
+       OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "proof-msx-zero-volume-link-quality-semantics")
         set(AOWIS_SERVER_EPANET_MSX_TEST_LABELS "proof;hydraulic;quality")
     else()
         set(AOWIS_SERVER_EPANET_MSX_TEST_LABELS "proof;quality")

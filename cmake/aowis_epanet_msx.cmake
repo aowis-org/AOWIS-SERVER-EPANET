@@ -41,6 +41,7 @@ set(AOWIS_SERVER_EPANET_MSX_SOURCES
     "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/rk5.c"
     "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/ros2.c"
     "${AOWIS_SERVER_EPANET_MSX_SOLVER_DIR}/smatrix.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../src/lib/internal/epanet_msx_mass_balance_bridge.c"
 )
 
 add_library(epanetmsx ${AOWIS_SERVER_EPANET_MSX_SOURCES})
