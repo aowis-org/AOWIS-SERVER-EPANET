@@ -169,13 +169,61 @@ HydraulicSimulationStatus buildHydraulicNodeDemandProjection(
                     .arg(demand_point.attachment.pipe_uuid.toString(QUuid::WithoutBraces))});
         }
 
+        if (demand_point.attachment.pipe_allocation_mode
+            == HydraulicDemandPointPipeAllocationMode::AssignedJunction)
+        {
+            const QUuid assigned_junction_uuid =
+                demand_point.attachment.pipe_assigned_junction_uuid;
+            if (assigned_junction_uuid.isNull())
+            {
+                return demandPointFailure(
+                    demand_point,
+                    HydraulicSimulationStatusOperation::ResolveEntity,
+                    QStringLiteral("Assigned-junction pipe demand point requires an assigned junction"),
+                    {QStringLiteral("pipe_uuid: %1")
+                         .arg(pipe->uuid.toString(QUuid::WithoutBraces))});
+            }
+
+            if (assigned_junction_uuid != pipe->node_uuid_from
+                && assigned_junction_uuid != pipe->node_uuid_to)
+            {
+                return demandPointFailure(
+                    demand_point,
+                    HydraulicSimulationStatusOperation::ResolveEntity,
+                    QStringLiteral("Assigned-junction pipe demand point must reference one of the attached pipe endpoints"),
+                    {QStringLiteral("pipe_uuid: %1")
+                         .arg(pipe->uuid.toString(QUuid::WithoutBraces)),
+                     QStringLiteral("assigned_junction_uuid: %1")
+                         .arg(assigned_junction_uuid.toString(QUuid::WithoutBraces))});
+            }
+
+            HydraulicSimulationStatus status = appendScaledDemands(
+                demand_point,
+                projected,
+                enabled_junction_indices,
+                assigned_junction_uuid,
+                1.0);
+            if (!status.success)
+                return status;
+            continue;
+        }
+
+        if (demand_point.attachment.pipe_allocation_mode
+            != HydraulicDemandPointPipeAllocationMode::InterpolateByPosition)
+        {
+            return demandPointFailure(
+                demand_point,
+                HydraulicSimulationStatusOperation::ResolveEntity,
+                QStringLiteral("Demand point has an unsupported pipe demand allocation mode"));
+        }
+
         if (!enabled_junction_indices.contains(pipe->node_uuid_from)
             || !enabled_junction_indices.contains(pipe->node_uuid_to))
         {
             return demandPointFailure(
                 demand_point,
                 HydraulicSimulationStatusOperation::ResolveEntity,
-                QStringLiteral("Pipe-attached demand point currently requires both pipe endpoints to be enabled junctions"),
+                QStringLiteral("Position-interpolated pipe demand point requires both pipe endpoints to be enabled junctions"),
                 {QStringLiteral("pipe_uuid: %1").arg(pipe->uuid.toString(QUuid::WithoutBraces))});
         }
 

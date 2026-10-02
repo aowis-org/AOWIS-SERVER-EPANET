@@ -65,6 +65,16 @@ HydraulicNodeJunction *findModelJunction(NetworkHydraulic &network, const QStrin
     return nullptr;
 }
 
+HydraulicNodeJunction *findModelJunctionByUuid(NetworkHydraulic &network, const QUuid &uuid)
+{
+    for (HydraulicNodeJunction &junction : network.nodes_junctions)
+    {
+        if (junction.uuid == uuid)
+            return &junction;
+    }
+    return nullptr;
+}
+
 HydraulicNodeReservoir *findModelReservoir(NetworkHydraulic &network, const QString &id)
 {
     for (HydraulicNodeReservoir &reservoir : network.nodes_reservoirs)
@@ -507,6 +517,20 @@ void testDemandPointNodeProjection(TestContext &context)
     pipe_demand_point.attachment.pipe_uuid = pipe_11->uuid;
     pipe_demand_point.attachment.pipe_position = 0.25;
 
+    HydraulicDemandPoint assigned_pipe_demand_point;
+    assigned_pipe_demand_point.id = QStringLiteral("DP_PIPE_ASSIGNED");
+    assigned_pipe_demand_point.uuid = QUuid::createUuid();
+    assigned_pipe_demand_point.coordinate_wgs84.longitude_deg = 18.05;
+    assigned_pipe_demand_point.coordinate_wgs84.latitude_deg = 12.05;
+    assigned_pipe_demand_point.demands.append(demand);
+    assigned_pipe_demand_point.attachment.type = HydraulicDemandPointAttachmentType::Pipe;
+    assigned_pipe_demand_point.attachment.pipe_uuid = pipe_11->uuid;
+    assigned_pipe_demand_point.attachment.pipe_position = 0.80;
+    assigned_pipe_demand_point.attachment.pipe_allocation_mode =
+        HydraulicDemandPointPipeAllocationMode::AssignedJunction;
+    assigned_pipe_demand_point.attachment.pipe_assigned_junction_uuid =
+        pipe_11->node_uuid_to;
+
     HydraulicDemandPoint junction_demand_point;
     junction_demand_point.id = QStringLiteral("DP_JUNCTION");
     junction_demand_point.uuid = QUuid::createUuid();
@@ -536,10 +560,21 @@ void testDemandPointNodeProjection(TestContext &context)
     pipe_demand_to.base_demand_m3_per_h *= 0.25;
     equivalent_junction_12->demands.append(pipe_demand_to);
 
+    HydraulicNodeJunction *equivalent_assigned_junction =
+        findModelJunctionByUuid(equivalent_direct_network, pipe_11->node_uuid_to);
+    context.expect(equivalent_assigned_junction != nullptr,
+        "equivalent direct-demand fixture must contain the assigned pipe endpoint junction");
+    if (equivalent_assigned_junction == nullptr)
+        return;
+
+    HydraulicDemand assigned_pipe_demand = demand;
+    equivalent_assigned_junction->demands.append(assigned_pipe_demand);
+
     HydraulicDemand junction_demand = demand;
     equivalent_junction_12->demands.append(junction_demand);
 
     fixture.network.demand_points.append(pipe_demand_point);
+    fixture.network.demand_points.append(assigned_pipe_demand_point);
     fixture.network.demand_points.append(junction_demand_point);
 
     const EpanetResultInp projected_inp = EpanetRunner().retrieveInp(
@@ -555,16 +590,18 @@ void testDemandPointNodeProjection(TestContext &context)
     {
         context.expect(
             projected_inp.inp_text == direct_inp.inp_text,
-            "pipe and junction demand-point attachments must resolve to the same EPANET model as equivalent direct junction demands");
+            "positional pipe, assigned-junction pipe, and direct junction demand-point attachments must resolve to the same EPANET model as equivalent direct junction demands");
         context.expect(!projected_inp.inp_text.contains(pipe_demand_point.id),
-            "pipe-attached demand-point identity must not leak into the solver-facing EPANET model");
+            "position-interpolated pipe demand-point identity must not leak into the solver-facing EPANET model");
+        context.expect(!projected_inp.inp_text.contains(assigned_pipe_demand_point.id),
+            "assigned-junction pipe demand-point identity must not leak into the solver-facing EPANET model");
         context.expect(!projected_inp.inp_text.contains(junction_demand_point.id),
             "junction-attached demand-point identity must not leak into the solver-facing EPANET model");
     }
 
     NetworkHydraulic disabled_network = fixture.network;
-    disabled_network.demand_points.first().metadata.enabled = false;
-    disabled_network.demand_points.last().metadata.enabled = false;
+    for (HydraulicDemandPoint &disabled_demand_point : disabled_network.demand_points)
+        disabled_demand_point.metadata.enabled = false;
     const EpanetResultInp disabled_inp = EpanetRunner().retrieveInp(
         AowisEpanetTests::makeRunRequest(disabled_network));
     Net1Fixture baseline_fixture = AowisEpanetTests::makeNet1Fixture();
@@ -599,6 +636,31 @@ void testDemandPointNodeProjection(TestContext &context)
         AowisEpanetTests::makeRunRequest(invalid_position_network));
     context.expect(!invalid_position_inp.status.success,
         "demand-point pipe positions outside the normalized range must be rejected");
+
+    NetworkHydraulic missing_assigned_junction_network = fixture.network;
+    missing_assigned_junction_network.demand_points[1].attachment.pipe_assigned_junction_uuid = QUuid();
+    const EpanetResultInp missing_assigned_junction_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(missing_assigned_junction_network));
+    context.expect(!missing_assigned_junction_inp.status.success,
+        "assigned-junction pipe demand point without an assigned junction must be rejected");
+    context.expect(
+        missing_assigned_junction_inp.status.entity.type == HydraulicSimulationStatusEntityType::DemandPoint,
+        "missing assigned junction must identify the demand point as the failing entity type");
+
+    NetworkHydraulic non_endpoint_assigned_junction_network = fixture.network;
+    const QUuid non_endpoint_junction_uuid = junction_11->uuid == pipe_11->node_uuid_from
+            || junction_11->uuid == pipe_11->node_uuid_to
+        ? QUuid::createUuid()
+        : junction_11->uuid;
+    non_endpoint_assigned_junction_network.demand_points[1]
+        .attachment.pipe_assigned_junction_uuid = non_endpoint_junction_uuid;
+    const EpanetResultInp non_endpoint_assigned_junction_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(non_endpoint_assigned_junction_network));
+    context.expect(!non_endpoint_assigned_junction_inp.status.success,
+        "assigned-junction pipe demand point must reject a junction that is not a pipe endpoint");
+    context.expect(
+        non_endpoint_assigned_junction_inp.status.entity.type == HydraulicSimulationStatusEntityType::DemandPoint,
+        "non-endpoint assigned junction must identify the demand point as the failing entity type");
 }
 
 void configureFormulaFixture(Net1Fixture &fixture, HydraulicHeadlossFormula formula, double default_roughness, double pipe_10_roughness)
@@ -663,7 +725,7 @@ void registerInputMappingScenarios(ScenarioRegistry &registry)
         &testDemandCategories});
     registry.add(ScenarioDefinition{
         "conformance-demand-point-node-projection",
-        "Projects Demand Point pipe/junction attachments into transient junction demands before the EPANET-specific build and rejects invalid attachments.",
+        "Projects positional and assigned-junction Demand Point pipe attachments plus direct junction attachments into transient junction demands before the EPANET-specific build and rejects invalid attachments.",
         {"conformance", "hydraulic", "demand-point", "projection"},
         &testDemandPointNodeProjection});
     registry.add(ScenarioDefinition{
