@@ -261,20 +261,20 @@ void testDemandCategories(TestContext &context)
         return;
     junction->demands.clear();
 
-    HydraulicNodeJunctionDemand primary_demand;
+    HydraulicDemand primary_demand;
     primary_demand.category_name = QStringLiteral("PrimaryDemand");
     primary_demand.base_demand_m3_per_h = 20.0;
     primary_demand.pattern_mode = HydraulicTimePatternMode::TimePattern;
     primary_demand.pattern_uuid = primary_pattern.uuid;
     junction->demands.append(primary_demand);
 
-    HydraulicNodeJunctionDemand constant_demand;
+    HydraulicDemand constant_demand;
     constant_demand.category_name = QStringLiteral("SecondaryDemand");
     constant_demand.base_demand_m3_per_h = 7.0;
     constant_demand.pattern_mode = HydraulicTimePatternMode::Constant;
     junction->demands.append(constant_demand);
 
-    HydraulicNodeJunctionDemand secondary_demand;
+    HydraulicDemand secondary_demand;
     secondary_demand.category_name = QStringLiteral("TertiaryDemand");
     secondary_demand.base_demand_m3_per_h = 5.0;
     secondary_demand.pattern_mode = HydraulicTimePatternMode::TimePattern;

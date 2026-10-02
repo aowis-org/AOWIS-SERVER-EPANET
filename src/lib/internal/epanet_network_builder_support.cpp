@@ -318,10 +318,21 @@ HydraulicSimulationStatus setNodeOrLinkMetadata(EpanetProject &project, int obje
     if (!status.success)
         return status;
 
-    if (metadata.tag.isEmpty())
+    QString epanet_tag;
+    for (const QString &tag : metadata.tags)
+    {
+        const QString candidate = tag.trimmed();
+        if (candidate.isEmpty())
+            continue;
+
+        epanet_tag = candidate;
+        break;
+    }
+
+    if (epanet_tag.isEmpty())
         return makeEpanetSuccess();
 
-    const QByteArray tag_utf8 = metadata.tag.toUtf8();
+    const QByteArray tag_utf8 = epanet_tag.toUtf8();
     const int error = EN_settag(project.handle(), object_type, object_index, tag_utf8.constData());
     if (error != 0)
     {

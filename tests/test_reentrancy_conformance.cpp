@@ -241,7 +241,7 @@ NetworkHydraulic reentrancyNetwork(double source_head_m, double sink_demand_m3_p
     sink.id = QStringLiteral("J_SINK");
     sink.uuid = QUuid::createUuid();
     sink.elevation_m = 5.0;
-    HydraulicNodeJunctionDemand demand;
+    HydraulicDemand demand;
     demand.base_demand_m3_per_h = sink_demand_m3_per_h;
     sink.demands.append(demand);
 

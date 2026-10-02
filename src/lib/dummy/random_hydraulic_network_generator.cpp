@@ -395,7 +395,7 @@ void appendScaledJunctions(NetworkHydraulic &network, QVector<GeneratedJunction>
     for (int junction_index = 0; junction_index < junctions.length(); junction_index++)
     {
         GeneratedJunction &junction = junctions[junction_index];
-        HydraulicNodeJunctionDemand demand;
+        HydraulicDemand demand;
         demand.base_demand_m3_per_h = junction.raw_demand * demand_scale;
         junction.node.demands.append(demand);
         network.nodes_junctions.append(junction.node);

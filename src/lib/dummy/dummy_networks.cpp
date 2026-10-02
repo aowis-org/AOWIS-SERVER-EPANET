@@ -14,7 +14,7 @@ NetworkHydraulic DummyNetworks::networkSimple()
     junction.uuid = QUuid::createUuid();
     junction.id = "J1";
     junction.elevation_m = 0.0;
-    HydraulicNodeJunctionDemand junction_demand;
+    HydraulicDemand junction_demand;
     junction_demand.base_demand_m3_per_h = 3.6;
     junction.demands.append(junction_demand);
     
@@ -66,7 +66,7 @@ NetworkHydraulic DummyNetworks::networkOnMap()
     junction_1.coordinate_wgs84.longitude_deg = 18.20373;
     
     junction_1.elevation_m = 477.0;
-    HydraulicNodeJunctionDemand junction_1_demand;
+    HydraulicDemand junction_1_demand;
     junction_1_demand.base_demand_m3_per_h = 3.6;
     junction_1.demands.append(junction_1_demand);
     
@@ -117,7 +117,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     junction_1.coordinate_wgs84.latitude_deg = 11.98119;
     junction_1.coordinate_wgs84.longitude_deg = 18.19200;
     junction_1.elevation_m = 45.0;
-    HydraulicNodeJunctionDemand junction_1_demand;
+    HydraulicDemand junction_1_demand;
     junction_1_demand.base_demand_m3_per_h = 5.4;
     junction_1.demands.append(junction_1_demand);
     
@@ -127,7 +127,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     junction_2.coordinate_wgs84.latitude_deg = 11.98200;
     junction_2.coordinate_wgs84.longitude_deg = 18.19320;
     junction_2.elevation_m = 50.0;
-    HydraulicNodeJunctionDemand junction_2_demand;
+    HydraulicDemand junction_2_demand;
     junction_2_demand.base_demand_m3_per_h = 7.2;
     junction_2.demands.append(junction_2_demand);
     
@@ -137,7 +137,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     junction_3.coordinate_wgs84.latitude_deg = 11.98038;
     junction_3.coordinate_wgs84.longitude_deg = 18.19320;
     junction_3.elevation_m = 60.0;
-    HydraulicNodeJunctionDemand junction_3_demand;
+    HydraulicDemand junction_3_demand;
     junction_3_demand.base_demand_m3_per_h = 3.6;
     junction_3.demands.append(junction_3_demand);
     
@@ -147,7 +147,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     junction_4.coordinate_wgs84.latitude_deg = 11.98200;
     junction_4.coordinate_wgs84.longitude_deg = 18.19500;
     junction_4.elevation_m = 35.0;
-    HydraulicNodeJunctionDemand junction_4_demand;
+    HydraulicDemand junction_4_demand;
     junction_4_demand.base_demand_m3_per_h = 5.4;
     junction_4.demands.append(junction_4_demand);
     
@@ -157,7 +157,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     junction_5.coordinate_wgs84.latitude_deg = 11.98038;
     junction_5.coordinate_wgs84.longitude_deg = 18.19500;
     junction_5.elevation_m = 55.0;
-    HydraulicNodeJunctionDemand junction_5_demand;
+    HydraulicDemand junction_5_demand;
     junction_5_demand.base_demand_m3_per_h = 3.6;
     junction_5.demands.append(junction_5_demand);
     
@@ -591,15 +591,15 @@ NetworkHydraulic DummyNetworks::networkFull()
     junction_pump_out.coordinate_wgs84.longitude_deg = 18.2000;
     junction_pump_out.elevation_m = 54.0;
     
-    HydraulicNodeJunctionDemand junction_pump_out_demand_1;
+    HydraulicDemand junction_pump_out_demand_1;
     junction_pump_out_demand_1.base_demand_m3_per_h = 6.0;
-    junction_pump_out_demand_1.source_method = HydraulicNodeJunctionDemandSourceMethod::ManualEstimation;
+    junction_pump_out_demand_1.source_method = HydraulicDemandSourceMethod::ManualEstimation;
     junction_pump_out_demand_1.note = "Domestic demand";
     junction_pump_out.demands.append(junction_pump_out_demand_1);
     
-    HydraulicNodeJunctionDemand junction_pump_out_demand_2;
+    HydraulicDemand junction_pump_out_demand_2;
     junction_pump_out_demand_2.base_demand_m3_per_h = 3.0;
-    junction_pump_out_demand_2.source_method = HydraulicNodeJunctionDemandSourceMethod::MeterData;
+    junction_pump_out_demand_2.source_method = HydraulicDemandSourceMethod::MeterData;
     junction_pump_out_demand_2.note = "Measured commercial demand";
     junction_pump_out.demands.append(junction_pump_out_demand_2);
     
@@ -613,9 +613,9 @@ NetworkHydraulic DummyNetworks::networkFull()
     junction_prv_out.elevation_offset_m = 1.5;
     junction_prv_out.elevation_m = 49.5;
     
-    HydraulicNodeJunctionDemand junction_prv_out_demand;
+    HydraulicDemand junction_prv_out_demand;
     junction_prv_out_demand.base_demand_m3_per_h = 5.0;
-    junction_prv_out_demand.source_method = HydraulicNodeJunctionDemandSourceMethod::Scenario;
+    junction_prv_out_demand.source_method = HydraulicDemandSourceMethod::Scenario;
     junction_prv_out.demands.append(junction_prv_out_demand);
     
     HydraulicNodeJunction junction_psv_out;
@@ -667,9 +667,9 @@ NetworkHydraulic DummyNetworks::networkFull()
     junction_loop.coordinate_wgs84.longitude_deg = 18.2070;
     junction_loop.elevation_m = 47.0;
     
-    HydraulicNodeJunctionDemand junction_loop_demand;
+    HydraulicDemand junction_loop_demand;
     junction_loop_demand.base_demand_m3_per_h = 12.0;
-    junction_loop_demand.source_method = HydraulicNodeJunctionDemandSourceMethod::ManualEstimation;
+    junction_loop_demand.source_method = HydraulicDemandSourceMethod::ManualEstimation;
     junction_loop.demands.append(junction_loop_demand);
     
     network.nodes_junctions.append(junction_pump_out);
@@ -895,10 +895,10 @@ NetworkHydraulic DummyNetworks::networkFull()
     network.links_pipes.append(closed_pipe);
     network.links_pipes.append(tank_pipe);
     
-    NetworkHydraulicCustomerPoint customer_point;
-    customer_point.uuid = QUuid::createUuid();
-    customer_point.id = "CP_FULL";
-    network.customer_points.append(customer_point);
+    HydraulicDemandPoint demand_point;
+    demand_point.uuid = QUuid::createUuid();
+    demand_point.id = "CP_FULL";
+    network.demand_points.append(demand_point);
     
     return network;
 }

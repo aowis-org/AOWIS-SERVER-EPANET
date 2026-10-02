@@ -82,7 +82,7 @@ HydraulicLinkValve replacePipeWithMetadataValve(NetworkHydraulic &network, const
     valve.setting_loss_coefficient = 3.0;
     valve.initial_status = HydraulicLinkValveInitialStatus::Open;
     valve.metadata.comment = QStringLiteral("valve export comment");
-    valve.metadata.tag = QStringLiteral("valve-tag");
+    valve.metadata.tags = {QStringLiteral("valve-tag")};
     network.links_valves.append(valve);
     return valve;
 }
@@ -283,15 +283,15 @@ void scenarioTitlesCommentsTags(TestContext &context)
     network.title_line_3 = QStringLiteral("export fidelity title line three");
 
     network.nodes_junctions.first().metadata.comment = QStringLiteral("junction export comment");
-    network.nodes_junctions.first().metadata.tag = QStringLiteral("junction-tag");
+    network.nodes_junctions.first().metadata.tags = {QString(), QStringLiteral("junction-tag"), QStringLiteral("ignored-second-tag")};
     network.nodes_reservoirs.first().metadata.comment = QStringLiteral("reservoir export comment");
-    network.nodes_reservoirs.first().metadata.tag = QStringLiteral("reservoir-tag");
+    network.nodes_reservoirs.first().metadata.tags = {QStringLiteral("reservoir-tag")};
     network.nodes_tanks.first().metadata.comment = QStringLiteral("tank export comment");
-    network.nodes_tanks.first().metadata.tag = QStringLiteral("tank-tag");
+    network.nodes_tanks.first().metadata.tags = {QStringLiteral("tank-tag")};
     network.links_pipes.first().metadata.comment = QStringLiteral("pipe export comment");
-    network.links_pipes.first().metadata.tag = QStringLiteral("pipe-tag");
+    network.links_pipes.first().metadata.tags = {QStringLiteral("pipe-tag")};
     network.links_pumps.first().metadata.comment = QStringLiteral("pump export comment");
-    network.links_pumps.first().metadata.tag = QStringLiteral("pump-tag");
+    network.links_pumps.first().metadata.tags = {QStringLiteral("pump-tag")};
     const HydraulicLinkValve valve = replacePipeWithMetadataValve(network, QStringLiteral("121"));
 
     NativeSavedProject native(network);

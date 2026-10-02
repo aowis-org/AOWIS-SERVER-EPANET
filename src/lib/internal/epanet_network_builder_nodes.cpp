@@ -97,7 +97,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
     }
     else
     {
-        const HydraulicNodeJunctionDemand &first_demand = junction.demands.first();
+        const HydraulicDemand &first_demand = junction.demands.first();
         QByteArray first_pattern_id;
         if (first_demand.pattern_mode == HydraulicTimePatternMode::Constant)
         {
@@ -131,7 +131,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addNodeJunction(const HydraulicN
 
         for (int index = 1; index < junction.demands.length(); index++)
         {
-            const HydraulicNodeJunctionDemand &demand = junction.demands.at(index);
+            const HydraulicDemand &demand = junction.demands.at(index);
             QByteArray pattern_id;
             if (demand.pattern_mode == HydraulicTimePatternMode::Constant)
             {

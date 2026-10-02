@@ -2116,8 +2116,14 @@ void scenarioImportMetadataReportFidelity(TestContext &context)
             junction->metadata.comment.toStdString(), std::string("Junction comment"),
             comparison("J1.comment"));
         context.expectEqual(
-            junction->metadata.tag.toStdString(), std::string("JunctionTag"),
-            comparison("J1.tag"));
+            static_cast<std::int64_t>(junction->metadata.tags.size()), std::int64_t{1},
+            comparison("J1.tags.size"));
+        if (!junction->metadata.tags.isEmpty())
+        {
+            context.expectEqual(
+                junction->metadata.tags.first().toStdString(), std::string("JunctionTag"),
+                comparison("J1.tags.first"));
+        }
     }
     if (reservoir != nullptr)
     {
@@ -2125,8 +2131,14 @@ void scenarioImportMetadataReportFidelity(TestContext &context)
             reservoir->metadata.comment.toStdString(), std::string("Reservoir comment"),
             comparison("R1.comment"));
         context.expectEqual(
-            reservoir->metadata.tag.toStdString(), std::string("ReservoirTag"),
-            comparison("R1.tag"));
+            static_cast<std::int64_t>(reservoir->metadata.tags.size()), std::int64_t{1},
+            comparison("R1.tags.size"));
+        if (!reservoir->metadata.tags.isEmpty())
+        {
+            context.expectEqual(
+                reservoir->metadata.tags.first().toStdString(), std::string("ReservoirTag"),
+                comparison("R1.tags.first"));
+        }
     }
     if (pipe != nullptr)
     {
@@ -2134,8 +2146,14 @@ void scenarioImportMetadataReportFidelity(TestContext &context)
             pipe->metadata.comment.toStdString(), std::string("Pipe comment"),
             comparison("P1.comment"));
         context.expectEqual(
-            pipe->metadata.tag.toStdString(), std::string("PipeTag"),
-            comparison("P1.tag"));
+            static_cast<std::int64_t>(pipe->metadata.tags.size()), std::int64_t{1},
+            comparison("P1.tags.size"));
+        if (!pipe->metadata.tags.isEmpty())
+        {
+            context.expectEqual(
+                pipe->metadata.tags.first().toStdString(), std::string("PipeTag"),
+                comparison("P1.tags.first"));
+        }
     }
 
     const HydraulicSimulationReportOptions &report = network.options_report;

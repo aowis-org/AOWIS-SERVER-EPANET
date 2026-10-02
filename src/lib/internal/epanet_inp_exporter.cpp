@@ -100,7 +100,7 @@ QString internalConstantDemandPatternId(const NetworkHydraulic &network)
     bool has_constant_demand = false;
     for (const HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (const HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (const HydraulicDemand &demand : junction.demands)
         {
             if (demand.pattern_mode == HydraulicTimePatternMode::Constant)
             {
@@ -177,7 +177,7 @@ QString preserveDemandCategories(QString inp_text, const NetworkHydraulic &netwo
     demand_lines.append(QStringLiteral(";;Junction\tDemand\tPattern\tCategory"));
     for (const HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (const HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (const HydraulicDemand &demand : junction.demands)
         {
             QString pattern_id;
             if (demand.pattern_mode == HydraulicTimePatternMode::TimePattern)

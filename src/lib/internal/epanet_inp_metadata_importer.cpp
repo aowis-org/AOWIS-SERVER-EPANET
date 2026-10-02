@@ -79,7 +79,10 @@ HydraulicSimulationStatus importMetadataForEntities(
                 QStringLiteral("Failed to read an EPANET entity tag"),
                 entity_type);
         }
-        entity.metadata.tag = QString::fromUtf8(tag);
+        entity.metadata.tags.clear();
+        const QString imported_tag = QString::fromUtf8(tag).trimmed();
+        if (!imported_tag.isEmpty())
+            entity.metadata.tags.append(imported_tag);
     }
 
     return makeEpanetSuccess();

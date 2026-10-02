@@ -328,7 +328,7 @@ NetworkHydraulic buildModel(const StressSpecification &specification, const Gene
         junction.uuid = source.uuid;
         junction.elevation_m = source.elevation_m;
 
-        HydraulicNodeJunctionDemand demand;
+        HydraulicDemand demand;
         demand.category_name = QStringLiteral("Stress demand");
         demand.base_demand_m3_per_h = source.demand_m3_per_h;
         demand.pattern_mode = HydraulicTimePatternMode::TimePattern;

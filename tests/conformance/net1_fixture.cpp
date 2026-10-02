@@ -28,7 +28,7 @@ QUuid appendJunction(NetworkHydraulic &network, const QString &id, double elevat
     junction.uuid = QUuid::createUuid();
     junction.elevation_m = feetToMetres(elevation_ft);
 
-    HydraulicNodeJunctionDemand demand;
+    HydraulicDemand demand;
     demand.category_name = QStringLiteral("Demand 1");
     demand.base_demand_m3_per_h = gallonsPerMinuteToCubicMetresPerHour(demand_gpm);
     demand.pattern_mode = HydraulicTimePatternMode::TimePattern;

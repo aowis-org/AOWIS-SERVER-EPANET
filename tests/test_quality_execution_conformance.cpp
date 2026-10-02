@@ -267,7 +267,7 @@ NetworkHydraulic qualityCancellationNetwork()
     junction.id = QStringLiteral("J1");
     junction.uuid = QUuid::createUuid();
     junction.elevation_m = 10.0;
-    HydraulicNodeJunctionDemand demand;
+    HydraulicDemand demand;
     demand.base_demand_m3_per_h = 10.0;
     junction.demands.append(demand);
     network.nodes_junctions.append(junction);

@@ -1059,7 +1059,7 @@ bool runMsxSolverDecayFixture(
 
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (HydraulicDemand &demand : junction.demands)
             demand.base_demand_m3_per_h = 0.0;
     }
     for (HydraulicLinkPump &pump : network.links_pumps)
@@ -1169,7 +1169,7 @@ bool runMsxCouplingFixture(
 
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (HydraulicDemand &demand : junction.demands)
             demand.base_demand_m3_per_h = 0.0;
     }
     for (HydraulicLinkPump &pump : network.links_pumps)
@@ -1328,7 +1328,7 @@ NetworkHydraulic moleAreaRoundTripNetwork(MultiSpeciesAreaUnits area_units)
 
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (HydraulicDemand &demand : junction.demands)
             demand.base_demand_m3_per_h = 0.0;
     }
     for (HydraulicLinkPump &pump : network.links_pumps)
@@ -1530,7 +1530,7 @@ void scenarioMsxInitialQualityPrecedenceRuntime(AowisEpanetTests::TestContext &c
 
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (HydraulicDemand &demand : junction.demands)
             demand.base_demand_m3_per_h = 0.0;
     }
     for (HydraulicLinkPump &pump : network.links_pumps)
@@ -1872,7 +1872,7 @@ bool runMsxRateUnitsDecayFixture(
 
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (HydraulicDemand &demand : junction.demands)
             demand.base_demand_m3_per_h = 0.0;
     }
     for (HydraulicLinkPump &pump : network.links_pumps)
@@ -2040,7 +2040,7 @@ void scenarioMsxKnownAnswerFractionalMicrogramDecay(AowisEpanetTests::TestContex
 
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (HydraulicDemand &demand : junction.demands)
             demand.base_demand_m3_per_h = 0.0;
     }
     for (HydraulicLinkPump &pump : network.links_pumps)
@@ -2170,7 +2170,7 @@ NetworkHydraulic parameterTermOverrideNetwork(bool pipe_override)
 
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (HydraulicDemand &demand : junction.demands)
             demand.base_demand_m3_per_h = 0.0;
     }
     for (HydraulicLinkPump &pump : network.links_pumps)
@@ -2273,7 +2273,7 @@ NetworkHydraulic hydraulicFlowExpressionNetwork(
     junction.uuid = QUuid::createUuid();
     junction.elevation_m = 0.0;
 
-    HydraulicNodeJunctionDemand demand;
+    HydraulicDemand demand;
     demand.base_demand_m3_per_h = demand_m3_per_h;
     junction.demands.append(demand);
 
@@ -2521,7 +2521,7 @@ NetworkHydraulic molecularDiffusivityLaminarNetwork(bool enable_molecular_diffus
     junction.uuid = QUuid::createUuid();
     junction.elevation_m = 0.0;
 
-    HydraulicNodeJunctionDemand demand;
+    HydraulicDemand demand;
     demand.base_demand_m3_per_h = 0.036;
     junction.demands.append(demand);
 
@@ -2836,7 +2836,7 @@ void scenarioMsxFormulaEquilibriumKnownAnswer(AowisEpanetTests::TestContext &con
 
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (HydraulicDemand &demand : junction.demands)
             demand.base_demand_m3_per_h = 0.0;
     }
     for (HydraulicLinkPump &pump : network.links_pumps)
@@ -3198,7 +3198,7 @@ void scenarioMsxMassBalanceFinalSummary(AowisEpanetTests::TestContext &context)
 
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (HydraulicDemand &demand : junction.demands)
             demand.base_demand_m3_per_h = 0.0;
     }
     for (HydraulicLinkPump &pump : network.links_pumps)
@@ -3306,7 +3306,7 @@ void scenarioMsxWallReactionKnownAnswer(AowisEpanetTests::TestContext &context)
 
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (HydraulicDemand &demand : junction.demands)
             demand.base_demand_m3_per_h = 0.0;
     }
     for (HydraulicLinkPump &pump : network.links_pumps)
@@ -3458,7 +3458,7 @@ void scenarioMsxWallSpeciesPipeOnlyResults(AowisEpanetTests::TestContext &contex
 
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
-        for (HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (HydraulicDemand &demand : junction.demands)
             demand.base_demand_m3_per_h = 0.0;
     }
     for (HydraulicLinkPump &pump : network.links_pumps)

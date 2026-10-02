@@ -68,7 +68,7 @@ NetworkHydraulic multiQualityFixtureNetwork()
     sink.id = QStringLiteral("J_SINK");
     sink.uuid = QUuid::createUuid();
     sink.elevation_m = 5.0;
-    HydraulicNodeJunctionDemand demand;
+    HydraulicDemand demand;
     demand.base_demand_m3_per_h = 12.0;
     sink.demands.append(demand);
 

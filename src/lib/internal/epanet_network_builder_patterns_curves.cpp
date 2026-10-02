@@ -73,7 +73,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::configureConstantDemandPattern(c
     bool needs_constant_pattern = false;
     for (const HydraulicNodeJunction &junction : request.nodes_junctions)
     {
-        for (const HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (const HydraulicDemand &demand : junction.demands)
         {
             if (demand.pattern_mode == HydraulicTimePatternMode::Constant)
             {

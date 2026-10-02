@@ -50,7 +50,7 @@ QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulic &netw
     for (const HydraulicNodeJunction &junction : enabled_network.nodes_junctions)
     {
         validate_quality_source_pattern(junction.quality_source, HydraulicSimulationStatusEntityType::Junction, junction.id, junction.uuid);
-        for (const HydraulicNodeJunctionDemand &demand : junction.demands)
+        for (const HydraulicDemand &demand : junction.demands)
         {
             if (demand.pattern_mode != HydraulicTimePatternMode::TimePattern)
                 continue;

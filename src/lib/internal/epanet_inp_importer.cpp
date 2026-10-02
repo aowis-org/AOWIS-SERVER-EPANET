@@ -1306,7 +1306,7 @@ HydraulicSimulationStatus importJunction(
 
     for (int demand_index = 1; demand_index <= demand_count; demand_index++)
     {
-        HydraulicNodeJunctionDemand demand;
+        HydraulicDemand demand;
         double base_demand = 0.0;
         error = EN_getbasedemand(project.handle(), node_index, demand_index, &base_demand);
         if (error != 0)
