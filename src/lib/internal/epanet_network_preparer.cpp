@@ -1,4 +1,5 @@
 #include "epanet_network_preparer.h"
+#include "hydraulic_node_demand_projection.h"
 #include "epanet_network_validator.h"
 #include "epanet_status_helpers.h"
 
@@ -80,15 +81,35 @@ HydraulicSimulationStatus prepareEpanetNetwork(
     if (!status.success)
         return status;
 
-    prepared = source;
+    NetworkHydraulic enabled_network = source;
 
-    prepared.nodes_junctions = enabledEntities(source.nodes_junctions);
-    prepared.nodes_reservoirs = enabledEntities(source.nodes_reservoirs);
-    prepared.nodes_tanks = enabledEntities(source.nodes_tanks);
+    enabled_network.nodes_junctions = enabledEntities(source.nodes_junctions);
+    enabled_network.nodes_reservoirs = enabledEntities(source.nodes_reservoirs);
+    enabled_network.nodes_tanks = enabledEntities(source.nodes_tanks);
+    enabled_network.demand_points = enabledEntities(source.demand_points);
 
-    prepared.links_pipes = enabledEntities(source.links_pipes);
-    prepared.links_pumps = enabledEntities(source.links_pumps);
-    prepared.links_valves = enabledEntities(source.links_valves);
+    enabled_network.links_pipes = enabledEntities(source.links_pipes);
+    enabled_network.links_pumps = enabledEntities(source.links_pumps);
+    enabled_network.links_valves = enabledEntities(source.links_valves);
+
+    status = buildHydraulicNodeDemandProjection(enabled_network, prepared);
+    if (!status.success)
+    {
+        if (validation_failures != nullptr)
+            validation_failures->append(status);
+        return status;
+    }
+
+    // Validate the projected junction demands as ordinary solver-facing demands.
+    // This catches pattern references and numeric constraints after projection.
+    QList<HydraulicSimulationStatus> projected_validation_failures;
+    status = validateEpanetNetwork(prepared, &projected_validation_failures);
+    if (!status.success)
+    {
+        if (validation_failures != nullptr)
+            validation_failures->append(projected_validation_failures);
+        return status;
+    }
 
     const QSet<QUuid> all_node_uuids = nodeUuids(source);
     const QSet<QUuid> enabled_node_uuids = nodeUuids(prepared);

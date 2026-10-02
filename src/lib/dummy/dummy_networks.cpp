@@ -897,7 +897,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     
     HydraulicDemandPoint demand_point;
     demand_point.uuid = QUuid::createUuid();
-    demand_point.id = "CP_FULL";
+    demand_point.id = "DP_FULL";
     network.demand_points.append(demand_point);
     
     return network;

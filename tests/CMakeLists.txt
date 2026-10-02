@@ -53,6 +53,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-hydraulic-saved-file-reuse
     conformance-upstream-junction-reservoir-inputs
     conformance-upstream-demand-categories
+    conformance-demand-point-node-projection
     conformance-upstream-tank-uniform-area
     conformance-upstream-tank-volume-at-max
     conformance-upstream-tank-volume-curve

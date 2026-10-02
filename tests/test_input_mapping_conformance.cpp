@@ -21,6 +21,7 @@
 namespace
 {
 using AowisEpanetTests::ComparisonContext;
+using AowisEpanetTests::HydraulicQuantity;
 using AowisEpanetTests::NativeHydraulicResult;
 using AowisEpanetTests::NativeHydraulicTimeline;
 using AowisEpanetTests::NativeJunctionResult;
@@ -463,6 +464,143 @@ void testPipeInputs(TestContext &context)
     compareWithWrapper(fixture, native_timeline, context);
 }
 
+
+void testDemandPointNodeProjection(TestContext &context)
+{
+    Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
+    fixture.network.duration_s = 0;
+
+    HydraulicNodeJunction *junction_11 = findModelJunction(fixture.network, QStringLiteral("11"));
+    HydraulicNodeJunction *junction_12 = findModelJunction(fixture.network, QStringLiteral("12"));
+    context.expect(junction_11 != nullptr, "demand-point projection fixture must contain junction 11");
+    context.expect(junction_12 != nullptr, "demand-point projection fixture must contain junction 12");
+    if (junction_11 == nullptr || junction_12 == nullptr)
+        return;
+
+    HydraulicLinkPipe *pipe_11 = nullptr;
+    for (HydraulicLinkPipe &pipe : fixture.network.links_pipes)
+    {
+        if (pipe.id == QStringLiteral("11"))
+        {
+            pipe_11 = &pipe;
+            break;
+        }
+    }
+    context.expect(pipe_11 != nullptr, "demand-point projection fixture must contain pipe 11");
+    if (pipe_11 == nullptr)
+        return;
+
+    HydraulicDemand demand;
+    demand.category_name = QStringLiteral("Demand point attachment");
+    demand.base_demand_m3_per_h = 10.0;
+    demand.pattern_mode = HydraulicTimePatternMode::Constant;
+    demand.source_method = HydraulicDemandSourceMethod::MeterData;
+    demand.note = QStringLiteral("Projection provenance must survive scaling");
+
+    HydraulicDemandPoint pipe_demand_point;
+    pipe_demand_point.id = QStringLiteral("DP_PIPE");
+    pipe_demand_point.uuid = QUuid::createUuid();
+    pipe_demand_point.coordinate_wgs84.longitude_deg = 18.0;
+    pipe_demand_point.coordinate_wgs84.latitude_deg = 12.0;
+    pipe_demand_point.demands.append(demand);
+    pipe_demand_point.attachment.type = HydraulicDemandPointAttachmentType::Pipe;
+    pipe_demand_point.attachment.pipe_uuid = pipe_11->uuid;
+    pipe_demand_point.attachment.pipe_position = 0.25;
+
+    HydraulicDemandPoint junction_demand_point;
+    junction_demand_point.id = QStringLiteral("DP_JUNCTION");
+    junction_demand_point.uuid = QUuid::createUuid();
+    junction_demand_point.coordinate_wgs84.longitude_deg = 18.1;
+    junction_demand_point.coordinate_wgs84.latitude_deg = 12.1;
+    junction_demand_point.demands.append(demand);
+    junction_demand_point.attachment.type = HydraulicDemandPointAttachmentType::Junction;
+    junction_demand_point.attachment.junction_uuid = junction_12->uuid;
+
+    NetworkHydraulic equivalent_direct_network = fixture.network;
+    HydraulicNodeJunction *equivalent_junction_11 =
+        findModelJunction(equivalent_direct_network, QStringLiteral("11"));
+    HydraulicNodeJunction *equivalent_junction_12 =
+        findModelJunction(equivalent_direct_network, QStringLiteral("12"));
+    context.expect(equivalent_junction_11 != nullptr,
+        "equivalent direct-demand fixture must contain junction 11");
+    context.expect(equivalent_junction_12 != nullptr,
+        "equivalent direct-demand fixture must contain junction 12");
+    if (equivalent_junction_11 == nullptr || equivalent_junction_12 == nullptr)
+        return;
+
+    HydraulicDemand pipe_demand_from = demand;
+    pipe_demand_from.base_demand_m3_per_h *= 0.75;
+    equivalent_junction_11->demands.append(pipe_demand_from);
+
+    HydraulicDemand pipe_demand_to = demand;
+    pipe_demand_to.base_demand_m3_per_h *= 0.25;
+    equivalent_junction_12->demands.append(pipe_demand_to);
+
+    HydraulicDemand junction_demand = demand;
+    equivalent_junction_12->demands.append(junction_demand);
+
+    fixture.network.demand_points.append(pipe_demand_point);
+    fixture.network.demand_points.append(junction_demand_point);
+
+    const EpanetResultInp projected_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(fixture.network));
+    const EpanetResultInp direct_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(equivalent_direct_network));
+
+    context.expect(projected_inp.status.success,
+        "demand-point attachment projection must produce a valid EPANET input model");
+    context.expect(direct_inp.status.success,
+        "equivalent direct junction demands must produce a valid EPANET input model");
+    if (projected_inp.status.success && direct_inp.status.success)
+    {
+        context.expect(
+            projected_inp.inp_text == direct_inp.inp_text,
+            "pipe and junction demand-point attachments must resolve to the same EPANET model as equivalent direct junction demands");
+        context.expect(!projected_inp.inp_text.contains(pipe_demand_point.id),
+            "pipe-attached demand-point identity must not leak into the solver-facing EPANET model");
+        context.expect(!projected_inp.inp_text.contains(junction_demand_point.id),
+            "junction-attached demand-point identity must not leak into the solver-facing EPANET model");
+    }
+
+    NetworkHydraulic disabled_network = fixture.network;
+    disabled_network.demand_points.first().metadata.enabled = false;
+    disabled_network.demand_points.last().metadata.enabled = false;
+    const EpanetResultInp disabled_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(disabled_network));
+    Net1Fixture baseline_fixture = AowisEpanetTests::makeNet1Fixture();
+    baseline_fixture.network.duration_s = 0;
+    const EpanetResultInp baseline_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(baseline_fixture.network));
+    context.expect(disabled_inp.status.success,
+        "disabled demand points must be ignored by solver projection");
+    context.expect(baseline_inp.status.success,
+        "baseline demand-point comparison input must be valid");
+    if (disabled_inp.status.success && baseline_inp.status.success)
+    {
+        context.expect(
+            disabled_inp.inp_text == baseline_inp.inp_text,
+            "disabled demand points must not alter the solver-facing model");
+    }
+
+    NetworkHydraulic unattached_network = fixture.network;
+    unattached_network.demand_points.first().attachment =
+        HydraulicDemandPointAttachment();
+    const EpanetResultInp unattached_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(unattached_network));
+    context.expect(!unattached_inp.status.success,
+        "enabled demand point with hydraulic demand but without attachment must be rejected");
+    context.expect(
+        unattached_inp.status.entity.type == HydraulicSimulationStatusEntityType::DemandPoint,
+        "invalid demand-point projection must identify the demand point as the failing entity type");
+
+    NetworkHydraulic invalid_position_network = fixture.network;
+    invalid_position_network.demand_points.first().attachment.pipe_position = 1.5;
+    const EpanetResultInp invalid_position_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(invalid_position_network));
+    context.expect(!invalid_position_inp.status.success,
+        "demand-point pipe positions outside the normalized range must be rejected");
+}
+
 void configureFormulaFixture(Net1Fixture &fixture, HydraulicHeadlossFormula formula, double default_roughness, double pipe_10_roughness)
 {
     fixture.network.duration_s = 0;
@@ -523,6 +661,11 @@ void registerInputMappingScenarios(ScenarioRegistry &registry)
         "Ports multiple junction demand categories with independent patterned and constant modes and compares the complete hydraulic timeline.",
         {"conformance", "hydraulic", "upstream", "junction", "demand"},
         &testDemandCategories});
+    registry.add(ScenarioDefinition{
+        "conformance-demand-point-node-projection",
+        "Projects Demand Point pipe/junction attachments into transient junction demands before the EPANET-specific build and rejects invalid attachments.",
+        {"conformance", "hydraulic", "demand-point", "projection"},
+        &testDemandPointNodeProjection});
     registry.add(ScenarioDefinition{
         "conformance-upstream-tank-uniform-area",
         "Exercises the AOWIS uniform-cross-section tank geometry resolver against an equivalent native EPANET tank.",

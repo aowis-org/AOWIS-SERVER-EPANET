@@ -1,16 +1,22 @@
 # AOWIS hydraulic and water-quality model-field conformance policy.
 # Format: header|struct|fields_csv|state|evidence_scenarios_csv|note
-# States: complete, excluded-non-epanet, excluded-runtime-metadata
-@headers|hydraulic_types.h,hydraulic_nodes.h,hydraulic_links.h,hydraulic_curves.h,hydraulic_controls.h,hydraulic_simulation_options.h,hydraulic_simulation_results.h,water_quality_simulation_results.h,hydraulic_simulation_status.h,hydraulic_simulation_diagnostics.h,hydraulic_map.h,network_hydraulic.h
-hydraulic_types.h|HydraulicEntityMetadata|enabled|complete|conformance-negative-disabled-entity-pruning|
-hydraulic_types.h|HydraulicEntityMetadata|model_role,date_added,date_installed|excluded-non-epanet||AOWIS lifecycle/presentation metadata is not an EPANET simulation input.
-hydraulic_types.h|HydraulicEntityMetadata|comment,tag|complete|conformance-export-titles-comments-tags,conformance-import-metadata-report-fidelity|
+# States: complete, excluded-non-epanet, excluded-runtime-metadata, in-progress
+@headers|entity.h,hydraulic_types.h,hydraulic_demands.h,hydraulic_demand_point.h,hydraulic_nodes.h,hydraulic_links.h,hydraulic_curves.h,hydraulic_controls.h,hydraulic_simulation_options.h,hydraulic_simulation_results.h,water_quality_simulation_results.h,hydraulic_simulation_status.h,hydraulic_simulation_diagnostics.h,hydraulic_map.h,network_hydraulic.h
+entity.h|EntityMetadata|enabled|complete|conformance-negative-disabled-entity-pruning,conformance-demand-point-node-projection|
+entity.h|EntityMetadata|model_role,date_added,date_installed,description|excluded-non-epanet||AOWIS lifecycle and descriptive metadata is not an EPANET simulation input.
+entity.h|EntityMetadata|comment|complete|conformance-export-titles-comments-tags,conformance-import-metadata-report-fidelity|
+entity.h|EntityMetadata|tags|in-progress||AOWIS supports multiple tags while EPANET exposes one tag per node/link. The adapter maps the first non-empty AOWIS tag.
 hydraulic_types.h|HydraulicLinkVertex|coordinate_wgs84|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84|
 hydraulic_types.h|HydraulicNodeQualitySource|type,chemical_concentration_mg_per_l,chemical_mass_flow_mg_per_min,pattern_uuid|complete|conformance-quality-input-chemical|Typed water-quality source configuration maps to EPANET source type, strength, and optional pattern.
 hydraulic_types.h|WaterQualityBulkReaction|coefficient,order|complete|conformance-quality-input-chemical|Bulk reaction coefficient and network-wide-compatible order map to EPANET reaction configuration.
 hydraulic_types.h|WaterQualityWallReaction|coefficient,order|complete|conformance-quality-input-chemical|Wall reaction coefficient and EPANET-compatible wall order map to reaction configuration.
-hydraulic_nodes.h|HydraulicDemand|category_name,base_demand_m3_per_h,pattern_mode,pattern_uuid|complete|conformance-upstream-demand-categories,conformance-upstream-demand-pattern|
-hydraulic_nodes.h|HydraulicDemand|source_method,note|excluded-non-epanet||Demand provenance/note metadata is not an EPANET hydraulic input.
+hydraulic_demands.h|HydraulicDemand|category_name,base_demand_m3_per_h,pattern_mode,pattern_uuid|complete|conformance-upstream-demand-categories,conformance-upstream-demand-pattern,conformance-demand-point-node-projection|
+hydraulic_demands.h|HydraulicDemand|source_method,note|excluded-non-epanet||Demand provenance/note metadata is retained by AOWIS but is not an EPANET hydraulic input.
+hydraulic_demand_point.h|HydraulicDemandPoint|id,uuid|excluded-non-epanet||Demand-point identity remains in the AOWIS model and diagnostics but is not emitted as an EPANET entity.
+hydraulic_demand_point.h|HydraulicDemandPointAttachment|type,pipe_uuid,pipe_position,junction_uuid|complete|conformance-demand-point-node-projection|Junction attachments map directly, while pipe attachments are projected to endpoint junctions by normalized pipe position.
+hydraulic_demand_point.h|HydraulicDemandPoint|coordinate_wgs84|excluded-non-epanet||Demand-point coordinates describe the real demand location, while the separate network attachment defines solver projection.
+hydraulic_demand_point.h|HydraulicDemandPoint|attachment,demands,metadata|complete|conformance-demand-point-node-projection|
+hydraulic_demand_point.h|HydraulicDemandPoint|meter|excluded-non-epanet||The optional primary consumption meter is AOWIS measurement/device data and is not a direct EPANET hydraulic input.
 hydraulic_nodes.h|HydraulicNodeJunction|id,uuid|complete|conformance-net1,conformance-negative-duplicate-node-id,conformance-negative-duplicate-uuid|
 hydraulic_nodes.h|HydraulicNodeJunction|coordinate_wgs84|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84,conformance-import-geometry-missing-layout|
 hydraulic_nodes.h|HydraulicNodeJunctionEmitter|coefficient,pressure_exponent|complete|conformance-upstream-junction-reservoir-inputs,conformance-negative-invalid-emitter-configuration|
@@ -133,7 +139,6 @@ hydraulic_simulation_diagnostics.h|HydraulicSimulationDiagnostic|severity,stage,
 hydraulic_map.h|HydraulicMapLabel|id,uuid|excluded-non-epanet||AOWIS map-label identity is not serialized by EPANET.
 hydraulic_map.h|HydraulicMapLabel|coordinate_wgs84,text,anchor_node_uuid|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84,conformance-negative-invalid-map-numeric,conformance-negative-missing-map-label-anchor|
 hydraulic_map.h|HydraulicMapBackdrop|enabled,lower_left_wgs84,upper_right_wgs84,file,offset_longitude_deg,offset_latitude_deg|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84|
-network_hydraulic.h|HydraulicDemandPoint|id,uuid|excluded-non-epanet||Customer-point identity is application metadata, hydraulic demands are represented on junctions.
 network_hydraulic.h|NetworkHydraulic|id,uuid|excluded-non-epanet||Network application identity is not an EPANET simulation input.
 network_hydraulic.h|NetworkHydraulic|title_line_1,title_line_2,title_line_3|complete|conformance-export-titles-comments-tags,conformance-import-project-globals-net1,conformance-import-metadata-report-fidelity|
 network_hydraulic.h|NetworkHydraulic|duration_s|complete|conformance-options-time-duration|
@@ -157,4 +162,4 @@ network_hydraulic.h|NetworkHydraulic|nodes_reservoirs,nodes_junctions,nodes_tank
 network_hydraulic.h|NetworkHydraulic|controls_simple|complete|conformance-controls-simple-low-level,conformance-controls-simple-disabled|
 network_hydraulic.h|NetworkHydraulic|controls_rules|complete|conformance-controls-rule-logical-if,conformance-controls-rule-disabled|
 network_hydraulic.h|NetworkHydraulic|map_labels,map_backdrop|complete|conformance-export-coordinates-vertices|
-network_hydraulic.h|NetworkHydraulic|demand_points|excluded-non-epanet||Application/customer-point data is outside EPANET hydraulic semantics.
+network_hydraulic.h|NetworkHydraulic|demand_points|complete|conformance-demand-point-node-projection|Demand Points are resolved into transient junction demands before the EPANET-specific build.
