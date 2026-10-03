@@ -58,6 +58,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-upstream-tank-volume-at-max
     conformance-upstream-tank-volume-curve
     conformance-upstream-pipe-inputs
+    conformance-pipe-material-roughness-resolution
     conformance-upstream-pipe-darcy-weisbach
     conformance-upstream-pipe-chezy-manning
     conformance-upstream-pump-three-point
@@ -169,6 +170,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-import-project-globals-canonical-units
     conformance-import-core-topology-net1
     conformance-import-core-topology-canonical-units
+    conformance-import-junction-demand-presence-fidelity
     conformance-import-hydraulic-assets-net1
     conformance-import-patterns-curves-pumps-canonical-units
     conformance-import-valves-canonical-units
@@ -379,6 +381,7 @@ target_compile_definitions(aowis-server-epanet-conformance-tests
         AOWIS_EPANET_TEST_UPSTREAM_NETWORK_BUILDER_SMALL_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/upstream_netbuilder_test2.inp"
         AOWIS_EPANET_TEST_IMPORT_GLOBAL_OPTIONS_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_global_options_us.inp"
         AOWIS_EPANET_TEST_IMPORT_CORE_TOPOLOGY_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_core_topology_us.inp"
+        AOWIS_EPANET_TEST_IMPORT_JUNCTION_DEMAND_PRESENCE_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_junction_demand_presence.inp"
         AOWIS_EPANET_TEST_IMPORT_PUMPS_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_patterns_curves_pumps_us.inp"
         AOWIS_EPANET_TEST_IMPORT_VALVES_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_valves_us.inp"
         AOWIS_EPANET_TEST_IMPORT_CONTROLS_RULES_US_INP="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/inp/import_controls_rules_us.inp"

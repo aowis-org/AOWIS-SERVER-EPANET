@@ -98,6 +98,82 @@ HydraulicSimulationStatus appendScaledDemands(
 
     return successStatus();
 }
+
+bool demandProjectionKeyMatches(
+    const HydraulicDemand &left,
+    const HydraulicDemand &right)
+{
+    if (left.category_name != right.category_name
+        || left.pattern_mode != right.pattern_mode)
+    {
+        return false;
+    }
+
+    if (left.pattern_mode == HydraulicTimePatternMode::Constant)
+        return true;
+    return left.pattern_uuid == right.pattern_uuid;
+}
+
+HydraulicSimulationStatus aggregateProjectedDemands(
+    const NetworkHydraulic &source,
+    NetworkHydraulic &projected)
+{
+    QHash<QUuid, qsizetype> original_demand_counts;
+    original_demand_counts.reserve(source.nodes_junctions.size());
+    for (const HydraulicNodeJunction &junction : source.nodes_junctions)
+        original_demand_counts.insert(junction.uuid, junction.demands.size());
+
+    for (HydraulicNodeJunction &junction : projected.nodes_junctions)
+    {
+        const qsizetype original_count = original_demand_counts.value(
+            junction.uuid, junction.demands.size());
+        if (junction.demands.size() <= original_count + 1)
+            continue;
+
+        QList<HydraulicDemand> compacted;
+        compacted.reserve(junction.demands.size());
+        for (qsizetype demand_index = 0; demand_index < original_count; ++demand_index)
+            compacted.append(junction.demands.at(demand_index));
+
+        for (qsizetype demand_index = original_count;
+             demand_index < junction.demands.size(); ++demand_index)
+        {
+            const HydraulicDemand &candidate = junction.demands.at(demand_index);
+            bool merged = false;
+            for (qsizetype compacted_index = original_count;
+                 compacted_index < compacted.size(); ++compacted_index)
+            {
+                HydraulicDemand &aggregate = compacted[compacted_index];
+                if (!demandProjectionKeyMatches(aggregate, candidate))
+                    continue;
+
+                aggregate.base_demand_m3_per_h += candidate.base_demand_m3_per_h;
+                if (!std::isfinite(aggregate.base_demand_m3_per_h))
+                {
+                    HydraulicSimulationStatus status;
+                    status.success = false;
+                    status.stage = HydraulicSimulationStatusStage::BuildNetwork;
+                    status.operation = HydraulicSimulationStatusOperation::AddDemand;
+                    status.entity.type = HydraulicSimulationStatusEntityType::Junction;
+                    status.entity.id = junction.id;
+                    status.entity.uuid = junction.uuid;
+                    status.message = QStringLiteral(
+                        "Projected demand aggregation overflowed a junction demand");
+                    return status;
+                }
+                merged = true;
+                break;
+            }
+
+            if (!merged)
+                compacted.append(candidate);
+        }
+
+        junction.demands = compacted;
+    }
+
+    return successStatus();
+}
 }
 
 HydraulicSimulationStatus buildHydraulicNodeDemandProjection(
@@ -245,6 +321,11 @@ HydraulicSimulationStatus buildHydraulicNodeDemandProjection(
         if (!status.success)
             return status;
     }
+
+    HydraulicSimulationStatus aggregation_status = aggregateProjectedDemands(
+        source, projected);
+    if (!aggregation_status.success)
+        return aggregation_status;
 
     // The projection is solver-facing. Demand points remain only in the source model
     // and must never be forwarded as duplicate solver entities.

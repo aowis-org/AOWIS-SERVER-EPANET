@@ -55,6 +55,38 @@ bool hasDiagnosticContaining(const EpanetResultImport &result, const QString &te
     return false;
 }
 
+
+bool sectionContainsEntityLine(
+    const QString &inp_text,
+    const QString &section_name,
+    const QString &entity_id)
+{
+    QString current_section;
+    const QStringList lines = inp_text.split(QLatin1Char('\n'));
+    for (QString line : lines)
+    {
+        const qsizetype comment_index = line.indexOf(QLatin1Char(';'));
+        if (comment_index >= 0)
+            line.truncate(comment_index);
+        line = line.trimmed();
+        if (line.isEmpty())
+            continue;
+
+        if (line.startsWith(QLatin1Char('[')) && line.endsWith(QLatin1Char(']')))
+        {
+            current_section = line.mid(1, line.size() - 2).trimmed();
+            continue;
+        }
+        if (current_section.compare(section_name, Qt::CaseInsensitive) != 0)
+            continue;
+
+        const QStringList tokens = line.simplified().split(QLatin1Char(' '));
+        if (!tokens.isEmpty() && tokens.first() == entity_id)
+            return true;
+    }
+    return false;
+}
+
 ComparisonContext comparison(std::string field)
 {
     ComparisonContext value;
@@ -869,6 +901,9 @@ void scenarioImportPatternsCurvesPumpsCanonicalUnits(TestContext &context)
         context.expect(pump_2->definition_type == HydraulicLinkPumpDefinitionType::ConstantPower, "P2 must retain constant-power definition");
         context.expectNear(pump_2->constant_power_kw, 25.0 * 0.7457, numeric_tolerance, comparison("P2.power"));
         context.expectNear(pump_2->initial_speed_ratio, 1.1, numeric_tolerance, comparison("P2.speed"));
+        context.expect(
+            pump_2->initial_status == HydraulicLinkPumpInitialStatus::Off,
+            "P2 must preserve Closed status independently from nominal SPEED 1.1");
         context.expect(pump_2->energy_price_input_type == HydraulicLinkPumpEnergyPriceInputType::Constant, "P2 must retain constant pump-specific energy price");
         context.expectNear(pump_2->energy_price_per_kw_h, 0.30, numeric_tolerance, comparison("P2.energy_price"));
     }
@@ -2356,6 +2391,92 @@ void scenarioImportReportSettingThresholdDiagnostic(TestContext &context)
         "non-canonical SETTING threshold must not be silently replayed with incorrect units");
 }
 
+
+void scenarioImportJunctionDemandPresenceFidelity(TestContext &context)
+{
+    const EpanetResultImport result = EpanetRunner().importInp(
+        QStringLiteral(AOWIS_EPANET_TEST_IMPORT_JUNCTION_DEMAND_PRESENCE_INP));
+
+    context.expect(result.status.success, "junction demand-presence fixture must import successfully");
+    if (!result.status.success)
+        return;
+
+    const HydraulicNodeJunction *junction_none = junctionById(
+        result.request.network, QStringLiteral("J_NONE"));
+    const HydraulicNodeJunction *junction_zero = junctionById(
+        result.request.network, QStringLiteral("J_ZERO"));
+    const HydraulicNodeJunction *junction_section = junctionById(
+        result.request.network, QStringLiteral("J_SECTION"));
+
+    context.expect(junction_none != nullptr, "J_NONE must import");
+    context.expect(junction_zero != nullptr, "J_ZERO must import");
+    context.expect(junction_section != nullptr, "J_SECTION must import");
+
+    if (junction_none != nullptr)
+    {
+        context.expectEqual(
+            static_cast<std::int64_t>(junction_none->demands.size()),
+            std::int64_t{0},
+            comparison("J_NONE.demands.size"));
+    }
+
+    if (junction_zero != nullptr)
+    {
+        context.expectEqual(
+            static_cast<std::int64_t>(junction_zero->demands.size()),
+            std::int64_t{1},
+            comparison("J_ZERO.demands.size"));
+        if (!junction_zero->demands.isEmpty())
+        {
+            context.expectNear(
+                junction_zero->demands.first().base_demand_m3_per_h,
+                0.0,
+                numeric_tolerance,
+                comparison("J_ZERO.demands[0].base_demand_m3_per_h"));
+        }
+    }
+
+    if (junction_section != nullptr)
+    {
+        context.expectEqual(
+            static_cast<std::int64_t>(junction_section->demands.size()),
+            std::int64_t{1},
+            comparison("J_SECTION.demands.size"));
+        if (!junction_section->demands.isEmpty())
+        {
+            context.expectNear(
+                junction_section->demands.first().base_demand_m3_per_h,
+                0.0,
+                numeric_tolerance,
+                comparison("J_SECTION.demands[0].base_demand_m3_per_h"));
+        }
+    }
+
+    const EpanetResultInp exported = EpanetRunner().retrieveInp(result.request);
+    context.expect(exported.status.success, "junction demand-presence fixture must export successfully");
+    if (exported.status.success)
+    {
+        context.expect(
+            !sectionContainsEntityLine(
+                exported.inp_text,
+                QStringLiteral("DEMANDS"),
+                QStringLiteral("J_NONE")),
+            "junction without a source demand must not acquire a synthetic zero demand on export");
+        context.expect(
+            sectionContainsEntityLine(
+                exported.inp_text,
+                QStringLiteral("DEMANDS"),
+                QStringLiteral("J_ZERO")),
+            "explicit zero demand from [JUNCTIONS] must remain represented on export");
+        context.expect(
+            sectionContainsEntityLine(
+                exported.inp_text,
+                QStringLiteral("DEMANDS"),
+                QStringLiteral("J_SECTION")),
+            "explicit zero demand from [DEMANDS] must remain represented on export");
+    }
+}
+
 void scenarioImportOpenErrorDiagnostic(TestContext &context)
 {
     const EpanetResultImport result = EpanetRunner().importInp(
@@ -2395,6 +2516,11 @@ void registerInpImportScenarios(ScenarioRegistry &registry)
         "Imports demands, emitter data, tank geometry, pipe status, Darcy-Weisbach roughness, and leakage from US customary source units into canonical AOWIS fields.",
         {"conformance", "import", "hydraulic"},
         &scenarioImportCoreTopologyCanonicalUnits});
+    registry.add(ScenarioDefinition{
+        "conformance-import-junction-demand-presence-fidelity",
+        "Preserves the distinction between junctions with no source demand and explicitly authored zero-demand categories.",
+        {"conformance", "import", "hydraulic"},
+        &scenarioImportJunctionDemandPresenceFidelity});
     registry.add(ScenarioDefinition{
         "conformance-import-hydraulic-assets-net1",
         "Imports Net1 patterns, pump head curve, and pump references with UUID-resolved reference integrity.",

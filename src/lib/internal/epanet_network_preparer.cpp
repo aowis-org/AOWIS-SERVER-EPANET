@@ -3,8 +3,11 @@
 #include "epanet_network_validator.h"
 #include "epanet_status_helpers.h"
 
+#include <QDate>
 #include <QList>
 #include <QSet>
+
+#include <cmath>
 
 namespace
 {
@@ -51,6 +54,125 @@ QSet<QUuid> linkUuids(const NetworkHydraulic &network)
     return uuids;
 }
 
+const HydraulicPipeMaterial *pipeMaterialByUuid(
+    const NetworkHydraulic &network, const QUuid &uuid)
+{
+    for (const HydraulicPipeMaterial &material : network.pipe_materials)
+    {
+        if (material.uuid == uuid)
+            return &material;
+    }
+
+    return nullptr;
+}
+
+HydraulicSimulationStatus pipeMaterialFailure(
+    const HydraulicLinkPipe &pipe,
+    const QString &message,
+    const QStringList &details = QStringList())
+{
+    HydraulicSimulationStatus status;
+    status.success = false;
+    status.stage = HydraulicSimulationStatusStage::BuildNetwork;
+    status.operation = HydraulicSimulationStatusOperation::ResolveEntity;
+    status.entity.type = HydraulicSimulationStatusEntityType::Pipe;
+    status.entity.id = pipe.id;
+    status.entity.uuid = pipe.uuid;
+    status.message = message;
+    status.details = details;
+    return status;
+}
+
+HydraulicSimulationStatus resolveMaterialLibraryRoughness(
+    const NetworkHydraulic &source, NetworkHydraulic &resolved)
+{
+    resolved = source;
+    const QDate reference_date = QDate::currentDate();
+
+    for (HydraulicLinkPipe &pipe : resolved.links_pipes)
+    {
+        if (!pipe.metadata.enabled
+            || pipe.roughness_mode != HydraulicPipeRoughnessMode::MaterialLibrary)
+        {
+            continue;
+        }
+
+        if (pipe.material_uuid.isNull())
+        {
+            return pipeMaterialFailure(
+                pipe,
+                QStringLiteral("Pipe material-library roughness requires a material"));
+        }
+
+        const HydraulicPipeMaterial *material = pipeMaterialByUuid(source, pipe.material_uuid);
+        if (material == nullptr)
+        {
+            return pipeMaterialFailure(
+                pipe,
+                QStringLiteral("Pipe references a material that is not present in the network material library"),
+                {QStringLiteral("material_uuid: %1")
+                     .arg(pipe.material_uuid.toString(QUuid::WithoutBraces))});
+        }
+
+        if (!pipe.metadata.date_installed.has_value())
+        {
+            return pipeMaterialFailure(
+                pipe,
+                QStringLiteral("Pipe material-library roughness requires an installation date"),
+                {QStringLiteral("material: %1").arg(material->id)});
+        }
+
+        const std::optional<int> age_years = hydraulicPipeAgeYears(
+            pipe.metadata.date_installed.value(), reference_date);
+        if (!age_years.has_value())
+        {
+            return pipeMaterialFailure(
+                pipe,
+                QStringLiteral("Pipe installation date is invalid for material-library roughness"),
+                {QStringLiteral("material: %1").arg(material->id),
+                 QStringLiteral("date_installed: %1")
+                     .arg(pipe.metadata.date_installed->toString(Qt::ISODate)),
+                 QStringLiteral("reference_date: %1").arg(reference_date.toString(Qt::ISODate))});
+        }
+
+        const std::optional<double> roughness = resolveHydraulicPipeMaterialRoughness(
+            *material, source.options_hydraulic.headloss_formula, age_years.value());
+        if (!roughness.has_value())
+        {
+            return pipeMaterialFailure(
+                pipe,
+                QStringLiteral("No applicable material roughness is defined for the pipe age and active headloss formula"),
+                {QStringLiteral("material: %1").arg(material->id),
+                 QStringLiteral("pipe_age_years: %1").arg(age_years.value())});
+        }
+
+        if (!std::isfinite(roughness.value()) || roughness.value() <= 0.0)
+        {
+            return pipeMaterialFailure(
+                pipe,
+                QStringLiteral("Resolved material roughness must be finite and greater than zero"),
+                {QStringLiteral("material: %1").arg(material->id),
+                 QStringLiteral("pipe_age_years: %1").arg(age_years.value()),
+                 QStringLiteral("roughness: %1").arg(roughness.value(), 0, 'g', 17)});
+        }
+
+        switch (source.options_hydraulic.headloss_formula)
+        {
+        case HydraulicHeadlossFormula::HazenWilliams:
+            pipe.roughness_hazen_williams = roughness.value();
+            break;
+        case HydraulicHeadlossFormula::DarcyWeisbach:
+            pipe.roughness_darcy_weisbach_mm = roughness.value();
+            break;
+        case HydraulicHeadlossFormula::ChezyManning:
+            pipe.roughness_chezy_manning = roughness.value();
+            break;
+        }
+    }
+
+    return makeEpanetSuccess();
+}
+
 void removeDisabledReportSelections(HydraulicSimulationReportSelection &selection, const QSet<QUuid> &all_uuids, const QSet<QUuid> &enabled_uuids)
 {
     if (selection.mode != HydraulicSimulationReportSelectionMode::Selected)
@@ -77,20 +199,29 @@ HydraulicSimulationStatus prepareEpanetNetwork(
     NetworkHydraulic &prepared,
     QList<HydraulicSimulationStatus> *validation_failures)
 {
-    HydraulicSimulationStatus status = validateEpanetNetwork(source, validation_failures);
+    NetworkHydraulic resolved_source;
+    HydraulicSimulationStatus status = resolveMaterialLibraryRoughness(source, resolved_source);
+    if (!status.success)
+    {
+        if (validation_failures != nullptr)
+            validation_failures->append(status);
+        return status;
+    }
+
+    status = validateEpanetNetwork(resolved_source, validation_failures);
     if (!status.success)
         return status;
 
-    NetworkHydraulic enabled_network = source;
+    NetworkHydraulic enabled_network = resolved_source;
 
-    enabled_network.nodes_junctions = enabledEntities(source.nodes_junctions);
-    enabled_network.nodes_reservoirs = enabledEntities(source.nodes_reservoirs);
-    enabled_network.nodes_tanks = enabledEntities(source.nodes_tanks);
-    enabled_network.demand_points = enabledEntities(source.demand_points);
+    enabled_network.nodes_junctions = enabledEntities(resolved_source.nodes_junctions);
+    enabled_network.nodes_reservoirs = enabledEntities(resolved_source.nodes_reservoirs);
+    enabled_network.nodes_tanks = enabledEntities(resolved_source.nodes_tanks);
+    enabled_network.demand_points = enabledEntities(resolved_source.demand_points);
 
-    enabled_network.links_pipes = enabledEntities(source.links_pipes);
-    enabled_network.links_pumps = enabledEntities(source.links_pumps);
-    enabled_network.links_valves = enabledEntities(source.links_valves);
+    enabled_network.links_pipes = enabledEntities(resolved_source.links_pipes);
+    enabled_network.links_pumps = enabledEntities(resolved_source.links_pumps);
+    enabled_network.links_valves = enabledEntities(resolved_source.links_valves);
 
     status = buildHydraulicNodeDemandProjection(enabled_network, prepared);
     if (!status.success)

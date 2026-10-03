@@ -7,6 +7,7 @@
 #include "conformance/net1_fixture.h"
 #include "conformance/input_mapping_scenarios.h"
 
+#include <QDate>
 #include <QUuid>
 
 #include <cmath>
@@ -103,6 +104,35 @@ HydraulicLinkPipe *findModelPipe(NetworkHydraulic &network, const QString &id)
             return &pipe;
     }
     return nullptr;
+}
+
+std::optional<double> pipeRoughnessFromInp(const QString &inp_text, const QString &pipe_id)
+{
+    bool in_pipes = false;
+    const QStringList lines = inp_text.split(QChar('\n'));
+    for (const QString &line : lines)
+    {
+        const QString trimmed = line.trimmed();
+        if (trimmed.startsWith(QChar('[')))
+        {
+            in_pipes = trimmed.compare(QStringLiteral("[PIPES]"), Qt::CaseInsensitive) == 0;
+            continue;
+        }
+        if (!in_pipes || trimmed.isEmpty() || trimmed.startsWith(QChar(';')))
+            continue;
+
+        const QStringList fields = trimmed.simplified().split(QChar(' '));
+        if (fields.size() < 6 || fields.at(0) != pipe_id)
+            continue;
+
+        bool ok = false;
+        const double roughness = fields.at(5).toDouble(&ok);
+        if (ok)
+            return roughness;
+        return std::nullopt;
+    }
+
+    return std::nullopt;
 }
 
 const NativeHydraulicResult *findResult(const NativeHydraulicTimeline &timeline, std::int64_t time_s)
@@ -475,6 +505,128 @@ void testPipeInputs(TestContext &context)
 }
 
 
+void testPipeMaterialRoughnessResolution(TestContext &context)
+{
+    Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
+    fixture.network.duration_s = 0;
+
+    HydraulicLinkPipe *pipe = findModelPipe(fixture.network, QStringLiteral("111"));
+    context.expect(pipe != nullptr, "material-roughness fixture must contain pipe 111");
+    if (pipe == nullptr)
+        return;
+
+    HydraulicPipeMaterial material;
+    material.id = QStringLiteral("Imported Ductile Iron");
+    material.uuid = QUuid::createUuid();
+
+    HydraulicPipeMaterialRoughnessAtAge age_0;
+    age_0.age_years = 0;
+    age_0.roughness_hazen_williams = 140.0;
+    age_0.roughness_darcy_weisbach_mm = 0.26;
+    age_0.roughness_chezy_manning = 0.013;
+    material.roughness_by_age.append(age_0);
+
+    HydraulicPipeMaterialRoughnessAtAge age_20;
+    age_20.age_years = 20;
+    age_20.roughness_hazen_williams = 127.0;
+    age_20.roughness_darcy_weisbach_mm = 0.18;
+    material.roughness_by_age.append(age_20);
+
+    HydraulicPipeMaterialRoughnessAtAge age_40;
+    age_40.age_years = 40;
+    age_40.roughness_hazen_williams = 110.0;
+    age_40.roughness_chezy_manning = 0.016;
+    material.roughness_by_age.append(age_40);
+
+    fixture.network.pipe_materials.append(material);
+    pipe->material_uuid = material.uuid;
+    pipe->roughness_mode = HydraulicPipeRoughnessMode::MaterialLibrary;
+    pipe->metadata.date_installed = QDate(QDate::currentDate().year() - 25, 1, 1);
+    pipe->roughness_hazen_williams = 5.0;
+    pipe->roughness_darcy_weisbach_mm = 5.0;
+    pipe->roughness_chezy_manning = 0.05;
+
+    fixture.network.options_hydraulic.headloss_formula = HydraulicHeadlossFormula::HazenWilliams;
+    EpanetResultInp inp = EpanetRunner().retrieveInp(AowisEpanetTests::makeRunRequest(fixture.network));
+    context.expect(inp.status.success, "Hazen-Williams material-library roughness must resolve");
+    std::optional<double> roughness = pipeRoughnessFromInp(inp.inp_text, pipe->id);
+    context.expect(roughness.has_value(), "generated Hazen-Williams INP must contain material-backed pipe roughness");
+    if (roughness.has_value())
+        context.expectNear(roughness.value(), 127.0, NumericTolerance{1.0e-9, 0.0}, comparison("material_library.hazen_williams", 0, "Pipe", "111"));
+
+    fixture.network.options_hydraulic.headloss_formula = HydraulicHeadlossFormula::DarcyWeisbach;
+    inp = EpanetRunner().retrieveInp(AowisEpanetTests::makeRunRequest(fixture.network));
+    context.expect(inp.status.success, "Darcy-Weisbach material-library roughness must resolve");
+    roughness = pipeRoughnessFromInp(inp.inp_text, pipe->id);
+    context.expect(roughness.has_value(), "generated Darcy-Weisbach INP must contain material-backed pipe roughness");
+    if (roughness.has_value())
+        context.expectNear(roughness.value(), 0.18, NumericTolerance{1.0e-9, 0.0}, comparison("material_library.darcy_weisbach_mm", 0, "Pipe", "111"));
+
+    fixture.network.options_hydraulic.headloss_formula = HydraulicHeadlossFormula::ChezyManning;
+    inp = EpanetRunner().retrieveInp(AowisEpanetTests::makeRunRequest(fixture.network));
+    context.expect(inp.status.success, "Chezy-Manning material-library roughness must resolve");
+    roughness = pipeRoughnessFromInp(inp.inp_text, pipe->id);
+    context.expect(roughness.has_value(), "generated Chezy-Manning INP must contain material-backed pipe roughness");
+    if (roughness.has_value())
+        context.expectNear(roughness.value(), 0.013, NumericTolerance{1.0e-9, 0.0}, comparison("material_library.chezy_manning", 0, "Pipe", "111"));
+
+    NetworkHydraulic missing_material = fixture.network;
+    HydraulicLinkPipe *missing_material_pipe = findModelPipe(missing_material, QStringLiteral("111"));
+    missing_material_pipe->material_uuid = QUuid();
+    const EpanetResultInp missing_material_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(missing_material));
+    context.expect(!missing_material_inp.status.success,
+        "material-library roughness must reject a missing material reference");
+
+    NetworkHydraulic unknown_material = fixture.network;
+    HydraulicLinkPipe *unknown_material_pipe = findModelPipe(unknown_material, QStringLiteral("111"));
+    unknown_material_pipe->material_uuid = QUuid::createUuid();
+    const EpanetResultInp unknown_material_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(unknown_material));
+    context.expect(!unknown_material_inp.status.success,
+        "material-library roughness must reject an unknown material reference");
+
+    NetworkHydraulic missing_date = fixture.network;
+    HydraulicLinkPipe *missing_date_pipe = findModelPipe(missing_date, QStringLiteral("111"));
+    missing_date_pipe->metadata.date_installed.reset();
+    const EpanetResultInp missing_date_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(missing_date));
+    context.expect(!missing_date_inp.status.success,
+        "material-library roughness must reject a missing installation date");
+
+    NetworkHydraulic future_date = fixture.network;
+    HydraulicLinkPipe *future_date_pipe = findModelPipe(future_date, QStringLiteral("111"));
+    future_date_pipe->metadata.date_installed = QDate(QDate::currentDate().year() + 1, 1, 1);
+    const EpanetResultInp future_date_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(future_date));
+    context.expect(!future_date_inp.status.success,
+        "material-library roughness must reject a future installation year");
+
+    NetworkHydraulic missing_formula = fixture.network;
+    missing_formula.options_hydraulic.headloss_formula = HydraulicHeadlossFormula::DarcyWeisbach;
+    for (HydraulicPipeMaterialRoughnessAtAge &entry : missing_formula.pipe_materials[0].roughness_by_age)
+        entry.roughness_darcy_weisbach_mm.reset();
+    const EpanetResultInp missing_formula_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(missing_formula));
+    context.expect(!missing_formula_inp.status.success,
+        "material-library roughness must reject missing data for the active headloss formula");
+
+    NetworkHydraulic explicit_network = fixture.network;
+    explicit_network.options_hydraulic.headloss_formula = HydraulicHeadlossFormula::HazenWilliams;
+    HydraulicLinkPipe *explicit_pipe = findModelPipe(explicit_network, QStringLiteral("111"));
+    explicit_pipe->roughness_mode = HydraulicPipeRoughnessMode::Explicit;
+    explicit_pipe->material_uuid = QUuid();
+    explicit_pipe->metadata.date_installed.reset();
+    explicit_pipe->roughness_hazen_williams = 133.0;
+    const EpanetResultInp explicit_inp = EpanetRunner().retrieveInp(
+        AowisEpanetTests::makeRunRequest(explicit_network));
+    context.expect(explicit_inp.status.success,
+        "explicit roughness mode must not require material-library metadata");
+    roughness = pipeRoughnessFromInp(explicit_inp.inp_text, explicit_pipe->id);
+    if (roughness.has_value())
+        context.expectNear(roughness.value(), 133.0, NumericTolerance{1.0e-9, 0.0}, comparison("material_library.explicit_bypass", 0, "Pipe", "111"));
+}
+
 void testDemandPointNodeProjection(TestContext &context)
 {
     Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
@@ -556,10 +708,6 @@ void testDemandPointNodeProjection(TestContext &context)
     pipe_demand_from.base_demand_m3_per_h *= 0.75;
     equivalent_junction_11->demands.append(pipe_demand_from);
 
-    HydraulicDemand pipe_demand_to = demand;
-    pipe_demand_to.base_demand_m3_per_h *= 0.25;
-    equivalent_junction_12->demands.append(pipe_demand_to);
-
     HydraulicNodeJunction *equivalent_assigned_junction =
         findModelJunctionByUuid(equivalent_direct_network, pipe_11->node_uuid_to);
     context.expect(equivalent_assigned_junction != nullptr,
@@ -567,11 +715,9 @@ void testDemandPointNodeProjection(TestContext &context)
     if (equivalent_assigned_junction == nullptr)
         return;
 
-    HydraulicDemand assigned_pipe_demand = demand;
-    equivalent_assigned_junction->demands.append(assigned_pipe_demand);
-
-    HydraulicDemand junction_demand = demand;
-    equivalent_junction_12->demands.append(junction_demand);
+    HydraulicDemand aggregated_junction_12_demand = demand;
+    aggregated_junction_12_demand.base_demand_m3_per_h = 22.5;
+    equivalent_junction_12->demands.append(aggregated_junction_12_demand);
 
     fixture.network.demand_points.append(pipe_demand_point);
     fixture.network.demand_points.append(assigned_pipe_demand_point);
@@ -597,6 +743,9 @@ void testDemandPointNodeProjection(TestContext &context)
             "assigned-junction pipe demand-point identity must not leak into the solver-facing EPANET model");
         context.expect(!projected_inp.inp_text.contains(junction_demand_point.id),
             "junction-attached demand-point identity must not leak into the solver-facing EPANET model");
+        context.expect(
+            projected_inp.inp_text.count(QStringLiteral("Demand point attachment")) == 2,
+            "solver projection must aggregate equivalent projected demand categories per junction");
     }
 
     NetworkHydraulic disabled_network = fixture.network;
@@ -743,6 +892,11 @@ void registerInputMappingScenarios(ScenarioRegistry &registry)
         "Exercises a non-uniform tank volume curve with a non-default minimum volume and compares native and wrapper tank results.",
         {"conformance", "hydraulic", "upstream", "tank", "curve"},
         &testTankVolumeCurve});
+    registry.add(ScenarioDefinition{
+        "conformance-pipe-material-roughness-resolution",
+        "Resolves age-dependent pipe material roughness for all EPANET headloss formulas and rejects incomplete material-backed pipe configuration.",
+        {"conformance", "hydraulic", "pipe", "material", "roughness"},
+        &testPipeMaterialRoughnessResolution});
     registry.add(ScenarioDefinition{
         "conformance-upstream-pipe-inputs",
         "Exercises measured length, diameter, Hazen-Williams roughness, minor loss, reversed check valve, and closed pipe mappings.",

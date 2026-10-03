@@ -49,6 +49,9 @@ Step 3 pump, pattern, and curve import fixture
  Pump P2 Price 0.30
  Demand Charge 7.5
 
+[STATUS]
+ P2 Closed
+
 [TIMES]
  Duration 0:00
 

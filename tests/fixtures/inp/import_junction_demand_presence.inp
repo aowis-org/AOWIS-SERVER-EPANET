@@ -1,0 +1,32 @@
+[TITLE]
+Junction Demand Presence Fidelity Fixture
+
+[JUNCTIONS]
+ J_NONE 100
+ J_ZERO 100 0
+ J_SECTION 100
+
+[RESERVOIRS]
+ R1 120
+
+[PIPES]
+ P1 R1 J_NONE 100 100 100 0 Open
+ P2 R1 J_ZERO 100 100 100 0 Open
+ P3 R1 J_SECTION 100 100 100 0 Open
+
+[DEMANDS]
+ J_SECTION 0
+
+[TIMES]
+ Duration 0:00
+
+[REPORT]
+ Status No
+ Summary No
+
+[OPTIONS]
+ Units CMH
+ Headloss H-W
+ Quality None
+
+[END]

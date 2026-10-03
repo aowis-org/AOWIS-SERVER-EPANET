@@ -37,6 +37,8 @@ struct ImportReferences
     QHash<int, QUuid> node_uuids_by_index;
     QHash<int, QUuid> link_uuids_by_index;
     QHash<int, int> link_types_by_index;
+    QHash<QString, double> pump_initial_speed_ratios_by_id;
+    QSet<QString> junction_ids_with_explicit_demands;
 };
 
 HydraulicSimulationStatus readFailure(
@@ -55,6 +57,187 @@ HydraulicSimulationStatus readFailure(
         entity_type,
         QString(),
         message);
+}
+
+HydraulicSimulationStatus readPumpInitialSpeedRatios(
+    const QString &input_file_path,
+    QHash<QString, double> &speed_ratios_by_id)
+{
+    QFile file(input_file_path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::ReadInput,
+            HydraulicSimulationStatusOperation::ReadInput,
+            HydraulicSimulationStatusEntityType::Pump,
+            QString(),
+            QStringLiteral("Could not read the source INP [PUMPS] section: %1")
+                .arg(file.errorString()));
+    }
+
+    bool in_pumps = false;
+    const QString content = QString::fromUtf8(file.readAll());
+    const QStringList lines = content.split(QLatin1Char('\n'));
+    for (QString line : lines)
+    {
+        const qsizetype comment_index = line.indexOf(QLatin1Char(';'));
+        if (comment_index >= 0)
+            line.truncate(comment_index);
+        line = line.trimmed();
+        if (line.isEmpty())
+            continue;
+
+        if (line.startsWith(QLatin1Char('[')))
+        {
+            in_pumps = line.compare(QStringLiteral("[PUMPS]"), Qt::CaseInsensitive) == 0;
+            continue;
+        }
+        if (!in_pumps)
+            continue;
+
+        const QStringList tokens = line.simplified().split(QLatin1Char(' '));
+        if (tokens.size() < 4)
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Pump,
+                QString(),
+                QStringLiteral("Could not parse a source INP pump definition"));
+        }
+
+        const QString pump_id = tokens.at(0);
+        double speed_ratio = 1.0;
+        for (qsizetype token_index = 3; token_index < tokens.size(); ++token_index)
+        {
+            if (tokens.at(token_index).compare(QStringLiteral("SPEED"), Qt::CaseInsensitive) != 0)
+                continue;
+
+            if (token_index + 1 >= tokens.size())
+            {
+                return makeEpanetStatus(
+                    HydraulicSimulationStatusStage::ReadInput,
+                    HydraulicSimulationStatusOperation::ReadInput,
+                    HydraulicSimulationStatusEntityType::Pump,
+                    pump_id,
+                    QStringLiteral("Source INP pump SPEED keyword has no value"));
+            }
+
+            bool speed_ok = false;
+            const double parsed_speed = tokens.at(token_index + 1).toDouble(&speed_ok);
+            if (!speed_ok || !std::isfinite(parsed_speed) || parsed_speed < 0.0)
+            {
+                return makeEpanetStatus(
+                    HydraulicSimulationStatusStage::ReadInput,
+                    HydraulicSimulationStatusOperation::ReadInput,
+                    HydraulicSimulationStatusEntityType::Pump,
+                    pump_id,
+                    QStringLiteral("Source INP pump SPEED value is invalid"));
+            }
+            speed_ratio = parsed_speed;
+            ++token_index;
+        }
+
+        speed_ratios_by_id.insert(pump_id, speed_ratio);
+    }
+
+    bool in_status = false;
+    for (QString line : lines)
+    {
+        const qsizetype comment_index = line.indexOf(QLatin1Char(';'));
+        if (comment_index >= 0)
+            line.truncate(comment_index);
+        line = line.trimmed();
+        if (line.isEmpty())
+            continue;
+
+        if (line.startsWith(QLatin1Char('[')))
+        {
+            in_status = line.compare(QStringLiteral("[STATUS]"), Qt::CaseInsensitive) == 0;
+            continue;
+        }
+        if (!in_status)
+            continue;
+
+        const QStringList tokens = line.simplified().split(QLatin1Char(' '));
+        if (tokens.size() < 2 || !speed_ratios_by_id.contains(tokens.at(0)))
+            continue;
+
+        bool setting_ok = false;
+        const double setting = tokens.at(1).toDouble(&setting_ok);
+        if (!setting_ok)
+            continue;
+        if (!std::isfinite(setting) || setting < 0.0)
+        {
+            return makeEpanetStatus(
+                HydraulicSimulationStatusStage::ReadInput,
+                HydraulicSimulationStatusOperation::ReadInput,
+                HydraulicSimulationStatusEntityType::Pump,
+                tokens.at(0),
+                QStringLiteral("Source INP pump [STATUS] setting is invalid"));
+        }
+        speed_ratios_by_id[tokens.at(0)] = setting;
+    }
+
+    return makeEpanetSuccess();
+}
+
+
+HydraulicSimulationStatus readExplicitJunctionDemandIds(
+    const QString &input_file_path,
+    QSet<QString> &junction_ids_with_explicit_demands)
+{
+    QFile file(input_file_path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        return makeEpanetStatus(
+            HydraulicSimulationStatusStage::ReadInput,
+            HydraulicSimulationStatusOperation::ReadInput,
+            HydraulicSimulationStatusEntityType::Junction,
+            QString(),
+            QStringLiteral("Could not read source INP junction demand definitions: %1")
+                .arg(file.errorString()));
+    }
+
+    QString current_section;
+    const QString content = QString::fromUtf8(file.readAll());
+    const QStringList lines = content.split(QLatin1Char('\n'));
+    for (QString line : lines)
+    {
+        const qsizetype comment_index = line.indexOf(QLatin1Char(';'));
+        if (comment_index >= 0)
+            line.truncate(comment_index);
+        line = line.trimmed();
+        if (line.isEmpty())
+            continue;
+
+        if (line.startsWith(QLatin1Char('[')) && line.endsWith(QLatin1Char(']')))
+        {
+            current_section = line.mid(1, line.size() - 2).trimmed().toUpper();
+            continue;
+        }
+
+        const QStringList tokens = line.simplified().split(QLatin1Char(' '));
+        if (tokens.isEmpty())
+            continue;
+
+        if (current_section == QStringLiteral("JUNCTIONS"))
+        {
+            // EPANET's junction demand field is optional. If it is absent, the
+            // toolkit still exposes one synthetic zero-demand category. Record
+            // only source-authored demand fields so that synthetic category can
+            // be omitted from the lossless AOWIS import. An explicit zero is
+            // still a source-authored demand and must be preserved.
+            if (tokens.size() >= 3)
+                junction_ids_with_explicit_demands.insert(tokens.at(0));
+        }
+        else if (current_section == QStringLiteral("DEMANDS"))
+        {
+            junction_ids_with_explicit_demands.insert(tokens.at(0));
+        }
+    }
+
+    return makeEpanetSuccess();
 }
 
 HydraulicSimulationStatus readSimpleControlActionTokens(
@@ -1304,8 +1487,16 @@ HydraulicSimulationStatus importJunction(
             HydraulicSimulationStatusEntityType::Junction);
     }
 
+    const bool source_has_explicit_demand =
+        references.junction_ids_with_explicit_demands.contains(node_id);
+    const bool skip_synthetic_zero_demand =
+        demand_count == 1 && !source_has_explicit_demand;
+
     for (int demand_index = 1; demand_index <= demand_count; demand_index++)
     {
+        if (skip_synthetic_zero_demand)
+            break;
+
         HydraulicDemand demand;
         double base_demand = 0.0;
         error = EN_getbasedemand(project.handle(), node_index, demand_index, &base_demand);
@@ -1775,7 +1966,8 @@ HydraulicSimulationStatus importPump(
         }
     }
 
-    pump.initial_speed_ratio = initial_speed;
+    pump.initial_speed_ratio = references.pump_initial_speed_ratios_by_id.value(
+        pump.id, initial_speed);
     const int backend_status = static_cast<int>(std::llround(initial_status));
     if (backend_status == EN_OPEN)
         pump.initial_status = HydraulicLinkPumpInitialStatus::On;
@@ -3659,12 +3851,27 @@ EpanetResultImport importEpanetInp(const QString &input_file_path)
     source_units.pressure_units = static_cast<int>(std::llround(source_pressure_units_value));
     source_units.specific_gravity = source_specific_gravity;
 
+    QHash<QString, double> source_pump_initial_speed_ratios_by_id;
+    status = readPumpInitialSpeedRatios(
+        input_file_path, source_pump_initial_speed_ratios_by_id);
+    if (!status.success)
+        return finishImport(std::move(result), status, project);
+
+    QSet<QString> source_junction_ids_with_explicit_demands;
+    status = readExplicitJunctionDemandIds(
+        input_file_path, source_junction_ids_with_explicit_demands);
+    if (!status.success)
+        return finishImport(std::move(result), status, project);
+
     status = normalizeProjectToCanonicalUnits(project, source_flow_units);
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
     NetworkHydraulic &network = result.request.network;
     ImportReferences references;
+    references.pump_initial_speed_ratios_by_id = source_pump_initial_speed_ratios_by_id;
+    references.junction_ids_with_explicit_demands =
+        source_junction_ids_with_explicit_demands;
 
     status = importTitles(project, network);
     if (!status.success)

@@ -816,6 +816,29 @@ NetworkHydraulic DummyNetworks::networkFull()
     network.links_valves.append(tcv);
     network.links_valves.append(gpv);
     network.links_valves.append(pcv);
+
+    HydraulicPipeMaterial material_di;
+    material_di.uuid = QUuid::createUuid();
+    material_di.id = QStringLiteral("DI");
+    HydraulicPipeMaterialRoughnessAtAge material_di_new;
+    material_di_new.age_years = 0;
+    material_di_new.roughness_hazen_williams = 125.0;
+    material_di_new.roughness_darcy_weisbach_mm = 0.26;
+    material_di_new.roughness_chezy_manning = 0.014;
+    material_di.roughness_by_age.append(material_di_new);
+
+    HydraulicPipeMaterial material_pvc;
+    material_pvc.uuid = QUuid::createUuid();
+    material_pvc.id = QStringLiteral("PVC");
+    HydraulicPipeMaterialRoughnessAtAge material_pvc_new;
+    material_pvc_new.age_years = 0;
+    material_pvc_new.roughness_hazen_williams = 145.0;
+    material_pvc_new.roughness_darcy_weisbach_mm = 0.0015;
+    material_pvc_new.roughness_chezy_manning = 0.010;
+    material_pvc.roughness_by_age.append(material_pvc_new);
+
+    network.pipe_materials.append(material_di);
+    network.pipe_materials.append(material_pvc);
     
     // Pipes exercise open, closed and check-valve states and reaction overrides.
     HydraulicLinkPipe loop_pipe_1;
@@ -827,7 +850,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     loop_pipe_1.length_measured_m = 418.6;
     loop_pipe_1.initial_status = HydraulicLinkPipeInitialStatus::Open;
     loop_pipe_1.diameter_mm = 200.0;
-    loop_pipe_1.material_id = "DI";
+    loop_pipe_1.material_uuid = material_di.uuid;
     loop_pipe_1.roughness_hazen_williams = 125.0;
     loop_pipe_1.roughness_darcy_weisbach_mm = 0.26;
     loop_pipe_1.roughness_chezy_manning = 0.014;
@@ -847,7 +870,7 @@ NetworkHydraulic DummyNetworks::networkFull()
     loop_pipe_2.length_calculated_m = 650.0;
     loop_pipe_2.initial_status = HydraulicLinkPipeInitialStatus::Open;
     loop_pipe_2.diameter_mm = 250.0;
-    loop_pipe_2.material_id = "PVC";
+    loop_pipe_2.material_uuid = material_pvc.uuid;
     loop_pipe_2.roughness_hazen_williams = 145.0;
     loop_pipe_2.roughness_darcy_weisbach_mm = 0.0015;
     loop_pipe_2.roughness_chezy_manning = 0.010;

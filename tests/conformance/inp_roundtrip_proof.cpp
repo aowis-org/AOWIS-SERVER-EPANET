@@ -10,6 +10,7 @@
 #include <QByteArray>
 #include <QFile>
 #include <QHash>
+#include <QSet>
 #include <QTemporaryDir>
 #include <QStringList>
 
@@ -170,10 +171,63 @@ private:
     bool opened_ = false;
 };
 
+QSet<QString> sourceJunctionIdsWithExplicitDemands(const QString &input_file)
+{
+    QFile file(input_file);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        throw std::runtime_error(
+            QStringLiteral("Could not read INP source-demand inventory: %1")
+                .arg(file.errorString())
+                .toStdString());
+    }
+
+    QSet<QString> junction_ids;
+    QString current_section;
+    const QString content = QString::fromUtf8(file.readAll());
+    const QStringList lines = content.split(QLatin1Char('\n'));
+    for (QString line : lines)
+    {
+        const qsizetype comment_index = line.indexOf(QLatin1Char(';'));
+        if (comment_index >= 0)
+            line.truncate(comment_index);
+        line = line.trimmed();
+        if (line.isEmpty())
+            continue;
+
+        if (line.startsWith(QLatin1Char('[')) && line.endsWith(QLatin1Char(']')))
+        {
+            current_section = line.mid(1, line.size() - 2).trimmed().toUpper();
+            continue;
+        }
+
+        const QStringList tokens = line.simplified().split(QLatin1Char(' '));
+        if (tokens.isEmpty())
+            continue;
+
+        if (current_section == QStringLiteral("JUNCTIONS"))
+        {
+            // EPANET exposes one zero-demand category even when the optional
+            // junction demand field was absent. Only count source-authored
+            // demand definitions in the structural round-trip inventory.
+            if (tokens.size() >= 3)
+                junction_ids.insert(tokens.at(0));
+        }
+        else if (current_section == QStringLiteral("DEMANDS"))
+        {
+            junction_ids.insert(tokens.at(0));
+        }
+    }
+
+    return junction_ids;
+}
+
 InputInventory nativeInventory(const QString &input_file)
 {
     NativeInputProject native(input_file);
     InputInventory inventory;
+    const QSet<QString> junction_ids_with_explicit_demands =
+        sourceJunctionIdsWithExplicitDemands(input_file);
 
     int node_count = 0;
     checkEpanet(EN_getcount(native.handle(), EN_NODECOUNT, &node_count), "EN_getcount(EN_NODECOUNT)");
@@ -192,18 +246,25 @@ InputInventory nativeInventory(const QString &input_file)
             checkEpanet(
                 EN_getnumdemands(native.handle(), node_index, &demand_count),
                 "EN_getnumdemands");
-            inventory.demand_categories += demand_count;
-            for (int demand_index = 1; demand_index <= demand_count; demand_index++)
+            const bool skip_synthetic_zero_demand =
+                demand_count == 1
+                && !junction_ids_with_explicit_demands.contains(node_id);
+            if (!skip_synthetic_zero_demand)
             {
-                char demand_name[EN_MAXID + 1] = {};
-                checkEpanet(
-                    EN_getdemandname(native.handle(), node_index, demand_index, demand_name),
-                    "EN_getdemandname");
-                inventory.demand_category_names.append(
-                    QStringLiteral("%1|%2|%3")
-                        .arg(node_id)
-                        .arg(demand_index)
-                        .arg(QString::fromUtf8(demand_name)));
+                inventory.demand_categories += demand_count;
+                for (int demand_index = 1; demand_index <= demand_count; demand_index++)
+                {
+                    char demand_name[EN_MAXID + 1] = {};
+                    checkEpanet(
+                        EN_getdemandname(
+                            native.handle(), node_index, demand_index, demand_name),
+                        "EN_getdemandname");
+                    inventory.demand_category_names.append(
+                        QStringLiteral("%1|%2|%3")
+                            .arg(node_id)
+                            .arg(demand_index)
+                            .arg(QString::fromUtf8(demand_name)));
+                }
             }
         }
         else if (node_type == EN_RESERVOIR)

@@ -447,8 +447,15 @@ void comparePumps(const NativeHydraulicResult &expected, const HydraulicSimulati
         context.expectEqual(static_cast<std::int64_t>(actual_pump->state),
             static_cast<std::int64_t>(modelPumpState(expected_pump.state)),
             comparison("state", expected.time_elapsed_s, "Pump", id));
-        context.expectNear(actual_pump->speed_ratio, expected_pump.speed_ratio,
-            scaledTolerance(HydraulicQuantity::Setting, tolerance_scale), comparison("speed", expected.time_elapsed_s, "Pump", id));
+        // A closed pump's EN_SETTING is not a hydraulically meaningful speed.
+        // Native INP parsing can collapse it to 0 through [STATUS] CLOSED,
+        // while a programmatically built EPANET project can retain the pump's
+        // nominal setting. Compare speed only while the pump is operating.
+        if (actual_pump->open && expected_pump.open)
+        {
+            context.expectNear(actual_pump->speed_ratio, expected_pump.speed_ratio,
+                scaledTolerance(HydraulicQuantity::Setting, tolerance_scale), comparison("speed", expected.time_elapsed_s, "Pump", id));
+        }
         context.expectNear(actual_pump->efficiency_percent, expected_pump.efficiency_percent,
             scaledTolerance(HydraulicQuantity::Percent, tolerance_scale), comparison("efficiency_percent", expected.time_elapsed_s, "Pump", id));
         context.expectNear(actual_pump->power_kw, expected_pump.power_kw,
