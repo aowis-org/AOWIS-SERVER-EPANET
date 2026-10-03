@@ -634,6 +634,23 @@ void scenarioInvalidCurveShape(TestContext &context)
 
     {
         NetworkHydraulic network = cleanNet1();
+        HydraulicCurveTankVolume curve;
+        curve.id = QStringLiteral("BAD_TANK_CURVE_VOLUME_SHAPE");
+        curve.uuid = QUuid::createUuid();
+        HydraulicCurveTankVolumePoint point_1;
+        point_1.water_level_m = 0.0;
+        point_1.volume_m3 = 10.0;
+        HydraulicCurveTankVolumePoint point_2;
+        point_2.water_level_m = 1.0;
+        point_2.volume_m3 = 10.0;
+        curve.points = {point_1, point_2};
+        network.curves_tank_volume.append(curve);
+        expectRejected(context, network, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid,
+            QStringLiteral("volumes must increase"), HydraulicSimulationStatusStage::AddCurve);
+    }
+
+    {
+        NetworkHydraulic network = cleanNet1();
         HydraulicCurvePumpHead curve;
         curve.id = QStringLiteral("BAD_PUMP_CURVE_SHAPE");
         curve.uuid = QUuid::createUuid();
