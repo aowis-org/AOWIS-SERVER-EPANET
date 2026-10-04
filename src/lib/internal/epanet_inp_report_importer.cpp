@@ -20,16 +20,16 @@ constexpr double meters_per_foot = 0.3048;
 constexpr double psi_per_foot = 0.4333;
 constexpr double kpa_per_psi = 6.895;
 constexpr double bar_per_psi = 0.068948;
-constexpr double gallons_per_minute_per_cfs = 448.831;
-constexpr double acre_feet_per_day_per_cfs = 1.9837;
-constexpr double million_gallons_per_day_per_cfs = 0.64632;
-constexpr double imperial_million_gallons_per_day_per_cfs = 0.5382;
-constexpr double liters_per_second_per_cfs = 28.317;
-constexpr double liters_per_minute_per_cfs = 1699.0;
-constexpr double cubic_meters_per_second_per_cfs = 0.028317;
-constexpr double cubic_meters_per_hour_per_cfs = 101.94;
-constexpr double cubic_meters_per_day_per_cfs = 2446.6;
-constexpr double million_liters_per_day_per_cfs = 2.4466;
+constexpr double gallons_per_minute_per_cfs = 448.8311688311688;
+constexpr double acre_feet_per_day_per_cfs = 1.9834710743801653;
+constexpr double million_gallons_per_day_per_cfs = 0.6463168831168831;
+constexpr double imperial_million_gallons_per_day_per_cfs = 0.5381713836613002;
+constexpr double liters_per_second_per_cfs = 28.316846592;
+constexpr double liters_per_minute_per_cfs = 1699.01079552;
+constexpr double cubic_meters_per_second_per_cfs = 0.028316846592;
+constexpr double cubic_meters_per_hour_per_cfs = 101.9406477312;
+constexpr double cubic_meters_per_day_per_cfs = 2446.5755455488;
+constexpr double million_liters_per_day_per_cfs = 2.4465755455488;
 
 void appendImportWarning(
     EpanetResultImport &result,

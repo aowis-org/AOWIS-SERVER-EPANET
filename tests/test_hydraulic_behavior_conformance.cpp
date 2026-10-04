@@ -44,8 +44,8 @@ using AowisEpanetTests::ScenarioRegistry;
 using AowisEpanetTests::TestContext;
 
 constexpr double kMetresPerFoot = 0.3048;
-constexpr double kCubicMetresPerHourPerCubicFootPerSecond = 101.94;
-constexpr double kGallonsPerMinutePerCubicFootPerSecond = 448.831;
+constexpr double kCubicMetresPerHourPerCubicFootPerSecond = 101.9406477312;
+constexpr double kGallonsPerMinutePerCubicFootPerSecond = 448.8311688311688;
 constexpr double kPsiPerFoot = 0.4333;
 
 ComparisonContext comparison(std::string field, std::int64_t time_s = -1, std::string entity_type = {}, std::string entity_id = {})

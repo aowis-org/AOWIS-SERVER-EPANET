@@ -7,8 +7,8 @@ namespace AowisEpanetTests
 namespace
 {
 constexpr double kMetresPerFoot = 0.3048;
-constexpr double kCubicMetresPerHourPerCubicFootPerSecond = 101.94;
-constexpr double kGallonsPerMinutePerCubicFootPerSecond = 448.831;
+constexpr double kCubicMetresPerHourPerCubicFootPerSecond = 101.9406477312;
+constexpr double kGallonsPerMinutePerCubicFootPerSecond = 448.8311688311688;
 
 double feetToMetres(double feet)
 {

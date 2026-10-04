@@ -23,8 +23,8 @@ using AowisEpanetTests::ScenarioRegistry;
 using AowisEpanetTests::TestContext;
 
 constexpr NumericTolerance numeric_tolerance{1.0e-10, 1.0e-10};
-constexpr double epanet_cmh_per_cfs = 101.94;
-constexpr double epanet_gpm_per_cfs = 448.831;
+constexpr double epanet_cmh_per_cfs = 101.9406477312;
+constexpr double epanet_gpm_per_cfs = 448.8311688311688;
 constexpr double epanet_gpm_to_cmh = epanet_cmh_per_cfs / epanet_gpm_per_cfs;
 
 constexpr double wgs84_equatorial_radius_m = 6378137.0;
@@ -1280,7 +1280,7 @@ void scenarioImportStructuredRulesCanonicalUnits(TestContext &context)
         {
             context.expectNear(
                 flow.flow_m3_per_h.value(),
-                2.271233493230191,
+                2.2712470704,
                 numeric_tolerance,
                 comparison("R_FLOW.flow_m3_per_h"));
         }
@@ -1338,7 +1338,7 @@ void scenarioImportStructuredRulesCanonicalUnits(TestContext &context)
             {
                 context.expectNear(
                     demand.demand_m3_per_h.value(),
-                    1.1356167466150955,
+                    1.1356235352,
                     numeric_tolerance,
                     comparison("R_SYSTEM.demand_m3_per_h"));
             }

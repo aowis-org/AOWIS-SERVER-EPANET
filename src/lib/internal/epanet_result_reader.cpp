@@ -333,7 +333,7 @@ HydraulicSimulationStatus EpanetResultReader::readLinksPipes(HydraulicSimulation
             pipe_result.head_loss_gradient_m_per_km = pipe_result.head_loss_m / length_m * 1000.0;
 
         constexpr double meters_per_foot = 0.3048;
-        constexpr double cubic_meters_per_hour_per_cubic_foot_per_second = 101.94;
+        constexpr double cubic_meters_per_hour_per_cubic_foot_per_second = 101.9406477312;
         constexpr double tiny_flow_cubic_feet_per_second = 1.0e-6;
         const double flow_cubic_feet_per_second = std::abs(pipe_result.flow_m3_per_h) / cubic_meters_per_hour_per_cubic_foot_per_second;
         if (length_m > 0.0 && pipe.diameter_mm > 0.0 && flow_cubic_feet_per_second > tiny_flow_cubic_feet_per_second)
