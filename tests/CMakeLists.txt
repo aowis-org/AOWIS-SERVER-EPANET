@@ -62,6 +62,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-upstream-pipe-darcy-weisbach
     conformance-upstream-pipe-chezy-manning
     conformance-upstream-pump-three-point
+    conformance-upstream-pump-three-point-zero-head
     conformance-upstream-pump-multipoint
     conformance-upstream-pump-constant-power
     conformance-upstream-pump-initial-speed

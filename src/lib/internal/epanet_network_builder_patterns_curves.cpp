@@ -268,10 +268,12 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addCurvePumpHead(const Hydraulic
     for (int index = 0; index < curve.points.size(); index++)
     {
         const HydraulicCurvePumpHeadPoint &point = curve.points.at(index);
-        if (point.flow_m3_per_h < 0.0 || point.head_gain_m <= 0.0)
-            return makeEpanetStatus(HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::None, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("Pump head curve requires non-negative flows and positive heads"));
+        if (point.flow_m3_per_h < 0.0)
+            return makeEpanetStatus(HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::None, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("Pump head curve requires non-negative flows"));
         if (curve.points.size() == 1 && point.flow_m3_per_h <= 0.0)
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::None, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("One-point pump curve requires positive design flow"));
+        if (curve.points.size() == 1 && point.head_gain_m <= 0.0)
+            return makeEpanetStatus(HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::None, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("One-point pump curve requires positive design head"));
         if (index > 0 && point.flow_m3_per_h <= curve.points.at(index - 1).flow_m3_per_h)
             return makeEpanetStatus(HydraulicSimulationStatusStage::AddCurve, HydraulicSimulationStatusOperation::None, HydraulicSimulationStatusEntityType::Curve, curve.id, curve.uuid, QStringLiteral("Pump head curve flows must increase"));
         if (index > 0 && point.head_gain_m >= curve.points.at(index - 1).head_gain_m)

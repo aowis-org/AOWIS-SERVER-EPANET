@@ -429,6 +429,15 @@ void applyReferenceVariant(EN_Project project, NativeReferenceVariant variant)
         setPumpCurve(project, flows, heads, 3);
         return;
     }
+    case NativeReferenceVariant::PumpThreePointZeroHead:
+    {
+        configureCanonicalMetricUnits(project);
+        checkEpanet(EN_settimeparam(project, EN_DURATION, 0), "EN_settimeparam(EN_DURATION)");
+        double flows[] = {0.0, 300.0, 600.0};
+        double heads[] = {90.0, 65.0, 0.0};
+        setPumpCurve(project, flows, heads, 3);
+        return;
+    }
     case NativeReferenceVariant::PumpMultiPoint:
     {
         configureCanonicalMetricUnits(project);

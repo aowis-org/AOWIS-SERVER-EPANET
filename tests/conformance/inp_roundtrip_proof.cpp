@@ -639,7 +639,7 @@ void compareNativeQualityTimelines(
     const NativeQualityReferenceTimeline &actual,
     WaterQualityAnalysisType analysis)
 {
-    context.expect(expected.success, "canonical source native quality solve must succeed");
+    context.expect(expected.success, "native serialized baseline quality solve must succeed");
     context.expect(actual.success, "generated INP native quality solve must succeed");
     if (!expected.success || !actual.success)
         return;
@@ -711,6 +711,24 @@ QString writeGeneratedInp(QTemporaryDir &directory, const QString &inp_text)
     return path;
 }
 
+QString writeNativeCanonicalInp(QTemporaryDir &directory, const QString &source_file)
+{
+    NativeInputProject native(source_file);
+    checkEpanet(
+        EN_setflowunits(native.handle(), EN_CMH),
+        "EN_setflowunits(EN_CMH native serialization baseline)");
+    checkEpanet(
+        EN_setoption(native.handle(), EN_PRESS_UNITS, EN_METERS),
+        "EN_setoption(EN_PRESS_UNITS native serialization baseline)");
+
+    const QString path = directory.filePath(QStringLiteral("native-roundtrip.inp"));
+    const QByteArray path_native = QFile::encodeName(path);
+    checkEpanet(
+        EN_saveinpfile(native.handle(), path_native.constData()),
+        "EN_saveinpfile(native serialization baseline)");
+    return path;
+}
+
 void proveInpRoundTripInternal(TestContext &context, const QString &source_file)
 {
     const InputInventory source_inventory = nativeInventory(source_file);
@@ -765,6 +783,21 @@ void proveInpRoundTripInternal(TestContext &context, const QString &source_file)
         return;
     const QString roundtrip_file = writeGeneratedInp(directory, exported.inp_text);
 
+    NativeQualityReferenceTimeline native_serialized_source_quality;
+    if (source_quality_analysis != WaterQualityAnalysisType::None)
+    {
+        // A canonical-unit EN_saveinpfile()/reopen is the strict numerical baseline
+        // for generated INP quality. EPANET intentionally serializes many numeric
+        // fields at finite decimal precision, so comparing a reopened generated
+        // file directly against the still-open source project can report drift that
+        // native EPANET produces by itself (official Net3 is one such case).
+        const QString native_roundtrip_file =
+            writeNativeCanonicalInp(directory, source_file);
+        native_serialized_source_quality =
+            AowisEpanetTests::runNativeQualityReference(
+                native_roundtrip_file, imported.request.network, true);
+    }
+
     // importInp() opens the generated file through native EPANET first. A successful
     // re-import therefore proves native syntax/reopen before the second model comparison.
     const EpanetResultImport reimported = EpanetRunner().importInp(roundtrip_file);
@@ -808,7 +841,7 @@ void proveInpRoundTripInternal(TestContext &context, const QString &source_file)
         if (source_quality_analysis == analysis)
         {
             compareNativeQualityTimelines(
-                context, source_quality, roundtrip_quality, analysis);
+                context, native_serialized_source_quality, roundtrip_quality, analysis);
         }
     }
 }

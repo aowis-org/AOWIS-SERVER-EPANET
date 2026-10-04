@@ -189,6 +189,24 @@ void testPumpThreePoint(TestContext &context)
     compareWithWrapper(fixture, native_timeline, context);
 }
 
+void testPumpThreePointZeroHead(TestContext &context)
+{
+    Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
+    fixture.network.duration_s = 0;
+    HydraulicLinkPump *pump = replaceHeadCurve(
+        fixture, HydraulicLinkPumpDefinitionType::ThreePointCurve,
+        {{0.0, 90.0}, {300.0, 65.0}, {600.0, 0.0}});
+    context.expect(pump != nullptr, "pump-conformance fixture must contain pump 9");
+    if (pump == nullptr)
+        return;
+
+    const NativeHydraulicTimeline native_timeline = runNative(
+        fixture, NativeReferenceVariant::PumpThreePointZeroHead, context);
+    context.expect(native_timeline.success,
+        "EPANET must accept a three-point pump curve whose max-flow point has zero head");
+    compareWithWrapper(fixture, native_timeline, context);
+}
+
 void testPumpMultiPoint(TestContext &context)
 {
     Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
@@ -527,6 +545,9 @@ void registerPumpScenarios(ScenarioRegistry &registry)
     registry.add(ScenarioDefinition{"conformance-upstream-pump-three-point",
         "Exercises a three-point pump head definition and complete pump hydraulic result mapping.",
         {"conformance", "hydraulic", "upstream", "pump", "curve"}, &testPumpThreePoint});
+    registry.add(ScenarioDefinition{"conformance-upstream-pump-three-point-zero-head",
+        "Exercises EPANET-compatible three-point pump curves whose maximum-flow point has zero head.",
+        {"conformance", "hydraulic", "upstream", "pump", "curve"}, &testPumpThreePointZeroHead});
     registry.add(ScenarioDefinition{"conformance-upstream-pump-multipoint",
         "Exercises a four-point pump head curve including native curve interpolation.",
         {"conformance", "hydraulic", "upstream", "pump", "curve"}, &testPumpMultiPoint});

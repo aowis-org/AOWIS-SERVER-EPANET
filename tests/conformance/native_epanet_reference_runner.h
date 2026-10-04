@@ -204,6 +204,7 @@ enum class NativeReferenceVariant
     DarcyWeisbach,
     ChezyManning,
     PumpThreePoint,
+    PumpThreePointZeroHead,
     PumpMultiPoint,
     PumpConstantPower,
     PumpInitialSpeed,

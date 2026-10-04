@@ -185,9 +185,14 @@ QString preserveDemandCategories(QString inp_text, const NetworkHydraulic &netwo
             else
                 pattern_id = constant_pattern_id;
 
+            // Match EN_saveinpfile()'s native [DEMANDS] precision. This
+            // post-processing exists to retain demand presence/categories, not
+            // to change the backend's numeric serialization contract. In
+            // particular, re-emitting converted legacy demands at full double
+            // precision can move hydraulic event boundaries on reopen.
             QString line = QStringLiteral(" %1\t%2\t%3")
                 .arg(junction.id,
-                    QString::number(demand.base_demand_m3_per_h, 'g', 17),
+                    QString::number(demand.base_demand_m3_per_h, 'f', 6),
                     pattern_id);
             if (!demand.category_name.isEmpty())
                 line += QStringLiteral("\t;%1").arg(demand.category_name);
