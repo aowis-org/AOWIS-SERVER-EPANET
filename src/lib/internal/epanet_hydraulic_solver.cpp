@@ -6,6 +6,8 @@
 #include "epanet_result_reader.h"
 #include "epanet_status_helpers.h"
 
+#include <aowis/model/units/conversion.h>
+
 #include <algorithm>
 #include <cmath>
 
@@ -83,7 +85,7 @@ void accumulatePumpEnergy(const NetworkHydraulic &network, const HydraulicSimula
         accumulator.online_hours += interval_hours;
         accumulator.efficiency_percent_hours += pump_result.efficiency_percent * interval_hours;
         accumulator.power_kw_hours += pump_result.power_kw * interval_hours;
-        constexpr double minimum_energy_flow_m3_per_h = 1.0e-6 * 101.9406477312;
+        constexpr double minimum_energy_flow_m3_per_h = 1.0e-6 * aowis::units::epanet_cubic_metres_per_hour_per_cfs;
         const double energy_flow_m3_per_h = std::max(minimum_energy_flow_m3_per_h, std::abs(pump_result.flow_m3_per_h));
         // kW / (m3/h) is kWh/m3, the AOWIS canonical energy-intensity unit.
         accumulator.energy_intensity_hours += pump_result.power_kw / energy_flow_m3_per_h * interval_hours;

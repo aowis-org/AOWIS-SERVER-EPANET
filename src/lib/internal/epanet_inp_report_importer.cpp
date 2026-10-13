@@ -166,7 +166,7 @@ double sourceLengthToM(int flow_units)
 
 double sourceDiameterToMm(int flow_units)
 {
-    return flowUnitsAreSi(flow_units) ? 1.0 : 25.4;
+    return flowUnitsAreSi(flow_units) ? 1.0 : aowis::units::inchesToMillimetres(1.0);
 }
 
 double sourceVelocityToMPerS(int flow_units)

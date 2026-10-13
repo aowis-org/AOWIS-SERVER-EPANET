@@ -2,11 +2,10 @@
 #define AOWIS_EPANET_INTERNAL_EPANET_MSX_UNITS_H
 
 #include <aowis/model/hydraulic/multi_species.h>
+#include <aowis/model/units/conversion.h>
 
 namespace EpanetMsxUnits
 {
-constexpr double square_metres_per_square_foot = 0.09290304;
-constexpr double square_metres_per_square_centimetre = 0.0001;
 constexpr double msx_reference_diffusivity_ft2_per_s = 1.29e-8;
 
 inline double solverMassScale(MultiSpeciesUnits units)
@@ -30,11 +29,11 @@ inline double solverAreaScale(MultiSpeciesAreaUnits area_units)
     switch (area_units)
     {
     case MultiSpeciesAreaUnits::SquareFeet:
-        return square_metres_per_square_foot;
+        return aowis::units::square_metres_per_square_foot;
     case MultiSpeciesAreaUnits::SquareMetres:
         return 1.0;
     case MultiSpeciesAreaUnits::SquareCentimetres:
-        return square_metres_per_square_centimetre;
+        return aowis::units::square_metres_per_square_centimetre;
     }
     return 1.0;
 }
@@ -70,7 +69,7 @@ inline double bulkSourceValueToSolver(double canonical_value, MultiSpeciesUnits 
 
 inline double diffusivityToSolverRatio(double m2_per_s)
 {
-    const double ft2_per_s = m2_per_s / square_metres_per_square_foot;
+    const double ft2_per_s = m2_per_s / aowis::units::square_metres_per_square_foot;
     return ft2_per_s / msx_reference_diffusivity_ft2_per_s;
 }
 }

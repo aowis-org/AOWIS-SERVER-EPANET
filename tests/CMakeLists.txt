@@ -1,3 +1,23 @@
+# Verify that the Model's EPANET compatibility factors track the vendored
+# EPANET solver. Independent of the large conformance test runner.
+add_executable(aowis-server-epanet-unit-constants-tests
+    test_model_epanet_unit_constants.cpp
+)
+target_link_libraries(aowis-server-epanet-unit-constants-tests
+    PRIVATE AOWIS::ServerModel
+)
+target_include_directories(aowis-server-epanet-unit-constants-tests PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../external/epanet/src"
+)
+target_compile_features(aowis-server-epanet-unit-constants-tests PRIVATE cxx_std_20)
+add_test(
+    NAME aowis-server-epanet-model-unit-constants
+    COMMAND $<TARGET_FILE:aowis-server-epanet-unit-constants-tests>
+)
+set_tests_properties(aowis-server-epanet-model-unit-constants
+    PROPERTIES LABELS "aowis;proof"
+)
+
 set(AOWIS_SERVER_EPANET_CONTRACT_TEST_SCENARIOS
     contract-physical-results-and-leakage
     contract-structured-rule-control

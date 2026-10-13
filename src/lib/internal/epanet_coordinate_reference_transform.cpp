@@ -1,6 +1,7 @@
 #include "epanet_coordinate_reference_transform.h"
 
 #include <GeographicLib/LambertConformalConic.hpp>
+#include <aowis/model/units/conversion.h>
 
 #include <cmath>
 
@@ -16,7 +17,6 @@ constexpr double kentucky_false_easting_m = 1500000.0;
 constexpr double kentucky_false_northing_m = 1000000.0;
 constexpr double kentucky_false_easting_ft_us = 4921250.0;
 constexpr double kentucky_false_northing_ft_us = 3280833.333;
-constexpr double meters_per_us_survey_foot = 1200.0 / 3937.0;
 
 bool validGeographicCoordinate(double longitude_deg, double latitude_deg)
 {
@@ -134,10 +134,10 @@ bool transformEpanetEpsgToWgs84(
             coordinate);
     case 3089:
         return reverseKentuckySingleZone(
-            x * meters_per_us_survey_foot,
-            y * meters_per_us_survey_foot,
-            kentucky_false_easting_ft_us * meters_per_us_survey_foot,
-            kentucky_false_northing_ft_us * meters_per_us_survey_foot,
+            x * aowis::units::metres_per_us_survey_foot,
+            y * aowis::units::metres_per_us_survey_foot,
+            kentucky_false_easting_ft_us * aowis::units::metres_per_us_survey_foot,
+            kentucky_false_northing_ft_us * aowis::units::metres_per_us_survey_foot,
             coordinate);
     default:
         return false;
