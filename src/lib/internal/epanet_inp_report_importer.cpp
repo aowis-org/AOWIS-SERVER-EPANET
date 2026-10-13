@@ -5,6 +5,7 @@
 #include "epanet_status_helpers.h"
 
 #include <aowis/epanet/epanet_api.h>
+#include <aowis/model/units/conversion.h>
 #include <aowis/epanet/epanet_result_import.h>
 
 #include <QFile>
@@ -16,21 +17,6 @@
 
 namespace
 {
-constexpr double meters_per_foot = 0.3048;
-constexpr double psi_per_foot = 0.4333;
-constexpr double kpa_per_psi = 6.895;
-constexpr double bar_per_psi = 0.068948;
-constexpr double gallons_per_minute_per_cfs = 448.8311688311688;
-constexpr double acre_feet_per_day_per_cfs = 1.9834710743801653;
-constexpr double million_gallons_per_day_per_cfs = 0.6463168831168831;
-constexpr double imperial_million_gallons_per_day_per_cfs = 0.5381713836613002;
-constexpr double liters_per_second_per_cfs = 28.316846592;
-constexpr double liters_per_minute_per_cfs = 1699.01079552;
-constexpr double cubic_meters_per_second_per_cfs = 0.028316846592;
-constexpr double cubic_meters_per_hour_per_cfs = 101.9406477312;
-constexpr double cubic_meters_per_day_per_cfs = 2446.5755455488;
-constexpr double million_liters_per_day_per_cfs = 2.4465755455488;
-
 void appendImportWarning(
     EpanetResultImport &result,
     const QString &message,
@@ -120,47 +106,47 @@ bool parseInteger(const QString &text, int &value)
 
 double flowToCanonicalM3PerH(int flow_units)
 {
-    double source_per_cfs = cubic_meters_per_hour_per_cfs;
+    double source_per_cfs = aowis::units::epanet_cubic_metres_per_hour_per_cfs;
     switch (flow_units)
     {
     case EN_CFS:
         source_per_cfs = 1.0;
         break;
     case EN_GPM:
-        source_per_cfs = gallons_per_minute_per_cfs;
+        source_per_cfs = aowis::units::epanet_gallons_per_minute_per_cfs;
         break;
     case EN_MGD:
-        source_per_cfs = million_gallons_per_day_per_cfs;
+        source_per_cfs = aowis::units::epanet_million_gallons_per_day_per_cfs;
         break;
     case EN_IMGD:
-        source_per_cfs = imperial_million_gallons_per_day_per_cfs;
+        source_per_cfs = aowis::units::epanet_imperial_million_gallons_per_day_per_cfs;
         break;
     case EN_AFD:
-        source_per_cfs = acre_feet_per_day_per_cfs;
+        source_per_cfs = aowis::units::epanet_acre_feet_per_day_per_cfs;
         break;
     case EN_LPS:
-        source_per_cfs = liters_per_second_per_cfs;
+        source_per_cfs = aowis::units::epanet_litres_per_second_per_cfs;
         break;
     case EN_LPM:
-        source_per_cfs = liters_per_minute_per_cfs;
+        source_per_cfs = aowis::units::epanet_litres_per_minute_per_cfs;
         break;
     case EN_MLD:
-        source_per_cfs = million_liters_per_day_per_cfs;
+        source_per_cfs = aowis::units::epanet_million_litres_per_day_per_cfs;
         break;
     case EN_CMH:
-        source_per_cfs = cubic_meters_per_hour_per_cfs;
+        source_per_cfs = aowis::units::epanet_cubic_metres_per_hour_per_cfs;
         break;
     case EN_CMD:
-        source_per_cfs = cubic_meters_per_day_per_cfs;
+        source_per_cfs = aowis::units::epanet_cubic_metres_per_day_per_cfs;
         break;
     case EN_CMS:
-        source_per_cfs = cubic_meters_per_second_per_cfs;
+        source_per_cfs = aowis::units::epanet_cubic_metres_per_second_per_cfs;
         break;
     default:
         break;
     }
 
-    return cubic_meters_per_hour_per_cfs / source_per_cfs;
+    return aowis::units::epanet_cubic_metres_per_hour_per_cfs / source_per_cfs;
 }
 
 bool flowUnitsAreSi(int flow_units)
@@ -175,7 +161,7 @@ bool flowUnitsAreSi(int flow_units)
 
 double sourceLengthToM(int flow_units)
 {
-    return flowUnitsAreSi(flow_units) ? 1.0 : meters_per_foot;
+    return flowUnitsAreSi(flow_units) ? 1.0 : aowis::units::metres_per_international_foot;
 }
 
 double sourceDiameterToMm(int flow_units)
@@ -185,7 +171,7 @@ double sourceDiameterToMm(int flow_units)
 
 double sourceVelocityToMPerS(int flow_units)
 {
-    return flowUnitsAreSi(flow_units) ? 1.0 : meters_per_foot;
+    return flowUnitsAreSi(flow_units) ? 1.0 : aowis::units::metres_per_international_foot;
 }
 
 double sourcePressureToHeadM(const EpanetInpSourceUnits &source_units)
@@ -198,13 +184,13 @@ double sourcePressureToHeadM(const EpanetInpSourceUnits &source_units)
     case EN_METERS:
         return 1.0;
     case EN_FEET:
-        return meters_per_foot;
+        return aowis::units::metres_per_international_foot;
     case EN_PSI:
-        return meters_per_foot / (psi_per_foot * specific_gravity);
+        return aowis::units::metres_per_international_foot / (aowis::units::epanet_psi_per_foot * specific_gravity);
     case EN_KPA:
-        return meters_per_foot / (kpa_per_psi * psi_per_foot * specific_gravity);
+        return aowis::units::metres_per_international_foot / (aowis::units::epanet_kpa_per_psi * aowis::units::epanet_psi_per_foot * specific_gravity);
     case EN_BAR:
-        return meters_per_foot / (bar_per_psi * psi_per_foot * specific_gravity);
+        return aowis::units::metres_per_international_foot / (aowis::units::epanet_bar_per_psi * aowis::units::epanet_psi_per_foot * specific_gravity);
     default:
         return 1.0;
     }

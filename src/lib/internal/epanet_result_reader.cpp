@@ -3,6 +3,8 @@
 #include "epanet_project.h"
 #include "epanet_status_helpers.h"
 
+#include <aowis/model/units/conversion.h>
+
 #include <cmath>
 
 namespace
@@ -331,16 +333,13 @@ HydraulicSimulationStatus EpanetResultReader::readLinksPipes(HydraulicSimulation
         const double length_m = pipe.length_measured_m.value_or(pipe.length_calculated_m);
         if (length_m > 0.0)
             pipe_result.head_loss_gradient_m_per_km = pipe_result.head_loss_m / length_m * 1000.0;
-
-        constexpr double meters_per_foot = 0.3048;
-        constexpr double cubic_meters_per_hour_per_cubic_foot_per_second = 101.9406477312;
         constexpr double tiny_flow_cubic_feet_per_second = 1.0e-6;
-        const double flow_cubic_feet_per_second = std::abs(pipe_result.flow_m3_per_h) / cubic_meters_per_hour_per_cubic_foot_per_second;
+        const double flow_cubic_feet_per_second = std::abs(pipe_result.flow_m3_per_h) / aowis::units::epanet_cubic_metres_per_hour_per_cfs;
         if (length_m > 0.0 && pipe.diameter_mm > 0.0 && flow_cubic_feet_per_second > tiny_flow_cubic_feet_per_second)
         {
-            const double head_loss_ft = pipe_result.head_loss_m / meters_per_foot;
-            const double diameter_ft = pipe.diameter_mm / 1000.0 / meters_per_foot;
-            const double length_ft = length_m / meters_per_foot;
+            const double head_loss_ft = pipe_result.head_loss_m / aowis::units::metres_per_international_foot;
+            const double diameter_ft = pipe.diameter_mm / 1000.0 / aowis::units::metres_per_international_foot;
+            const double length_ft = length_m / aowis::units::metres_per_international_foot;
             pipe_result.friction_factor = 39.725 * head_loss_ft * std::pow(diameter_ft, 5.0)
                 / length_ft / std::pow(flow_cubic_feet_per_second, 2.0);
         }

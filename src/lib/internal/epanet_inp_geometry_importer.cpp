@@ -6,6 +6,7 @@
 #include "epanet_status_helpers.h"
 
 #include <aowis/epanet/epanet_api.h>
+#include <aowis/model/units/conversion.h>
 
 #include <GeographicLib/LocalCartesian.hpp>
 
@@ -20,7 +21,6 @@
 
 namespace
 {
-constexpr double meters_per_foot = 0.3048;
 constexpr int missing_coordinate_error = 254;
 
 using SourcePoint = EpanetImportSourcePoint;
@@ -576,7 +576,7 @@ GeometryTransform makeGeometryTransform(
     }
 
     if (units == SourceMapUnits::Feet)
-        transform.scale_to_m = meters_per_foot;
+        transform.scale_to_m = aowis::units::metres_per_international_foot;
     else
         transform.scale_to_m = 1.0;
 

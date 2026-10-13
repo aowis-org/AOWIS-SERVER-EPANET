@@ -8,6 +8,7 @@
 #include "epanet_status_helpers.h"
 
 #include <aowis/epanet/epanet_api.h>
+#include <aowis/model/units/conversion.h>
 
 #include <QFile>
 #include <QFileInfo>
@@ -24,8 +25,6 @@
 namespace
 {
 constexpr double pi = 3.14159265358979323846;
-constexpr double kw_per_hp = 0.7457;
-constexpr double meters_per_foot = 0.3048;
 constexpr int epanet_active_valve_status = 2;
 constexpr int epanet_no_quality_source_error = 240;
 
@@ -369,7 +368,7 @@ HydraulicSimulationStatus normalizeProjectToCanonicalUnits(
                 continue;
 
             error = EN_setlinkvalue(
-                project.handle(), link_index, EN_PUMP_POWER, power * kw_per_hp);
+                project.handle(), link_index, EN_PUMP_POWER, power * aowis::units::epanet_kw_per_hp);
             if (error != 0)
             {
                 return readFailure(
@@ -3255,7 +3254,7 @@ double wallReactionSourceCoefficientScaleToCanonical(
     double wall_order,
     int source_flow_units)
 {
-    const double source_length_to_m = flowUnitsAreSi(source_flow_units) ? 1.0 : meters_per_foot;
+    const double source_length_to_m = flowUnitsAreSi(source_flow_units) ? 1.0 : aowis::units::metres_per_international_foot;
     if (wall_order == 0.0)
     {
         return chemical_scale_to_canonical_mg
