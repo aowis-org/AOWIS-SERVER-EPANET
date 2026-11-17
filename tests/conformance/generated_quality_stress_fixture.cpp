@@ -216,7 +216,7 @@ QualityStressSpecification generateQualitySpecification(const GeneratedQualitySt
     return quality;
 }
 
-QUuid patternUuid(const NetworkHydraulic &network, const QString &id)
+QUuid patternUuid(const NetworkHydraulicDistribution &network, const QString &id)
 {
     if (id.isEmpty())
         return QUuid();
@@ -228,7 +228,7 @@ QUuid patternUuid(const NetworkHydraulic &network, const QString &id)
     throw std::runtime_error("Generated quality stress pattern ID is unresolved in Model fixture");
 }
 
-void applyNodeSpecification(HydraulicNodeJunction &node, const QualityNodeSpecification &quality, const NetworkHydraulic &network, WaterQualityAnalysisType analysis)
+void applyNodeSpecification(HydraulicNodeJunction &node, const QualityNodeSpecification &quality, const NetworkHydraulicDistribution &network, WaterQualityAnalysisType analysis)
 {
     if (analysis == WaterQualityAnalysisType::Chemical)
         node.initial_chemical_concentration_mg_per_l = quality.initial_value;
@@ -243,7 +243,7 @@ void applyNodeSpecification(HydraulicNodeJunction &node, const QualityNodeSpecif
     node.quality_source.pattern_uuid = patternUuid(network, quality.source_pattern_id);
 }
 
-void applyNodeSpecification(HydraulicNodeReservoir &node, const QualityNodeSpecification &quality, const NetworkHydraulic &network, WaterQualityAnalysisType analysis)
+void applyNodeSpecification(HydraulicNodeReservoir &node, const QualityNodeSpecification &quality, const NetworkHydraulicDistribution &network, WaterQualityAnalysisType analysis)
 {
     if (analysis == WaterQualityAnalysisType::Chemical)
         node.initial_chemical_concentration_mg_per_l = quality.initial_value;
@@ -258,7 +258,7 @@ void applyNodeSpecification(HydraulicNodeReservoir &node, const QualityNodeSpeci
     node.quality_source.pattern_uuid = patternUuid(network, quality.source_pattern_id);
 }
 
-void applyQualityToModel(NetworkHydraulic &network, WaterQualitySolverOptions &options, const QualityStressSpecification &quality)
+void applyQualityToModel(NetworkHydraulicDistribution &network, WaterQualitySolverOptions &options, const QualityStressSpecification &quality)
 {
     options.analysis = quality.analysis;
     options.chemical_name = quality.chemical_name;

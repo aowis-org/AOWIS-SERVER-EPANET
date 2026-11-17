@@ -7,7 +7,7 @@
 
 namespace AowisEpanetTests
 {
-inline EpanetRunRequest makeRunRequest(NetworkHydraulic network)
+inline EpanetRunRequest makeRunRequest(NetworkHydraulicDistribution network)
 {
     EpanetRunRequest request;
     request.network = std::move(network);
@@ -15,7 +15,7 @@ inline EpanetRunRequest makeRunRequest(NetworkHydraulic network)
 }
 
 inline EpanetRunRequest makeRunRequest(
-    NetworkHydraulic network,
+    NetworkHydraulicDistribution network,
     const WaterQualitySolverOptions &quality_options)
 {
     EpanetRunRequest request = makeRunRequest(std::move(network));
@@ -24,7 +24,7 @@ inline EpanetRunRequest makeRunRequest(
 }
 
 inline EpanetRunRequest makeRunRequest(
-    NetworkHydraulic network,
+    NetworkHydraulicDistribution network,
     const QList<WaterQualitySolverOptions> &quality_runs)
 {
     EpanetRunRequest request = makeRunRequest(std::move(network));

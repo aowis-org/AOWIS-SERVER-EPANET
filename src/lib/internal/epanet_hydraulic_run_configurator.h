@@ -5,11 +5,11 @@
 
 class EpanetProject;
 struct EpanetIndexRegistry;
-struct NetworkHydraulic;
+struct NetworkHydraulicDistribution;
 
 HydraulicSimulationStatus configureEpanetHydraulicRun(
     EpanetProject &project,
-    const NetworkHydraulic &request,
+    const NetworkHydraulicDistribution &request,
     const EpanetIndexRegistry &indices);
 
 #endif // AOWIS_EPANET_HYDRAULIC_RUN_CONFIGURATOR_H

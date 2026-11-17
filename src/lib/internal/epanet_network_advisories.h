@@ -4,7 +4,7 @@
 #include <QList>
 
 #include <aowis/model/hydraulic/hydraulic_simulation_diagnostics.h>
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 // Non-blocking advisories about a hydraulic network's static configuration.
 //
@@ -22,6 +22,6 @@
 // intentional use is possible, callers should surface these as
 // Warning-severity diagnostics and let the simulation proceed - never as a
 // validation failure that blocks it.
-QList<HydraulicSimulationDiagnostic> collectEpanetNetworkAdvisories(const NetworkHydraulic &network);
+QList<HydraulicSimulationDiagnostic> collectEpanetNetworkAdvisories(const NetworkHydraulicDistribution &network);
 
 #endif // AOWIS_EPANET_NETWORK_ADVISORIES_H

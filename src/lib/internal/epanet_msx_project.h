@@ -4,7 +4,7 @@
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
 #include <aowis/model/hydraulic/multi_species.h>
 #include <aowis/model/hydraulic/multi_species_results.h>
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 #include <functional>
 
@@ -28,7 +28,7 @@ class EpanetMsxProject
 {
 public:
     HydraulicSimulationStatus run(
-        const NetworkHydraulic &network,
+        const NetworkHydraulicDistribution &network,
         const MultiSpeciesRunOptions &run_options,
         const QString &configured_inp_text,
         const QString &hydraulic_file_path,

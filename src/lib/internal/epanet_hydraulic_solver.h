@@ -3,7 +3,7 @@
 
 #include <aowis/model/hydraulic/hydraulic_simulation_results.h>
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 #include <functional>
 
@@ -13,7 +13,7 @@ class EpanetResultReader;
 class EpanetHydraulicSolver
 {
 public:
-    EpanetHydraulicSolver(EpanetProject &project, const NetworkHydraulic &network, const EpanetResultReader &result_reader);
+    EpanetHydraulicSolver(EpanetProject &project, const NetworkHydraulicDistribution &network, const EpanetResultReader &result_reader);
 
     HydraulicSimulationStatus run(
         HydraulicSimulationResultTimeline &timeline,
@@ -22,7 +22,7 @@ public:
 
 private:
     EpanetProject &project;
-    const NetworkHydraulic &network;
+    const NetworkHydraulicDistribution &network;
     const EpanetResultReader &result_reader;
 };
 

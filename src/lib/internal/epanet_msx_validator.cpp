@@ -14,7 +14,7 @@ namespace
 constexpr int kMsxMaximumInputLineLength = 1024;
 
 HydraulicSimulationStatus msxValidationFailure(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const QString &message,
     const QStringList &details = {})
 {
@@ -129,7 +129,7 @@ QSet<QUuid> enabledUuidsOf(const QList<Entity> &entities)
     return result;
 }
 
-QSet<QUuid> nodeUuids(const NetworkHydraulic &network)
+QSet<QUuid> nodeUuids(const NetworkHydraulicDistribution &network)
 {
     QSet<QUuid> result = uuidsOf(network.nodes_junctions);
     result.unite(uuidsOf(network.nodes_reservoirs));
@@ -137,7 +137,7 @@ QSet<QUuid> nodeUuids(const NetworkHydraulic &network)
     return result;
 }
 
-QSet<QUuid> enabledNodeUuids(const NetworkHydraulic &network)
+QSet<QUuid> enabledNodeUuids(const NetworkHydraulicDistribution &network)
 {
     QSet<QUuid> result = enabledUuidsOf(network.nodes_junctions);
     result.unite(enabledUuidsOf(network.nodes_reservoirs));
@@ -146,7 +146,7 @@ QSet<QUuid> enabledNodeUuids(const NetworkHydraulic &network)
 }
 
 void validateIdentity(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     QList<HydraulicSimulationStatus> &failures,
     QSet<QUuid> &uuids,
     QSet<QString> &ids,
@@ -207,7 +207,7 @@ void validateIdentity(
 }
 
 void validateIdentities(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     QList<HydraulicSimulationStatus> &failures)
 {
     const NetworkMultiSpecies &model = network.multi_species;
@@ -249,7 +249,7 @@ void validateIdentities(
 }
 
 void appendReferenceFailure(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     QList<HydraulicSimulationStatus> &failures,
     const QSet<QUuid> &all_uuids,
     const QSet<QUuid> &enabled_uuids,
@@ -274,7 +274,7 @@ void appendReferenceFailure(
 }
 
 void validateReferencesAndAssignments(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     QList<HydraulicSimulationStatus> &failures)
 {
     const NetworkMultiSpecies &model = network.multi_species;
@@ -417,7 +417,7 @@ void validateReferencesAndAssignments(
 }
 
 HydraulicSimulationStatus validateFiniteValue(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     double value,
     const QString &field,
     bool non_negative)
@@ -433,7 +433,7 @@ HydraulicSimulationStatus validateFiniteValue(
 }
 
 void validateNumerics(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     QList<HydraulicSimulationStatus> &failures)
 {
     const NetworkMultiSpecies &model = network.multi_species;
@@ -736,7 +736,7 @@ bool findTermCycle(
 }
 
 void validateExpressions(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     QList<HydraulicSimulationStatus> &failures)
 {
     const NetworkMultiSpecies &model = network.multi_species;
@@ -848,7 +848,7 @@ HydraulicSimulationStatus finishValidation(
 }
 
 HydraulicSimulationStatus validateEpanetMultiSpeciesModel(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     QList<HydraulicSimulationStatus> *validation_failures)
 {
     QList<HydraulicSimulationStatus> failures;
@@ -872,7 +872,7 @@ HydraulicSimulationStatus validateEpanetMultiSpeciesModel(
 }
 
 HydraulicSimulationStatus validateEpanetMultiSpeciesRun(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const MultiSpeciesRunOptions &run_options,
     QList<HydraulicSimulationStatus> *validation_failures)
 {

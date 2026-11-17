@@ -1,7 +1,7 @@
 #ifndef AOWIS_EPANET_NATIVE_QUALITY_REFERENCE_RUNNER_H
 #define AOWIS_EPANET_NATIVE_QUALITY_REFERENCE_RUNNER_H
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 #include <QHash>
 #include <QList>
@@ -30,7 +30,7 @@ struct NativeQualityReferenceTimeline
 
 NativeQualityReferenceTimeline runNativeQualityReference(
     const QString &input_file,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     bool canonical_metric_units = false);
 }
 

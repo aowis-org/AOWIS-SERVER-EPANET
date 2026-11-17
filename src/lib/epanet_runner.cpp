@@ -51,7 +51,7 @@ QString nodeIdForUuid(const QList<Node> &nodes, const QUuid &uuid)
     return QString();
 }
 
-QString traceNodeLabel(const NetworkHydraulic &network, const QUuid &uuid)
+QString traceNodeLabel(const NetworkHydraulicDistribution &network, const QUuid &uuid)
 {
     if (uuid.isNull())
         return QStringLiteral("not set");
@@ -69,7 +69,7 @@ QString traceNodeLabel(const NetworkHydraulic &network, const QUuid &uuid)
 
 QString qualitySectionHeading(
     const WaterQualitySolverOptions &options,
-    const NetworkHydraulic &network)
+    const NetworkHydraulicDistribution &network)
 {
     switch (options.analysis)
     {
@@ -117,7 +117,7 @@ QString qualityRunStatusText(const EpanetQualityResult &quality_result)
     return QString();
 }
 
-void finalizeReportText(EpanetResultRun &result, const NetworkHydraulic &network)
+void finalizeReportText(EpanetResultRun &result, const NetworkHydraulicDistribution &network)
 {
     QStringList report_sections;
     if (!result.report_lines.isEmpty())
@@ -203,7 +203,7 @@ void markPendingMultiSpeciesRun(EpanetResultRun &result, EpanetRunState state)
 EpanetResultRun cancelledRun(
     EpanetResultRun result,
     const EpanetPreparedProject &prepared_project,
-    const NetworkHydraulic &network)
+    const NetworkHydraulicDistribution &network)
 {
     result.cancelled = true;
     result.state = EpanetRunState::Cancelled;
@@ -219,7 +219,7 @@ EpanetResultRun failedRun(
     EpanetResultRun result,
     const HydraulicSimulationStatus &status,
     const EpanetPreparedProject &prepared_project,
-    const NetworkHydraulic &network)
+    const NetworkHydraulicDistribution &network)
 {
     result.status = status;
     result.state = EpanetRunState::Error;

@@ -320,7 +320,7 @@ double choosePipeDiameterMm(PipeClass pipe_class, double length_m, std::mt19937_
     return 100.0;
 }
 
-void appendPipe(NetworkHydraulic &network, const QUuid &from_uuid, const QUuid &to_uuid, double straight_length_m, PipeClass pipe_class, int &pipe_index, std::mt19937_64 &generator)
+void appendPipe(NetworkHydraulicDistribution &network, const QUuid &from_uuid, const QUuid &to_uuid, double straight_length_m, PipeClass pipe_class, int &pipe_index, std::mt19937_64 &generator)
 {
     HydraulicLinkPipe pipe;
     pipe.uuid = QUuid::createUuid();
@@ -336,7 +336,7 @@ void appendPipe(NetworkHydraulic &network, const QUuid &from_uuid, const QUuid &
     pipe_index++;
 }
 
-void appendJunctionPipe(NetworkHydraulic &network, const QVector<GeneratedJunction> &junctions, int from_index, int to_index, PipeClass pipe_class, int &pipe_index, QSet<quint64> &edges, std::mt19937_64 &generator)
+void appendJunctionPipe(NetworkHydraulicDistribution &network, const QVector<GeneratedJunction> &junctions, int from_index, int to_index, PipeClass pipe_class, int &pipe_index, QSet<quint64> &edges, std::mt19937_64 &generator)
 {
     if (from_index < 0 || to_index < 0 || from_index == to_index)
         return;
@@ -385,7 +385,7 @@ HydraulicCurveTankVolume createTankVolumeCurve(int tank_index, double maximum_le
     return curve;
 }
 
-void appendScaledJunctions(NetworkHydraulic &network, QVector<GeneratedJunction> &junctions)
+void appendScaledJunctions(NetworkHydraulicDistribution &network, QVector<GeneratedJunction> &junctions)
 {
     double raw_total_demand = 0.0;
     for (int junction_index = 0; junction_index < junctions.length(); junction_index++)
@@ -402,7 +402,7 @@ void appendScaledJunctions(NetworkHydraulic &network, QVector<GeneratedJunction>
     }
 }
 
-void appendReservoir(NetworkHydraulic &network, const QVector<GeneratedJunction> &junctions, double x_m, double y_m, double hydraulic_head_m, int reservoir_index, int &pipe_index, std::mt19937_64 &generator)
+void appendReservoir(NetworkHydraulicDistribution &network, const QVector<GeneratedJunction> &junctions, double x_m, double y_m, double hydraulic_head_m, int reservoir_index, int &pipe_index, std::mt19937_64 &generator)
 {
     HydraulicNodeReservoir reservoir;
     reservoir.uuid = QUuid::createUuid();
@@ -416,7 +416,7 @@ void appendReservoir(NetworkHydraulic &network, const QVector<GeneratedJunction>
     appendPipe(network, reservoir.uuid, nearest_junction.node.uuid, distance(x_m, y_m, nearest_junction.x_m, nearest_junction.y_m), PipeClass::DistrictFeed, pipe_index, generator);
 }
 
-void appendTank(NetworkHydraulic &network, const QVector<GeneratedJunction> &junctions, double x_m, double y_m, int tank_index, int &pipe_index, std::mt19937_64 &generator)
+void appendTank(NetworkHydraulicDistribution &network, const QVector<GeneratedJunction> &junctions, double x_m, double y_m, int tank_index, int &pipe_index, std::mt19937_64 &generator)
 {
     const double bottom_elevation_m = syntheticTerrainElevation(x_m, y_m, generator) + randomReal(generator, 8.0, 18.0);
     const double minimum_level_m = 2.0;
@@ -470,7 +470,7 @@ void appendTank(NetworkHydraulic &network, const QVector<GeneratedJunction> &jun
     appendPipe(network, tank.uuid, nearest_junction.node.uuid, distance(x_m, y_m, nearest_junction.x_m, nearest_junction.y_m), PipeClass::StorageConnection, pipe_index, generator);
 }
 
-void appendCitySourcesAndStorage(NetworkHydraulic &network, const QVector<GeneratedJunction> &junctions, int &pipe_index, std::mt19937_64 &generator)
+void appendCitySourcesAndStorage(NetworkHydraulicDistribution &network, const QVector<GeneratedJunction> &junctions, int &pipe_index, std::mt19937_64 &generator)
 {
     const std::array<std::array<double, 3>, 2> reservoir_definitions = {
         std::array<double, 3>{-3600.0, 7200.0, 302.0},
@@ -724,7 +724,7 @@ void appendHybridDistrictJunctions(QVector<GeneratedJunction> &junctions, QVecto
     }
 }
 
-void appendHybridDistrictLoops(NetworkHydraulic &network, const QVector<GeneratedJunction> &junctions, const QVector<int> &district_indices, int &pipe_index, QSet<quint64> &edges, std::mt19937_64 &generator)
+void appendHybridDistrictLoops(NetworkHydraulicDistribution &network, const QVector<GeneratedJunction> &junctions, const QVector<int> &district_indices, int &pipe_index, QSet<quint64> &edges, std::mt19937_64 &generator)
 {
     for (int position = 0; position < district_indices.length(); position++)
     {
@@ -740,10 +740,10 @@ void appendHybridDistrictLoops(NetworkHydraulic &network, const QVector<Generate
     }
 }
 
-NetworkHydraulic generateCombinedNetwork(quint64 seed)
+NetworkHydraulicDistribution generateCombinedNetwork(quint64 seed)
 {
     std::mt19937_64 generator(seed);
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.uuid = QUuid::createUuid();
 
     QVector<GeneratedJunction> junctions;
@@ -823,22 +823,22 @@ NetworkHydraulic generateCombinedNetwork(quint64 seed)
 }
 }
 
-NetworkHydraulic RandomHydraulicNetworkGenerator::generate()
+NetworkHydraulicDistribution RandomHydraulicNetworkGenerator::generate()
 {
     return generate(randomSeed());
 }
 
-NetworkHydraulic RandomHydraulicNetworkGenerator::generate(quint64 seed)
+NetworkHydraulicDistribution RandomHydraulicNetworkGenerator::generate(quint64 seed)
 {
     return generateCombinedNetwork(seed);
 }
 
-NetworkHydraulic RandomHydraulicNetworkGenerator::generateFractal()
+NetworkHydraulicDistribution RandomHydraulicNetworkGenerator::generateFractal()
 {
     return generate();
 }
 
-NetworkHydraulic RandomHydraulicNetworkGenerator::generateFractal(quint64 seed)
+NetworkHydraulicDistribution RandomHydraulicNetworkGenerator::generateFractal(quint64 seed)
 {
     return generateCombinedNetwork(seed);
 }

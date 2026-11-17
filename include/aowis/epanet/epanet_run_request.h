@@ -5,11 +5,11 @@
 
 #include <QList>
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 struct EpanetRunRequest
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     QList<WaterQualitySolverOptions> quality_runs;
 
     // Standard EPANET chemical/age/trace quality_runs and the multi-species
@@ -17,8 +17,8 @@ struct EpanetRunRequest
     // them sequentially against the same hydraulic solution; MSX consumes the
     // hydraulic file persisted from that one EPANET hydraulic solve. Within
     // MultiSpeciesRunOptions, output_species_uuids is an output filter only: MSX
-    // always solves the complete NetworkHydraulic::multi_species chemistry.
-    // nullopt means this run does not execute NetworkHydraulic::multi_species
+    // always solves the complete NetworkHydraulicDistribution::multi_species chemistry.
+    // nullopt means this run does not execute NetworkHydraulicDistribution::multi_species
     // even if that model is defined.
     std::optional<MultiSpeciesRunOptions> multi_species_run;
 };

@@ -4,10 +4,10 @@
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
 
 class EpanetProject;
-struct NetworkHydraulic;
+struct NetworkHydraulicDistribution;
 
 HydraulicSimulationStatus configureEpanetReport(
     EpanetProject &project,
-    const NetworkHydraulic &request);
+    const NetworkHydraulicDistribution &request);
 
 #endif // AOWIS_EPANET_REPORT_CONFIGURATOR_H

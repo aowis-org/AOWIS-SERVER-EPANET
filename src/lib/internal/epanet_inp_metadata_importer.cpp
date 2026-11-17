@@ -92,7 +92,7 @@ HydraulicSimulationStatus importMetadataForEntities(
 HydraulicSimulationStatus importEpanetInpEntityMetadata(
     const EpanetProject &project, EpanetResultImport &result)
 {
-    NetworkHydraulic &network = result.request.network;
+    NetworkHydraulicDistribution &network = result.request.network;
     HydraulicSimulationStatus status = importMetadataForEntities(
         project, network.nodes_junctions, EN_NODE,
         HydraulicSimulationStatusEntityType::Junction, true);

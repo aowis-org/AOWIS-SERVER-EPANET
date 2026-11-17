@@ -5,7 +5,7 @@
 #include "epanet_project.h"
 #include "epanet_status_helpers.h"
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 #include <QByteArray>
 
@@ -115,7 +115,7 @@ double qualityTolerance(const WaterQualitySolverOptions &options)
 }
 
 double effectivePipeWallReactionCoefficient(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const HydraulicLinkPipe &pipe)
 {
     if (pipe.override_wall_reaction)
@@ -140,7 +140,7 @@ double effectivePipeWallReactionCoefficient(
     return 0.0;
 }
 
-bool resolveTraceNodeId(const NetworkHydraulic &network, const QUuid &uuid, QByteArray &backend_id)
+bool resolveTraceNodeId(const NetworkHydraulicDistribution &network, const QUuid &uuid, QByteArray &backend_id)
 {
     for (const HydraulicNodeJunction &node : network.nodes_junctions)
     {
@@ -188,7 +188,7 @@ void collectConfigurationFailure(
 
 HydraulicSimulationStatus configureQualityAnalysis(
     EpanetProject &project,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const EpanetIndexRegistry &indices,
     const WaterQualitySolverOptions &options)
 {
@@ -338,7 +338,7 @@ HydraulicSimulationStatus configureQualityAnalysis(
 
 HydraulicSimulationStatus configureQualityReactions(
     EpanetProject &project,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const EpanetIndexRegistry &indices)
 {
     for (const HydraulicLinkPipe &pipe : network.links_pipes)
@@ -375,7 +375,7 @@ HydraulicSimulationStatus configureQualityReactions(
 
 HydraulicSimulationStatus configureEpanetQualityRun(
     EpanetProject &project,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const EpanetIndexRegistry &indices,
     const WaterQualitySolverOptions &options)
 {

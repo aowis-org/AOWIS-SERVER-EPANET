@@ -2,7 +2,7 @@
 
 EPANET 2.3 simulation backend for the solver-neutral AOWIS hydraulic model.
 
-The adapter translates `NetworkHydraulic` into a native EPANET project, executes one hydraulic analysis, optionally executes one or more water-quality analyses against the saved hydraulic solution, and maps native results and diagnostics back into AOWIS result types.
+The adapter translates `NetworkHydraulicDistribution` into a native EPANET project, executes one hydraulic analysis, optionally executes one or more water-quality analyses against the saved hydraulic solution, and maps native results and diagnostics back into AOWIS result types.
 
 ## Public API
 
@@ -17,11 +17,11 @@ The implementation keeps native EPANET state behind adapter-internal builders, c
 
 ## Execution model
 
-Each request contains exactly one hydraulic configuration. The selected headloss formula comes from `NetworkHydraulic::options_hydraulic.headloss_formula`.
+Each request contains exactly one hydraulic configuration. The selected headloss formula comes from `NetworkHydraulicDistribution::options_hydraulic.headloss_formula`.
 
 Hydraulics are solved and saved once. The adapter then executes the ordered `quality_runs` list against that saved hydraulic solution. Chemical concentration, water age, and source trace use independent quality timelines because their timesteps do not have to coincide with hydraulic events.
 
-`NetworkHydraulic` contains the network and its persistent hydraulic/quality input data. The active water-quality analysis, trace origin, chemical name, tolerances, and diffusivity are execution settings carried only by `EpanetRunRequest::quality_runs`; they are not mutable network state.
+`NetworkHydraulicDistribution` contains the network and its persistent hydraulic/quality input data. The active water-quality analysis, trace origin, chemical name, tolerances, and diffusivity are execution settings carried only by `EpanetRunRequest::quality_runs`; they are not mutable network state.
 
 Multiple headloss formulas are separate requests; they are not branches inside one `EpanetRunRequest`. `retrieveInp()` accepts the same request type because quality-analysis configuration is part of execution state, but an INP file can represent at most one active quality analysis, so INP export rejects requests containing more than one quality child.
 

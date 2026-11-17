@@ -94,7 +94,7 @@ ComparisonContext comparison(std::string field)
     return value;
 }
 
-const HydraulicNodeJunction *junctionById(const NetworkHydraulic &network, const QString &id)
+const HydraulicNodeJunction *junctionById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicNodeJunction &junction : network.nodes_junctions)
     {
@@ -104,7 +104,7 @@ const HydraulicNodeJunction *junctionById(const NetworkHydraulic &network, const
     return nullptr;
 }
 
-const HydraulicNodeReservoir *reservoirById(const NetworkHydraulic &network, const QString &id)
+const HydraulicNodeReservoir *reservoirById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicNodeReservoir &reservoir : network.nodes_reservoirs)
     {
@@ -114,7 +114,7 @@ const HydraulicNodeReservoir *reservoirById(const NetworkHydraulic &network, con
     return nullptr;
 }
 
-const HydraulicNodeTank *tankById(const NetworkHydraulic &network, const QString &id)
+const HydraulicNodeTank *tankById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicNodeTank &tank : network.nodes_tanks)
     {
@@ -124,7 +124,7 @@ const HydraulicNodeTank *tankById(const NetworkHydraulic &network, const QString
     return nullptr;
 }
 
-const HydraulicLinkPipe *pipeById(const NetworkHydraulic &network, const QString &id)
+const HydraulicLinkPipe *pipeById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicLinkPipe &pipe : network.links_pipes)
     {
@@ -134,7 +134,7 @@ const HydraulicLinkPipe *pipeById(const NetworkHydraulic &network, const QString
     return nullptr;
 }
 
-const HydraulicLinkPump *pumpById(const NetworkHydraulic &network, const QString &id)
+const HydraulicLinkPump *pumpById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicLinkPump &pump : network.links_pumps)
     {
@@ -144,7 +144,7 @@ const HydraulicLinkPump *pumpById(const NetworkHydraulic &network, const QString
     return nullptr;
 }
 
-const HydraulicLinkValve *valveById(const NetworkHydraulic &network, const QString &id)
+const HydraulicLinkValve *valveById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicLinkValve &valve : network.links_valves)
     {
@@ -154,7 +154,7 @@ const HydraulicLinkValve *valveById(const NetworkHydraulic &network, const QStri
     return nullptr;
 }
 
-const HydraulicPatternTime *patternById(const NetworkHydraulic &network, const QString &id)
+const HydraulicPatternTime *patternById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicPatternTime &pattern : network.patterns_time)
     {
@@ -164,7 +164,7 @@ const HydraulicPatternTime *patternById(const NetworkHydraulic &network, const Q
     return nullptr;
 }
 
-const HydraulicCurvePumpHead *pumpHeadCurveById(const NetworkHydraulic &network, const QString &id)
+const HydraulicCurvePumpHead *pumpHeadCurveById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicCurvePumpHead &curve : network.curves_pump_head)
     {
@@ -174,7 +174,7 @@ const HydraulicCurvePumpHead *pumpHeadCurveById(const NetworkHydraulic &network,
     return nullptr;
 }
 
-const HydraulicCurvePumpEfficiency *pumpEfficiencyCurveById(const NetworkHydraulic &network, const QString &id)
+const HydraulicCurvePumpEfficiency *pumpEfficiencyCurveById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicCurvePumpEfficiency &curve : network.curves_pump_efficiency)
     {
@@ -184,7 +184,7 @@ const HydraulicCurvePumpEfficiency *pumpEfficiencyCurveById(const NetworkHydraul
     return nullptr;
 }
 
-const HydraulicCurveGeneric *genericCurveById(const NetworkHydraulic &network, const QString &id)
+const HydraulicCurveGeneric *genericCurveById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicCurveGeneric &curve : network.curves_generic)
     {
@@ -194,7 +194,7 @@ const HydraulicCurveGeneric *genericCurveById(const NetworkHydraulic &network, c
     return nullptr;
 }
 
-const HydraulicCurveTankVolume *tankVolumeCurveById(const NetworkHydraulic &network, const QString &id)
+const HydraulicCurveTankVolume *tankVolumeCurveById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicCurveTankVolume &curve : network.curves_tank_volume)
     {
@@ -204,7 +204,7 @@ const HydraulicCurveTankVolume *tankVolumeCurveById(const NetworkHydraulic &netw
     return nullptr;
 }
 
-const HydraulicCurveValveHeadloss *valveHeadlossCurveById(const NetworkHydraulic &network, const QString &id)
+const HydraulicCurveValveHeadloss *valveHeadlossCurveById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicCurveValveHeadloss &curve : network.curves_valve_headloss)
     {
@@ -215,7 +215,7 @@ const HydraulicCurveValveHeadloss *valveHeadlossCurveById(const NetworkHydraulic
 }
 
 const HydraulicCurveValveCharacteristic *valveCharacteristicCurveById(
-    const NetworkHydraulic &network, const QString &id)
+    const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicCurveValveCharacteristic &curve : network.curves_valve_characteristic)
     {
@@ -225,7 +225,7 @@ const HydraulicCurveValveCharacteristic *valveCharacteristicCurveById(
     return nullptr;
 }
 
-QString nodeIdForUuid(const NetworkHydraulic &network, const QUuid &uuid)
+QString nodeIdForUuid(const NetworkHydraulicDistribution &network, const QUuid &uuid)
 {
     for (const HydraulicNodeJunction &junction : network.nodes_junctions)
     {
@@ -411,7 +411,7 @@ void expectNoDeferredQualityImportDiagnostics(
     }
 }
 
-QString linkIdForUuid(const NetworkHydraulic &network, const QUuid &uuid)
+QString linkIdForUuid(const NetworkHydraulicDistribution &network, const QUuid &uuid)
 {
     for (const HydraulicLinkPipe &pipe : network.links_pipes)
     {
@@ -432,7 +432,7 @@ QString linkIdForUuid(const NetworkHydraulic &network, const QUuid &uuid)
 }
 
 const HydraulicControlSimple *simpleControlById(
-    const NetworkHydraulic &network, const QString &id)
+    const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicControlSimple &control : network.controls_simple)
     {
@@ -442,7 +442,7 @@ const HydraulicControlSimple *simpleControlById(
     return nullptr;
 }
 
-const HydraulicControlRule *ruleById(const NetworkHydraulic &network, const QString &id)
+const HydraulicControlRule *ruleById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicControlRule &rule : network.controls_rules)
     {
@@ -453,7 +453,7 @@ const HydraulicControlRule *ruleById(const NetworkHydraulic &network, const QStr
 }
 
 void mapNativeControlIds(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     AowisEpanetTests::NativeReferenceConfiguration &configuration)
 {
     for (int index = 0; index < network.controls_simple.size(); index++)
@@ -468,7 +468,7 @@ void scenarioImportNet1ProjectGlobals(TestContext &context)
     context.expect(result.status.success, "Net1 INP import must open successfully");
     context.expect(result.complete, "Net1 import must be complete across the supported EPANET 2.3 INP surface");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     context.expectEqual(network.id.toStdString(), std::string("Net1"), comparison("network.id"));
     context.expect(!network.uuid.isNull(), "imported network must receive a stable in-memory UUID");
     context.expectEqual(network.title_line_1.toStdString(), std::string(" EPANET Example Network 1"), comparison("title_line_1"));
@@ -522,7 +522,7 @@ void scenarioImportCanonicalGlobalUnits(TestContext &context)
     expectNoDeferredQualityImportDiagnostics(context, result);
     context.expect(result.complete, "global-options fixture must import completely once report directives are reconstructed");
     context.expect(result.request.quality_runs.isEmpty(), "QUALITY NONE must import as a hydraulics-only request");
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
 
     context.expectEqual(network.title_line_1.toStdString(), std::string("Import Global Options Fixture"), comparison("title_line_1"));
     context.expectEqual(static_cast<std::int64_t>(network.duration_s), std::int64_t{45000}, comparison("duration_s"));
@@ -587,7 +587,7 @@ void scenarioImportCoreTopologyNet1(TestContext &context)
     context.expect(result.status.success, "Net1 core topology import must succeed");
     context.expect(result.complete, "Net1 core import must no longer depend on deferred metadata/report layers");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const HydraulicNodeJunction *junction_11 = junctionById(network, QStringLiteral("11"));
     context.expect(junction_11 != nullptr, "Net1 junction 11 must be imported");
     if (junction_11 != nullptr)
@@ -651,7 +651,7 @@ void scenarioImportCoreTopologyCanonicalUnits(TestContext &context)
         QStringLiteral(AOWIS_EPANET_TEST_IMPORT_CORE_TOPOLOGY_US_INP));
     context.expect(result.status.success, "US customary core-topology fixture must import successfully");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     context.expectEqual(static_cast<std::int64_t>(network.nodes_junctions.size()), std::int64_t{2}, comparison("junction_count"));
     context.expectEqual(static_cast<std::int64_t>(network.nodes_reservoirs.size()), std::int64_t{1}, comparison("reservoir_count"));
     context.expectEqual(static_cast<std::int64_t>(network.nodes_tanks.size()), std::int64_t{1}, comparison("tank_count"));
@@ -748,7 +748,7 @@ void scenarioImportHydraulicAssetsNet1(TestContext &context)
         QStringLiteral(AOWIS_EPANET_TEST_NET1_INP));
     context.expect(result.status.success, "Net1 hydraulic asset import must succeed");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     context.expectEqual(static_cast<std::int64_t>(network.patterns_time.size()), std::int64_t{1}, comparison("pattern_count"));
     context.expectEqual(static_cast<std::int64_t>(network.curves_pump_head.size()), std::int64_t{1}, comparison("pump_head_curve_count"));
     context.expectEqual(static_cast<std::int64_t>(network.links_pumps.size()), std::int64_t{1}, comparison("pump_count"));
@@ -789,7 +789,7 @@ void scenarioImportPatternsCurvesPumpsCanonicalUnits(TestContext &context)
         QStringLiteral(AOWIS_EPANET_TEST_IMPORT_PUMPS_US_INP));
     context.expect(result.status.success, "pump/pattern/curve fixture must import successfully");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     context.expectEqual(static_cast<std::int64_t>(network.patterns_time.size()), std::int64_t{5}, comparison("pattern_count"));
     context.expectEqual(static_cast<std::int64_t>(network.curves_tank_volume.size()), std::int64_t{1}, comparison("tank_curve_count"));
     context.expectEqual(static_cast<std::int64_t>(network.curves_pump_head.size()), std::int64_t{1}, comparison("pump_head_curve_count"));
@@ -925,7 +925,7 @@ void scenarioImportValvesCanonicalUnits(TestContext &context)
         QStringLiteral(AOWIS_EPANET_TEST_IMPORT_VALVES_US_INP));
     context.expect(result.status.success, "all-valve fixture must import successfully");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     context.expectEqual(static_cast<std::int64_t>(network.links_valves.size()), std::int64_t{7}, comparison("valve_count"));
     context.expectEqual(static_cast<std::int64_t>(network.curves_valve_headloss.size()), std::int64_t{1}, comparison("headloss_curve_count"));
     context.expectEqual(static_cast<std::int64_t>(network.curves_valve_characteristic.size()), std::int64_t{1}, comparison("characteristic_curve_count"));
@@ -1024,7 +1024,7 @@ void scenarioImportControlsNet1Equivalence(TestContext &context)
         QStringLiteral(AOWIS_EPANET_TEST_NET1_INP));
     context.expect(result.status.success, "Net1 controls must import successfully");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     context.expectEqual(
         static_cast<std::int64_t>(network.controls_simple.size()),
         std::int64_t{2}, comparison("simple_control_count"));
@@ -1093,7 +1093,7 @@ void scenarioImportStructuredRulesCanonicalUnits(TestContext &context)
         QStringLiteral(AOWIS_EPANET_TEST_IMPORT_CONTROLS_RULES_US_INP));
     context.expect(result.status.success, "controls/rules fixture must import successfully");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     context.expectEqual(
         static_cast<std::int64_t>(network.controls_simple.size()),
         std::int64_t{10}, comparison("simple_control_count"));
@@ -1384,7 +1384,7 @@ void scenarioImportQualityChemicalCanonicalUnits(TestContext &context)
     if (result.request.quality_runs.size() != 1)
         return;
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const WaterQualitySolverOptions &quality = result.request.quality_runs.constFirst();
     context.expect(
         quality.analysis == WaterQualityAnalysisType::Chemical,
@@ -1443,7 +1443,7 @@ void scenarioImportQualitySourcesCanonicalUnits(TestContext &context)
     if (result.request.quality_runs.size() != 1)
         return;
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const HydraulicPatternTime *pattern = patternById(network, QStringLiteral("SRC"));
     const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
     const HydraulicNodeJunction *mass = junctionById(network, QStringLiteral("J1"));
@@ -1528,7 +1528,7 @@ void scenarioImportQualityMixingReactionsCanonicalUnits(TestContext &context)
     if (result.request.quality_runs.size() != 1)
         return;
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const WaterQualityReactionOptions &reactions = network.options_reaction;
 
     context.expectNear(
@@ -1703,7 +1703,7 @@ void scenarioImportQualityMixingReactionsCanonicalUnits(TestContext &context)
         comparison("us_wall.quality_runs.size"));
     if (us_wall_result.request.quality_runs.size() == 1)
     {
-        const NetworkHydraulic &us_wall_network = us_wall_result.request.network;
+        const NetworkHydraulicDistribution &us_wall_network = us_wall_result.request.network;
         context.expectNear(
             us_wall_network.options_reaction.global_pipe_wall_reaction.order,
             0.0,
@@ -1736,7 +1736,7 @@ void scenarioImportQualityWaterAge(TestContext &context)
     if (result.request.quality_runs.size() != 1)
         return;
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const WaterQualitySolverOptions &quality = result.request.quality_runs.constFirst();
     context.expect(
         quality.analysis == WaterQualityAnalysisType::WaterAge,
@@ -1786,7 +1786,7 @@ void scenarioImportQualitySourceTrace(TestContext &context)
     if (result.request.quality_runs.size() != 1)
         return;
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const WaterQualitySolverOptions &quality = result.request.quality_runs.constFirst();
     context.expect(
         quality.analysis == WaterQualityAnalysisType::SourceTrace,
@@ -1830,7 +1830,7 @@ void scenarioImportQualityNet1Equivalence(TestContext &context)
     if (result.request.quality_runs.size() != 1)
         return;
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const WaterQualitySolverOptions &quality = result.request.quality_runs.constFirst();
     context.expect(
         quality.analysis == WaterQualityAnalysisType::Chemical,
@@ -1868,7 +1868,7 @@ void scenarioImportGeometryDegrees(TestContext &context)
     context.expect(!result.source_geometry.transformed_to_wgs84,
         "CRS-unspecified degree geometry is interpreted directly rather than projected");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
     const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
     const HydraulicLinkPipe *pipe = pipeById(network, QStringLiteral("P1"));
@@ -1943,7 +1943,7 @@ void scenarioImportGeometryEpsg3089(TestContext &context)
     context.expect(source.link_vertices.contains(QStringLiteral("P1")),
         "original EPSG:3089 link vertices must be retained");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
     const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
     const HydraulicLinkPipe *pipe = pipeById(network, QStringLiteral("P1"));
@@ -2006,7 +2006,7 @@ void scenarioImportGeometryUnknownEpsg(TestContext &context)
     context.expect(!result.source_geometry.georeferenced,
         "unsupported EPSG geometry must not be claimed as georeferenced");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
     const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
     context.expect(reservoir != nullptr && junction != nullptr,
@@ -2039,7 +2039,7 @@ void scenarioImportGeometryMeters(TestContext &context)
     context.expect(result.source_geometry.node_coordinates.contains(QStringLiteral("R1")),
         "original metric coordinates must be retained alongside Null Island geometry");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
     const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
     const HydraulicLinkPipe *pipe = pipeById(network, QStringLiteral("P1"));
@@ -2066,7 +2066,7 @@ void scenarioImportGeometryFeet(TestContext &context)
         QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GEOMETRY_FEET_INP));
     context.expect(result.status.success, "feet geometry fixture must import successfully");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
     const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
     context.expect(reservoir != nullptr && junction != nullptr,
@@ -2087,7 +2087,7 @@ void scenarioImportGeometryArbitrary(TestContext &context)
         QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GEOMETRY_ARBITRARY_INP));
     context.expect(result.status.success, "arbitrary geometry fixture must import successfully");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
     const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
     context.expect(reservoir != nullptr && junction != nullptr,
@@ -2108,7 +2108,7 @@ void scenarioImportGeometryMissingCoordinates(TestContext &context)
         QStringLiteral(AOWIS_EPANET_TEST_IMPORT_GEOMETRY_MISSING_INP));
     context.expect(result.status.success, "coordinate-free geometry fixture must import successfully");
 
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
     const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));
     const HydraulicNodeJunction *junction_1 = junctionById(network, QStringLiteral("J1"));
     const HydraulicNodeJunction *junction_2 = junctionById(network, QStringLiteral("J2"));
@@ -2137,7 +2137,7 @@ void scenarioImportMetadataReportFidelity(TestContext &context)
 
     context.expect(result.status.success, "metadata/report fixture must import successfully");
     context.expect(result.complete, "fully representable metadata/report fixture must import completely");
-    const NetworkHydraulic &network = result.request.network;
+    const NetworkHydraulicDistribution &network = result.request.network;
 
     const HydraulicNodeJunction *junction = junctionById(network, QStringLiteral("J1"));
     const HydraulicNodeReservoir *reservoir = reservoirById(network, QStringLiteral("R1"));

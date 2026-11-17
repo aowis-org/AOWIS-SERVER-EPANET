@@ -102,7 +102,7 @@ const HydraulicSimulationResultLinkPumpEnergyUsage *findPumpEnergy(const Hydraul
     return nullptr;
 }
 
-const HydraulicNodeJunction *findModelJunction(const NetworkHydraulic &network, const QString &id)
+const HydraulicNodeJunction *findModelJunction(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicNodeJunction &junction : network.nodes_junctions)
     {
@@ -112,7 +112,7 @@ const HydraulicNodeJunction *findModelJunction(const NetworkHydraulic &network, 
     return nullptr;
 }
 
-const HydraulicNodeReservoir *findModelReservoir(const NetworkHydraulic &network, const QString &id)
+const HydraulicNodeReservoir *findModelReservoir(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicNodeReservoir &reservoir : network.nodes_reservoirs)
     {
@@ -122,7 +122,7 @@ const HydraulicNodeReservoir *findModelReservoir(const NetworkHydraulic &network
     return nullptr;
 }
 
-const HydraulicNodeTank *findModelTank(const NetworkHydraulic &network, const QString &id)
+const HydraulicNodeTank *findModelTank(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicNodeTank &tank : network.nodes_tanks)
     {
@@ -132,7 +132,7 @@ const HydraulicNodeTank *findModelTank(const NetworkHydraulic &network, const QS
     return nullptr;
 }
 
-const HydraulicLinkPipe *findModelPipe(const NetworkHydraulic &network, const QString &id)
+const HydraulicLinkPipe *findModelPipe(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicLinkPipe &pipe : network.links_pipes)
     {
@@ -142,7 +142,7 @@ const HydraulicLinkPipe *findModelPipe(const NetworkHydraulic &network, const QS
     return nullptr;
 }
 
-const HydraulicLinkPump *findModelPump(const NetworkHydraulic &network, const QString &id)
+const HydraulicLinkPump *findModelPump(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicLinkPump &pump : network.links_pumps)
     {
@@ -152,7 +152,7 @@ const HydraulicLinkPump *findModelPump(const NetworkHydraulic &network, const QS
     return nullptr;
 }
 
-const HydraulicLinkValve *findModelValve(const NetworkHydraulic &network, const QString &id)
+const HydraulicLinkValve *findModelValve(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicLinkValve &valve : network.links_valves)
     {
@@ -162,7 +162,7 @@ const HydraulicLinkValve *findModelValve(const NetworkHydraulic &network, const 
     return nullptr;
 }
 
-const HydraulicControlSimple *findModelControl(const NetworkHydraulic &network, const QString &id)
+const HydraulicControlSimple *findModelControl(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicControlSimple &control : network.controls_simple)
     {
@@ -213,7 +213,7 @@ HydraulicSimulationTimestepEventType modelEventType(NativeTimestepEventType type
     return HydraulicSimulationTimestepEventType::HydraulicStep;
 }
 
-void compareJunctions(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
+void compareJunctions(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulicDistribution &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.nodes_junctions.size()),
         static_cast<std::int64_t>(expected.nodes_junctions.size()),
@@ -256,7 +256,7 @@ void compareJunctions(const NativeHydraulicResult &expected, const HydraulicSimu
     }
 }
 
-void compareReservoirs(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
+void compareReservoirs(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulicDistribution &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.nodes_reservoirs.size()),
         static_cast<std::int64_t>(expected.nodes_reservoirs.size()),
@@ -289,7 +289,7 @@ void compareReservoirs(const NativeHydraulicResult &expected, const HydraulicSim
     }
 }
 
-void compareTanks(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
+void compareTanks(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulicDistribution &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.nodes_tanks.size()),
         static_cast<std::int64_t>(expected.nodes_tanks.size()),
@@ -357,7 +357,7 @@ void comparePipeRoughness(const NativePipeResult &expected, const HydraulicSimul
     }
 }
 
-void comparePipes(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
+void comparePipes(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulicDistribution &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.links_pipes.size()),
         static_cast<std::int64_t>(expected.links_pipes.size()),
@@ -414,7 +414,7 @@ void comparePipes(const NativeHydraulicResult &expected, const HydraulicSimulati
     }
 }
 
-void comparePumps(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
+void comparePumps(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulicDistribution &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.links_pumps.size()),
         static_cast<std::int64_t>(expected.links_pumps.size()),
@@ -465,7 +465,7 @@ void comparePumps(const NativeHydraulicResult &expected, const HydraulicSimulati
     }
 }
 
-void compareValves(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
+void compareValves(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulicDistribution &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.links_valves.size()),
         static_cast<std::int64_t>(expected.links_valves.size()),
@@ -552,7 +552,7 @@ void compareStatistics(const NativeHydraulicResult &expected, const HydraulicSim
         scaledTolerance(HydraulicQuantity::Percent, tolerance_scale), comparison("statistics.leakage_loss_percent", expected.time_elapsed_s));
 }
 
-void compareEvent(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context)
+void compareEvent(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulicDistribution &network, TestContext &context)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.event_next.type),
         static_cast<std::int64_t>(modelEventType(expected.event_next.type)),
@@ -588,7 +588,7 @@ void compareEvent(const NativeHydraulicResult &expected, const HydraulicSimulati
     }
 }
 
-void comparePumpEnergy(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
+void comparePumpEnergy(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulicDistribution &network, TestContext &context, double tolerance_scale)
 {
     context.expectEqual(static_cast<std::int64_t>(actual.links_pump_energy_usage.size()),
         static_cast<std::int64_t>(expected.links_pump_energy_usage.size()),
@@ -625,7 +625,7 @@ void comparePumpEnergy(const NativeHydraulicResult &expected, const HydraulicSim
     }
 }
 
-void compareSummaries(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulic &network, TestContext &context, double tolerance_scale)
+void compareSummaries(const NativeHydraulicResult &expected, const HydraulicSimulationResult &actual, const NetworkHydraulicDistribution &network, TestContext &context, double tolerance_scale)
 {
     context.expectNear(actual.flow_balance.total_inflow_m3_per_h, expected.flow_balance.total_inflow_m3_per_h,
         scaledTolerance(HydraulicQuantity::FlowM3PerHour, tolerance_scale), comparison("flow_balance.total_inflow_m3_per_h", expected.time_elapsed_s));
@@ -660,7 +660,7 @@ void compareSummaries(const NativeHydraulicResult &expected, const HydraulicSimu
 
 void compareHydraulicTimelines(const NativeHydraulicTimeline &expected,
     const EpanetResultRun &actual,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     TestContext &context)
 {
     compareHydraulicTimelines(expected, actual, network, context, 1.0);
@@ -668,7 +668,7 @@ void compareHydraulicTimelines(const NativeHydraulicTimeline &expected,
 
 void compareHydraulicTimelines(const NativeHydraulicTimeline &expected,
     const EpanetResultRun &actual,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     TestContext &context,
     double tolerance_scale)
 {

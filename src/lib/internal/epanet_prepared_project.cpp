@@ -8,7 +8,7 @@
 
 #include <QList>
 
-HydraulicSimulationStatus EpanetPreparedProject::prepare(const NetworkHydraulic &request)
+HydraulicSimulationStatus EpanetPreparedProject::prepare(const NetworkHydraulicDistribution &request)
 {
     QList<HydraulicSimulationStatus> validation_failures;
     HydraulicSimulationStatus status = prepareEpanetNetwork(request, this->prepared_network_, &validation_failures);
@@ -48,12 +48,12 @@ const EpanetProject &EpanetPreparedProject::project() const
     return this->project_;
 }
 
-NetworkHydraulic &EpanetPreparedProject::network()
+NetworkHydraulicDistribution &EpanetPreparedProject::network()
 {
     return this->prepared_network_;
 }
 
-const NetworkHydraulic &EpanetPreparedProject::network() const
+const NetworkHydraulicDistribution &EpanetPreparedProject::network() const
 {
     return this->prepared_network_;
 }

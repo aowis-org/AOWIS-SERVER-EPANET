@@ -3,7 +3,7 @@
 
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
 #include <aowis/model/hydraulic/hydraulic_types.h>
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 #include <aowis/model/hydraulic/water_quality_simulation_results.h>
 
 class EpanetProject;
@@ -12,7 +12,7 @@ struct EpanetIndexRegistry;
 class EpanetQualityResultReader
 {
 public:
-    EpanetQualityResultReader(const EpanetProject &project, const NetworkHydraulic &network, const EpanetIndexRegistry &indices, WaterQualityAnalysisType analysis);
+    EpanetQualityResultReader(const EpanetProject &project, const NetworkHydraulicDistribution &network, const EpanetIndexRegistry &indices, WaterQualityAnalysisType analysis);
 
     HydraulicSimulationStatus read(WaterQualitySimulationResult &result) const;
 
@@ -26,7 +26,7 @@ private:
     HydraulicSimulationStatus readStatistics(WaterQualitySimulationResult &result) const;
 
     const EpanetProject &project;
-    const NetworkHydraulic &network;
+    const NetworkHydraulicDistribution &network;
     const EpanetIndexRegistry &indices;
     WaterQualityAnalysisType analysis;
 };

@@ -5,11 +5,11 @@
 
 class EpanetProject;
 class EpanetReportCollector;
-struct NetworkHydraulic;
+struct NetworkHydraulicDistribution;
 
 HydraulicSimulationStatus initializeEpanetProject(
     EpanetProject &project,
-    const NetworkHydraulic &request,
+    const NetworkHydraulicDistribution &request,
     EpanetReportCollector &report_collector);
 
 #endif // AOWIS_EPANET_PROJECT_INITIALIZER_H

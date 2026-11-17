@@ -10,11 +10,11 @@
 #include <QByteArray>
 #include <QtGlobal>
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 namespace
 {
-double emitterPressureExponent(const NetworkHydraulic &request)
+double emitterPressureExponent(const NetworkHydraulicDistribution &request)
 {
     for (const HydraulicNodeJunction &junction : request.nodes_junctions)
     {
@@ -69,7 +69,7 @@ bool resolveReportStatistic(HydraulicSimulationReportStatistic statistic, int &b
 
 HydraulicSimulationStatus initializeEpanetProject(
     EpanetProject &project,
-    const NetworkHydraulic &request,
+    const NetworkHydraulicDistribution &request,
     EpanetReportCollector &report_collector)
 {
     int error = EN_setreportcallbackuserdata(project.handle(), &report_collector);

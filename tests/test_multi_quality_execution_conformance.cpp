@@ -35,9 +35,9 @@ ComparisonContext comparison(
     return value;
 }
 
-NetworkHydraulic multiQualityFixtureNetwork()
+NetworkHydraulicDistribution multiQualityFixtureNetwork()
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.id = QStringLiteral("multi-quality-reuse-conformance");
     network.uuid = QUuid::createUuid();
     network.duration_s = 3600;
@@ -126,7 +126,7 @@ WaterQualitySolverOptions traceOptions(const QUuid &trace_node_uuid)
 }
 
 EpanetRunRequest runRequest(
-    NetworkHydraulic network,
+    NetworkHydraulicDistribution network,
     HydraulicHeadlossFormula formula,
     const QList<WaterQualitySolverOptions> &quality_runs)
 {
@@ -139,7 +139,7 @@ EpanetRunRequest runRequest(
 }
 
 EpanetResultRun isolatedRun(
-    NetworkHydraulic network,
+    NetworkHydraulicDistribution network,
     HydraulicHeadlossFormula formula,
     const WaterQualitySolverOptions &quality_options)
 {
@@ -366,7 +366,7 @@ void compareQualityTimelines(
 
 void compareMultiQualityWithIsolated(
     TestContext &context,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     HydraulicHeadlossFormula formula,
     const EpanetResultRun &multi_quality_result,
     const WaterQualitySolverOptions &quality_options,
@@ -383,7 +383,7 @@ void compareMultiQualityWithIsolated(
 
 void testMultiQualityIsolatedEquivalence(TestContext &context)
 {
-    const NetworkHydraulic network = multiQualityFixtureNetwork();
+    const NetworkHydraulicDistribution network = multiQualityFixtureNetwork();
     const WaterQualitySolverOptions chemical = chemicalOptions();
     const WaterQualitySolverOptions water_age = waterAgeOptions();
     const WaterQualitySolverOptions trace = traceOptions(network.nodes_reservoirs.first().uuid);
@@ -423,7 +423,7 @@ void testMultiQualityIsolatedEquivalence(TestContext &context)
 
 void testMultiQualityOrderIndependence(TestContext &context)
 {
-    const NetworkHydraulic network = multiQualityFixtureNetwork();
+    const NetworkHydraulicDistribution network = multiQualityFixtureNetwork();
     const WaterQualitySolverOptions chemical = chemicalOptions();
     const WaterQualitySolverOptions water_age = waterAgeOptions();
     const WaterQualitySolverOptions trace = traceOptions(network.nodes_reservoirs.first().uuid);
@@ -455,7 +455,7 @@ void testMultiQualityOrderIndependence(TestContext &context)
 
 void testMultiQualityRepeatedSourceTrace(TestContext &context)
 {
-    const NetworkHydraulic network = multiQualityFixtureNetwork();
+    const NetworkHydraulicDistribution network = multiQualityFixtureNetwork();
     const WaterQualitySolverOptions trace_source = traceOptions(network.nodes_reservoirs.first().uuid);
     const WaterQualitySolverOptions trace_middle = traceOptions(network.nodes_junctions.first().uuid);
     const HydraulicHeadlossFormula formula = HydraulicHeadlossFormula::DarcyWeisbach;
@@ -483,7 +483,7 @@ void testMultiQualityRepeatedSourceTrace(TestContext &context)
 
 void testMultiQualityFailureIsolation(TestContext &context)
 {
-    const NetworkHydraulic network = multiQualityFixtureNetwork();
+    const NetworkHydraulicDistribution network = multiQualityFixtureNetwork();
     const WaterQualitySolverOptions water_age = waterAgeOptions();
     const WaterQualitySolverOptions invalid_trace = traceOptions(QUuid::createUuid());
     const WaterQualitySolverOptions chemical = chemicalOptions();
@@ -529,7 +529,7 @@ int countCancellationPolls(const EpanetRunRequest &request)
 
 void testMultiQualityCancellationBetweenRuns(TestContext &context)
 {
-    const NetworkHydraulic network = multiQualityFixtureNetwork();
+    const NetworkHydraulicDistribution network = multiQualityFixtureNetwork();
     const WaterQualitySolverOptions water_age = waterAgeOptions();
     const WaterQualitySolverOptions chemical = chemicalOptions();
     const HydraulicHeadlossFormula formula = HydraulicHeadlossFormula::HazenWilliams;

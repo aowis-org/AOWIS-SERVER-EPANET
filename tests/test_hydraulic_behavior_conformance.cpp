@@ -139,7 +139,7 @@ const NativeHydraulicResult *findResult(const NativeHydraulicTimeline &timeline,
     return nullptr;
 }
 
-void configureStressDemand(NetworkHydraulic &network, bool pressure_driven)
+void configureStressDemand(NetworkHydraulicDistribution &network, bool pressure_driven)
 {
     network.duration_s = 0;
     network.options_hydraulic.demand_multiplier = 10.0;

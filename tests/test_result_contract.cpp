@@ -27,9 +27,9 @@ ComparisonContext comparison(std::string field, std::int64_t time_s = -1, std::s
     return context;
 }
 
-NetworkHydraulic makeJunctionNetwork()
+NetworkHydraulicDistribution makeJunctionNetwork()
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.id = QStringLiteral("junction-contract");
     network.uuid = QUuid::createUuid();
     network.duration_s = 3600;
@@ -77,9 +77,9 @@ NetworkHydraulic makeJunctionNetwork()
     return network;
 }
 
-NetworkHydraulic makeReservoirPipeNetwork()
+NetworkHydraulicDistribution makeReservoirPipeNetwork()
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.id = QStringLiteral("rule-control");
     network.uuid = QUuid::createUuid();
     network.duration_s = 3600;
@@ -129,9 +129,9 @@ NetworkHydraulic makeReservoirPipeNetwork()
     return network;
 }
 
-NetworkHydraulic makePumpNetwork(bool with_timer_control, quint64 duration_s)
+NetworkHydraulicDistribution makePumpNetwork(bool with_timer_control, quint64 duration_s)
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.id = QStringLiteral("pump-control");
     network.uuid = QUuid::createUuid();
     network.duration_s = duration_s;
@@ -200,7 +200,7 @@ NetworkHydraulic makePumpNetwork(bool with_timer_control, quint64 duration_s)
 
 void testPhysicalResultContractAndLeakage(TestContext &context)
 {
-    const NetworkHydraulic network = makeJunctionNetwork();
+    const NetworkHydraulicDistribution network = makeJunctionNetwork();
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "leakage network should produce valid results");
     context.expect(!run.result_timeline.results.isEmpty(), "leakage network should return timesteps");
@@ -256,7 +256,7 @@ void testPhysicalResultContractAndLeakage(TestContext &context)
 
 void testStructuredRuleControl(TestContext &context)
 {
-    const NetworkHydraulic network = makeReservoirPipeNetwork();
+    const NetworkHydraulicDistribution network = makeReservoirPipeNetwork();
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "rule-controlled network should produce valid results");
     context.expect(!run.result_timeline.results.isEmpty(), "rule-controlled network should return timesteps");
@@ -274,7 +274,7 @@ void testStructuredRuleControl(TestContext &context)
 
 void testTimerPumpControlAndEnergySummary(TestContext &context)
 {
-    const NetworkHydraulic network = makePumpNetwork(true, 3600);
+    const NetworkHydraulicDistribution network = makePumpNetwork(true, 3600);
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "timer-controlled pump network should produce valid results");
     context.expect(!run.result_timeline.results.isEmpty(), "timer-controlled pump network should return timesteps");
@@ -320,7 +320,7 @@ void testTimerPumpControlAndEnergySummary(TestContext &context)
 
 void testUnsupportedPumpPowerRule(TestContext &context)
 {
-    NetworkHydraulic network = makePumpNetwork(false, 3600);
+    NetworkHydraulicDistribution network = makePumpNetwork(false, 3600);
     network.timestep_rule_s = 60;
 
     HydraulicControlRule rule;
@@ -474,7 +474,7 @@ void testMultiQualityRunEnvelope(TestContext &context)
 
 void testMultiQualitySequentialExecution(TestContext &context)
 {
-    NetworkHydraulic network = makeJunctionNetwork();
+    NetworkHydraulicDistribution network = makeJunctionNetwork();
     network.timestep_quality_s = 300;
     network.options_hydraulic.headloss_formula = HydraulicHeadlossFormula::DarcyWeisbach;
     network.links_pipes[0].roughness_darcy_weisbach_mm = 0.15;
@@ -529,7 +529,7 @@ void testMultiQualitySequentialExecution(TestContext &context)
 
 void testSteadyStatePumpEnergyRegression(TestContext &context)
 {
-    const NetworkHydraulic network = makePumpNetwork(false, 0);
+    const NetworkHydraulicDistribution network = makePumpNetwork(false, 0);
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
     context.expect(run.result_timeline.validity == HydraulicSimulationResultValidity::Valid, "steady-state pump network should produce valid results");
     context.expectEqual(static_cast<std::int64_t>(run.result_timeline.results.size()), std::int64_t{1}, comparison("results.size"), "steady-state run should return one timestep");

@@ -14,7 +14,7 @@
 
 namespace EpanetNetworkValidatorParts
 {
-QList<HydraulicSimulationStatus> validateIdentities(const NetworkHydraulic &network)
+QList<HydraulicSimulationStatus> validateIdentities(const NetworkHydraulicDistribution &network)
 {
     QList<HydraulicSimulationStatus> failures;
     QSet<QUuid> all_uuids;

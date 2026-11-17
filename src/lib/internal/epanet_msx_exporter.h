@@ -6,9 +6,9 @@
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
 #include <aowis/model/hydraulic/multi_species.h>
 
-struct NetworkHydraulic;
+struct NetworkHydraulicDistribution;
 
-// Formats NetworkHydraulic::multi_species as MSX 2.0 input file text.
+// Formats NetworkHydraulicDistribution::multi_species as MSX 2.0 input file text.
 //
 // Unlike retrieveEpanetInpText(), this does not call into the EPANET Toolkit
 // at all: MSX has no in-memory project or native writer equivalent to
@@ -26,7 +26,7 @@ struct NetworkHydraulic;
 // output_species_uuids only when reading results after the complete model is loaded
 // and solved. An empty list means return every species.
 HydraulicSimulationStatus retrieveEpanetMsxText(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const MultiSpeciesRunOptions &run_options,
     QString &msx_text);
 

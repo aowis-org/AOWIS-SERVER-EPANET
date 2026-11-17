@@ -6,11 +6,11 @@
 
 class EpanetProject;
 struct EpanetIndexRegistry;
-struct NetworkHydraulic;
+struct NetworkHydraulicDistribution;
 
 HydraulicSimulationStatus configureEpanetQualityRun(
     EpanetProject &project,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const EpanetIndexRegistry &indices,
     const WaterQualitySolverOptions &options);
 

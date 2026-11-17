@@ -4,19 +4,19 @@
 #include <QDateTime>
 #include <QUuid>
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 class DummyNetworks
 {
 public:
-    static NetworkHydraulic networkSimple();
-    static NetworkHydraulic networkOnMap();
-    static NetworkHydraulic networkTanks();
-    static NetworkHydraulic networkFull();
+    static NetworkHydraulicDistribution networkSimple();
+    static NetworkHydraulicDistribution networkOnMap();
+    static NetworkHydraulicDistribution networkTanks();
+    static NetworkHydraulicDistribution networkFull();
     
-    static NetworkHydraulic networkSimpleTimeline();
-    static NetworkHydraulic networkTanksTimeline();
-    static NetworkHydraulic networkFullTimeline();
+    static NetworkHydraulicDistribution networkSimpleTimeline();
+    static NetworkHydraulicDistribution networkTanksTimeline();
+    static NetworkHydraulicDistribution networkFullTimeline();
 };
 
 #endif // DUMMY_NETWORKS_H

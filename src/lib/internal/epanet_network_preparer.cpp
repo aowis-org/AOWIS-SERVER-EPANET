@@ -38,7 +38,7 @@ QSet<QUuid> entityUuids(const QList<Entity> &entities)
     return uuids;
 }
 
-QSet<QUuid> nodeUuids(const NetworkHydraulic &network)
+QSet<QUuid> nodeUuids(const NetworkHydraulicDistribution &network)
 {
     QSet<QUuid> uuids = entityUuids(network.nodes_junctions);
     uuids.unite(entityUuids(network.nodes_reservoirs));
@@ -46,7 +46,7 @@ QSet<QUuid> nodeUuids(const NetworkHydraulic &network)
     return uuids;
 }
 
-QSet<QUuid> linkUuids(const NetworkHydraulic &network)
+QSet<QUuid> linkUuids(const NetworkHydraulicDistribution &network)
 {
     QSet<QUuid> uuids = entityUuids(network.links_pipes);
     uuids.unite(entityUuids(network.links_pumps));
@@ -55,7 +55,7 @@ QSet<QUuid> linkUuids(const NetworkHydraulic &network)
 }
 
 const HydraulicPipeMaterial *pipeMaterialByUuid(
-    const NetworkHydraulic &network, const QUuid &uuid)
+    const NetworkHydraulicDistribution &network, const QUuid &uuid)
 {
     for (const HydraulicPipeMaterial &material : network.pipe_materials)
     {
@@ -84,7 +84,7 @@ HydraulicSimulationStatus pipeMaterialFailure(
 }
 
 HydraulicSimulationStatus resolveMaterialLibraryRoughness(
-    const NetworkHydraulic &source, NetworkHydraulic &resolved)
+    const NetworkHydraulicDistribution &source, NetworkHydraulicDistribution &resolved)
 {
     resolved = source;
     const QDate reference_date = QDate::currentDate();
@@ -195,11 +195,11 @@ void removeDisabledReportSelections(HydraulicSimulationReportSelection &selectio
 }
 
 HydraulicSimulationStatus prepareEpanetNetwork(
-    const NetworkHydraulic &source,
-    NetworkHydraulic &prepared,
+    const NetworkHydraulicDistribution &source,
+    NetworkHydraulicDistribution &prepared,
     QList<HydraulicSimulationStatus> *validation_failures)
 {
-    NetworkHydraulic resolved_source;
+    NetworkHydraulicDistribution resolved_source;
     HydraulicSimulationStatus status = resolveMaterialLibraryRoughness(source, resolved_source);
     if (!status.success)
     {
@@ -212,7 +212,7 @@ HydraulicSimulationStatus prepareEpanetNetwork(
     if (!status.success)
         return status;
 
-    NetworkHydraulic enabled_network = resolved_source;
+    NetworkHydraulicDistribution enabled_network = resolved_source;
 
     enabled_network.nodes_junctions = enabledEntities(resolved_source.nodes_junctions);
     enabled_network.nodes_reservoirs = enabledEntities(resolved_source.nodes_reservoirs);

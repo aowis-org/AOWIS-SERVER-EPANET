@@ -23,7 +23,7 @@ void checkEpanet(int error, const char *operation)
     throw std::runtime_error(std::string(operation) + " failed with EPANET code " + std::to_string(error) + ": " + message.data());
 }
 
-bool nodeHasSource(const NetworkHydraulic &network, const QString &id)
+bool nodeHasSource(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicNodeJunction &node : network.nodes_junctions)
     {
@@ -60,7 +60,7 @@ int linkIndex(EN_Project project, const QString &id)
 }
 
 template<typename NodeType>
-void collectNodes(EN_Project project, const QList<NodeType> &nodes, const NetworkHydraulic &network, double quality_scale, NativeQualityReferenceStep &step)
+void collectNodes(EN_Project project, const QList<NodeType> &nodes, const NetworkHydraulicDistribution &network, double quality_scale, NativeQualityReferenceStep &step)
 {
     for (const NodeType &node : nodes)
     {
@@ -96,7 +96,7 @@ void collectLinks(EN_Project project, const QList<LinkType> &links, double quali
 
 NativeQualityReferenceTimeline runNativeQualityReference(
     const QString &input_file,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     bool canonical_metric_units)
 {
     NativeQualityReferenceTimeline timeline;

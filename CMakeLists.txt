@@ -72,6 +72,23 @@ if(NOT TARGET AOWIS::ServerModel)
     )
 endif()
 
+# MODEL may be provided by the parent GUI, locally, or via FetchContent.
+# For source-based MODEL targets, reject the pre-rename API at configuration time.
+get_target_property(AOWIS_EPANET_MODEL_REAL_TARGET AOWIS::ServerModel ALIASED_TARGET)
+if(NOT AOWIS_EPANET_MODEL_REAL_TARGET)
+    set(AOWIS_EPANET_MODEL_REAL_TARGET AOWIS::ServerModel)
+endif()
+get_target_property(AOWIS_EPANET_MODEL_SOURCE_ROOT
+    ${AOWIS_EPANET_MODEL_REAL_TARGET} SOURCE_DIR)
+if(AOWIS_EPANET_MODEL_SOURCE_ROOT
+   AND EXISTS "${AOWIS_EPANET_MODEL_SOURCE_ROOT}/include/aowis/model/hydraulic"
+   AND NOT EXISTS "${AOWIS_EPANET_MODEL_SOURCE_ROOT}/include/aowis/model/hydraulic/network_hydraulic_distribution.h")
+    message(FATAL_ERROR
+        "AOWIS-SERVER-EPANET requires the current AOWIS-SERVER-MODEL "
+        "NetworkHydraulicDistribution API. Update the MODEL checkout or submodule."
+    )
+endif()
+
 if(TARGET GeographicLib_STATIC)
     # When embedded in AOWIS-SERVER-GUI, reuse the GeographicLib target that
     # the parent project already provides.

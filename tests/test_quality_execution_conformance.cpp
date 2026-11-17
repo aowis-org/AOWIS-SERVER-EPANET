@@ -59,7 +59,7 @@ void checkEpanet(int error, const char *operation)
     throw std::runtime_error(std::string(operation) + " failed with EPANET code " + std::to_string(error) + ": " + message.data());
 }
 
-HydraulicLinkValve replacePipeWithValve(NetworkHydraulic &network, const QString &pipe_id)
+HydraulicLinkValve replacePipeWithValve(NetworkHydraulicDistribution &network, const QString &pipe_id)
 {
     HydraulicLinkValve valve;
     for (int index = 0; index < network.links_pipes.size(); index++)
@@ -88,10 +88,10 @@ HydraulicLinkValve replacePipeWithValve(NetworkHydraulic &network, const QString
     return valve;
 }
 
-NetworkHydraulic qualityNetwork(WaterQualityAnalysisType analysis)
+NetworkHydraulicDistribution qualityNetwork(WaterQualityAnalysisType analysis)
 {
     Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
-    NetworkHydraulic network = fixture.network;
+    NetworkHydraulicDistribution network = fixture.network;
     network.controls_simple.clear();
     network.controls_rules.clear();
     network.duration_s = 1800;
@@ -117,7 +117,7 @@ NetworkHydraulic qualityNetwork(WaterQualityAnalysisType analysis)
 
 WaterQualitySolverOptions qualityOptions(
     WaterQualityAnalysisType analysis,
-    const NetworkHydraulic &network)
+    const NetworkHydraulicDistribution &network)
 {
     WaterQualitySolverOptions options;
     options.analysis = analysis;
@@ -128,7 +128,7 @@ WaterQualitySolverOptions qualityOptions(
     return options;
 }
 
-void clearChemicalInputs(NetworkHydraulic &network)
+void clearChemicalInputs(NetworkHydraulicDistribution &network)
 {
     for (HydraulicNodeJunction &node : network.nodes_junctions)
     {
@@ -147,9 +147,9 @@ void clearChemicalInputs(NetworkHydraulic &network)
     }
 }
 
-NetworkHydraulic sourceTypeNetwork(HydraulicNodeQualitySourceType source_type)
+NetworkHydraulicDistribution sourceTypeNetwork(HydraulicNodeQualitySourceType source_type)
 {
-    NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::Chemical);
+    NetworkHydraulicDistribution network = qualityNetwork(WaterQualityAnalysisType::Chemical);
     clearChemicalInputs(network);
     network.duration_s = 3600;
     network.timestep_hydraulic_s = 1800;
@@ -174,9 +174,9 @@ NetworkHydraulic sourceTypeNetwork(HydraulicNodeQualitySourceType source_type)
     return network;
 }
 
-NetworkHydraulic patternedSourceNetwork()
+NetworkHydraulicDistribution patternedSourceNetwork()
 {
-    NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
+    NetworkHydraulicDistribution network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
     network.duration_s = 2400;
     network.timestep_pattern_s = 600;
     network.timestep_quality_s = 300;
@@ -190,9 +190,9 @@ NetworkHydraulic patternedSourceNetwork()
     return network;
 }
 
-NetworkHydraulic tankMixingNetwork(HydraulicNodeTankMixingModel mixing_model)
+NetworkHydraulicDistribution tankMixingNetwork(HydraulicNodeTankMixingModel mixing_model)
 {
-    NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
+    NetworkHydraulicDistribution network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
     network.duration_s = 6 * 3600;
     network.timestep_hydraulic_s = 1800;
     network.timestep_quality_s = 300;
@@ -203,9 +203,9 @@ NetworkHydraulic tankMixingNetwork(HydraulicNodeTankMixingModel mixing_model)
     return network;
 }
 
-NetworkHydraulic reactionNetwork(HydraulicHeadlossFormula formula)
+NetworkHydraulicDistribution reactionNetwork(HydraulicHeadlossFormula formula)
 {
-    NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
+    NetworkHydraulicDistribution network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
     network.duration_s = 4 * 3600;
     network.options_hydraulic.headloss_formula = formula;
     network.options_reaction.global_pipe_bulk_reaction.coefficient = -0.35;
@@ -244,9 +244,9 @@ NetworkHydraulic reactionNetwork(HydraulicHeadlossFormula formula)
     return network;
 }
 
-NetworkHydraulic qualityCancellationNetwork()
+NetworkHydraulicDistribution qualityCancellationNetwork()
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.id = QStringLiteral("quality-cancellation");
     network.uuid = QUuid::createUuid();
     network.duration_s = 1800;
@@ -286,7 +286,7 @@ NetworkHydraulic qualityCancellationNetwork()
     return network;
 }
 
-bool nodeHasSource(const NetworkHydraulic &network, const QString &id)
+bool nodeHasSource(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicNodeJunction &node : network.nodes_junctions)
     {
@@ -318,12 +318,12 @@ struct NativeQualityStep
 class NativeQualityRun
 {
 public:
-    NativeQualityRun(const NetworkHydraulic &network, const WaterQualitySolverOptions &quality_options)
+    NativeQualityRun(const NetworkHydraulicDistribution &network, const WaterQualitySolverOptions &quality_options)
     {
         // Input-mapping scenarios cover Model-to-EPANET configuration. Build the runtime
         // reference in memory so EN_saveinpfile rounding cannot contaminate
         // the native-vs-AOWIS quality execution comparison.
-        NetworkHydraulic prepared_network;
+        NetworkHydraulicDistribution prepared_network;
         QList<HydraulicSimulationStatus> validation_failures;
         HydraulicSimulationStatus status = prepareEpanetNetwork(network, prepared_network, &validation_failures);
         checkStatus(status, "prepareEpanetNetwork(native quality)");
@@ -407,7 +407,7 @@ private:
         return index;
     }
 
-    void collectNodeValues(const NetworkHydraulic &network, NativeQualityStep &step) const
+    void collectNodeValues(const NetworkHydraulicDistribution &network, NativeQualityStep &step) const
     {
         const std::function<void(const QString &)> collect = [this, &network, &step](const QString &id)
         {
@@ -435,7 +435,7 @@ private:
             collect(node.id);
     }
 
-    void collectLinkValues(const NetworkHydraulic &network, NativeQualityStep &step) const
+    void collectLinkValues(const NetworkHydraulicDistribution &network, NativeQualityStep &step) const
     {
         const std::function<void(const QString &)> collect = [this, &step](const QString &id)
         {
@@ -517,7 +517,7 @@ void compareLinkResults(TestContext &context, const QList<ResultType> &actual, c
 
 void compareQualityTimeline(
     TestContext &context,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const WaterQualitySolverOptions &quality_options,
     const EpanetResultRun &actual_run)
 {
@@ -557,7 +557,7 @@ void compareQualityTimeline(
 
 void scenarioQualityExecutionNone(TestContext &context)
 {
-    const NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::None);
+    const NetworkHydraulicDistribution network = qualityNetwork(WaterQualityAnalysisType::None);
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
 
     context.expect(run.result_timeline.status.success, "quality-disabled run must retain successful hydraulics");
@@ -567,7 +567,7 @@ void scenarioQualityExecutionNone(TestContext &context)
 
 void scenarioQualityExecutionChemical(TestContext &context)
 {
-    const NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::Chemical);
+    const NetworkHydraulicDistribution network = qualityNetwork(WaterQualityAnalysisType::Chemical);
     const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
     compareQualityTimeline(context, network, options, run);
@@ -575,12 +575,12 @@ void scenarioQualityExecutionChemical(TestContext &context)
 
 void scenarioQualityExecutionWaterAge(TestContext &context)
 {
-    const NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::WaterAge);
+    const NetworkHydraulicDistribution network = qualityNetwork(WaterQualityAnalysisType::WaterAge);
     const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::WaterAge, network);
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
     compareQualityTimeline(context, network, options, run);
 
-    NetworkHydraulic steady_state_network = qualityNetwork(WaterQualityAnalysisType::WaterAge);
+    NetworkHydraulicDistribution steady_state_network = qualityNetwork(WaterQualityAnalysisType::WaterAge);
     steady_state_network.duration_s = 0;
     const WaterQualitySolverOptions steady_state_options = qualityOptions(WaterQualityAnalysisType::WaterAge, steady_state_network);
     const EpanetResultRun steady_state_run = EpanetRunner().run(
@@ -617,7 +617,7 @@ void scenarioQualityExecutionWaterAge(TestContext &context)
 
 void scenarioQualityExecutionSourceTrace(TestContext &context)
 {
-    const NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::SourceTrace);
+    const NetworkHydraulicDistribution network = qualityNetwork(WaterQualityAnalysisType::SourceTrace);
     const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::SourceTrace, network);
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
     compareQualityTimeline(context, network, options, run);
@@ -625,7 +625,7 @@ void scenarioQualityExecutionSourceTrace(TestContext &context)
 
 void scenarioQualityExecutionIndependentTimeline(TestContext &context)
 {
-    const NetworkHydraulic network = qualityNetwork(WaterQualityAnalysisType::Chemical);
+    const NetworkHydraulicDistribution network = qualityNetwork(WaterQualityAnalysisType::Chemical);
     const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
 
@@ -653,7 +653,7 @@ void scenarioQualityExecutionIndependentTimeline(TestContext &context)
 
 void scenarioQualityRuntimeSourceConcentration(TestContext &context)
 {
-    const NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
+    const NetworkHydraulicDistribution network = sourceTypeNetwork(HydraulicNodeQualitySourceType::Concentration);
     const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
     compareQualityTimeline(context, network, options, run);
@@ -661,7 +661,7 @@ void scenarioQualityRuntimeSourceConcentration(TestContext &context)
 
 void scenarioQualityRuntimeSourceMassBooster(TestContext &context)
 {
-    const NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::MassBooster);
+    const NetworkHydraulicDistribution network = sourceTypeNetwork(HydraulicNodeQualitySourceType::MassBooster);
     const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
     compareQualityTimeline(context, network, options, run);
@@ -669,7 +669,7 @@ void scenarioQualityRuntimeSourceMassBooster(TestContext &context)
 
 void scenarioQualityRuntimeSourceFlowPaced(TestContext &context)
 {
-    const NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::FlowPacedBooster);
+    const NetworkHydraulicDistribution network = sourceTypeNetwork(HydraulicNodeQualitySourceType::FlowPacedBooster);
     const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
     compareQualityTimeline(context, network, options, run);
@@ -677,7 +677,7 @@ void scenarioQualityRuntimeSourceFlowPaced(TestContext &context)
 
 void scenarioQualityRuntimeSourceSetpoint(TestContext &context)
 {
-    const NetworkHydraulic network = sourceTypeNetwork(HydraulicNodeQualitySourceType::SetpointBooster);
+    const NetworkHydraulicDistribution network = sourceTypeNetwork(HydraulicNodeQualitySourceType::SetpointBooster);
     const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
     compareQualityTimeline(context, network, options, run);
@@ -685,7 +685,7 @@ void scenarioQualityRuntimeSourceSetpoint(TestContext &context)
 
 void scenarioQualityRuntimeSourcePattern(TestContext &context)
 {
-    const NetworkHydraulic network = patternedSourceNetwork();
+    const NetworkHydraulicDistribution network = patternedSourceNetwork();
     const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
     compareQualityTimeline(context, network, options, run);
@@ -704,7 +704,7 @@ void scenarioQualityRuntimeTankMixingModels(TestContext &context)
 
     for (const HydraulicNodeTankMixingModel model : models)
     {
-        const NetworkHydraulic network = tankMixingNetwork(model);
+        const NetworkHydraulicDistribution network = tankMixingNetwork(model);
         const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
         const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
         compareQualityTimeline(context, network, options, run);
@@ -721,7 +721,7 @@ void scenarioQualityRuntimeReactions(TestContext &context)
 
     for (const HydraulicHeadlossFormula formula : formulas)
     {
-        const NetworkHydraulic network = reactionNetwork(formula);
+        const NetworkHydraulicDistribution network = reactionNetwork(formula);
         const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
         const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network, options));
         compareQualityTimeline(context, network, options, run);
@@ -730,7 +730,7 @@ void scenarioQualityRuntimeReactions(TestContext &context)
 
 void scenarioQualityRuntimeLongMultistepContract(TestContext &context)
 {
-    NetworkHydraulic network = patternedSourceNetwork();
+    NetworkHydraulicDistribution network = patternedSourceNetwork();
     network.duration_s = 12 * 3600;
     network.timestep_hydraulic_s = 3600;
     network.timestep_quality_s = 300;
@@ -763,7 +763,7 @@ void scenarioQualityRuntimeLongMultistepContract(TestContext &context)
 
 void scenarioQualityExecutionCancellationPartial(TestContext &context)
 {
-    const NetworkHydraulic network = qualityCancellationNetwork();
+    const NetworkHydraulicDistribution network = qualityCancellationNetwork();
     const WaterQualitySolverOptions options = qualityOptions(WaterQualityAnalysisType::Chemical, network);
     int cancellation_checks = 0;
     const EpanetResultRun run = EpanetRunner().run(

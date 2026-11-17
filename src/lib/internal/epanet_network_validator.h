@@ -5,14 +5,14 @@
 
 #include <aowis/model/hydraulic/hydraulic_simulation_options.h>
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 HydraulicSimulationStatus validateEpanetNetwork(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     QList<HydraulicSimulationStatus> *validation_failures = nullptr);
 
 HydraulicSimulationStatus validateEpanetQualityRun(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const WaterQualitySolverOptions &options,
     QList<HydraulicSimulationStatus> *validation_failures = nullptr);
 

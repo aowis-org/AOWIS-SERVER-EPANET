@@ -77,7 +77,7 @@ EpanetNetworkBuilder::EpanetNetworkBuilder(EpanetProject &project, EpanetIndexRe
 {
 }
 
-HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulic &request)
+HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulicDistribution &request)
 {
     HydraulicSimulationStatus first_failure = makeEpanetSuccess();
     HydraulicSimulationStatus status = EpanetNetworkBuilderSupport::validateSupportedFeatures(request);
@@ -365,7 +365,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::build(const NetworkHydraulic &re
     return first_failure;
 }
 
-HydraulicSimulationStatus EpanetNetworkBuilder::refreshNodeIndices(const NetworkHydraulic &request)
+HydraulicSimulationStatus EpanetNetworkBuilder::refreshNodeIndices(const NetworkHydraulicDistribution &request)
 {
     HydraulicSimulationStatus first_failure = makeEpanetSuccess();
     HydraulicSimulationStatus status = rebuildNodeIndices(this->project, request.nodes_junctions, this->indices.nodes_junctions, HydraulicSimulationStatusStage::AddJunction, HydraulicSimulationStatusEntityType::Junction, QStringLiteral("junction"));
@@ -383,7 +383,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::refreshNodeIndices(const Network
     return first_failure;
 }
 
-HydraulicSimulationStatus EpanetNetworkBuilder::refreshLinkIndices(const NetworkHydraulic &request)
+HydraulicSimulationStatus EpanetNetworkBuilder::refreshLinkIndices(const NetworkHydraulicDistribution &request)
 {
     HydraulicSimulationStatus first_failure = makeEpanetSuccess();
     HydraulicSimulationStatus status = rebuildLinkIndices(this->project, request.links_pipes, this->indices.links_pipes, HydraulicSimulationStatusStage::AddPipe, HydraulicSimulationStatusEntityType::Pipe, QStringLiteral("pipe"));

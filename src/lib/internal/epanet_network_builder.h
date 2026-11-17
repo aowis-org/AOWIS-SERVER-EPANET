@@ -2,7 +2,7 @@
 #define AOWIS_EPANET_NETWORK_BUILDER_H
 
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 #include <QHash>
 #include <QString>
@@ -16,13 +16,13 @@ class EpanetNetworkBuilder
 public:
     EpanetNetworkBuilder(EpanetProject &project, EpanetIndexRegistry &indices);
 
-    HydraulicSimulationStatus build(const NetworkHydraulic &request);
+    HydraulicSimulationStatus build(const NetworkHydraulicDistribution &request);
 
 private:
     HydraulicSimulationStatus addPatternTime(const HydraulicPatternTime &pattern);
-    HydraulicSimulationStatus configureConstantDemandPattern(const NetworkHydraulic &request);
-    HydraulicSimulationStatus configureDefaultDemandPattern(const NetworkHydraulic &request);
-    HydraulicSimulationStatus configureGlobalEnergyPattern(const NetworkHydraulic &request);
+    HydraulicSimulationStatus configureConstantDemandPattern(const NetworkHydraulicDistribution &request);
+    HydraulicSimulationStatus configureDefaultDemandPattern(const NetworkHydraulicDistribution &request);
+    HydraulicSimulationStatus configureGlobalEnergyPattern(const NetworkHydraulicDistribution &request);
     HydraulicSimulationStatus addCurveTankVolume(const HydraulicCurveTankVolume &curve);
     HydraulicSimulationStatus addCurvePumpHead(const HydraulicCurvePumpHead &curve);
     HydraulicSimulationStatus addCurvePumpEfficiency(const HydraulicCurvePumpEfficiency &curve);
@@ -38,8 +38,8 @@ private:
     HydraulicSimulationStatus addControlSimple(const HydraulicControlSimple &control);
     HydraulicSimulationStatus addControlRule(const HydraulicControlRule &rule);
     HydraulicSimulationStatus buildControlRuleText(const HydraulicControlRule &rule, QString &rule_text) const;
-    HydraulicSimulationStatus refreshNodeIndices(const NetworkHydraulic &request);
-    HydraulicSimulationStatus refreshLinkIndices(const NetworkHydraulic &request);
+    HydraulicSimulationStatus refreshNodeIndices(const NetworkHydraulicDistribution &request);
+    HydraulicSimulationStatus refreshLinkIndices(const NetworkHydraulicDistribution &request);
 
     bool resolveLinkId(const QUuid &uuid, QString &id) const;
     bool resolveLinkIndex(const QUuid &uuid, int &index) const;

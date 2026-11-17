@@ -217,7 +217,7 @@ double qualityToCanonical(const EpanetProject &project)
     return 1.0;
 }
 
-void initializeReportDefaults(NetworkHydraulic &network, const EpanetProject &project)
+void initializeReportDefaults(NetworkHydraulicDistribution &network, const EpanetProject &project)
 {
     HydraulicSimulationReportOptions &options = network.options_report;
     options.page_size = 0;
@@ -295,7 +295,7 @@ void initializeReportDefaults(NetworkHydraulic &network, const EpanetProject &pr
     }
 }
 
-QHash<QString, QUuid> nodeUuidsById(const NetworkHydraulic &network)
+QHash<QString, QUuid> nodeUuidsById(const NetworkHydraulicDistribution &network)
 {
     QHash<QString, QUuid> values;
     for (const HydraulicNodeJunction &junction : network.nodes_junctions)
@@ -307,7 +307,7 @@ QHash<QString, QUuid> nodeUuidsById(const NetworkHydraulic &network)
     return values;
 }
 
-QHash<QString, QUuid> linkUuidsById(const NetworkHydraulic &network)
+QHash<QString, QUuid> linkUuidsById(const NetworkHydraulicDistribution &network)
 {
     QHash<QString, QUuid> values;
     for (const HydraulicLinkPipe &pipe : network.links_pipes)
@@ -419,7 +419,7 @@ ReportField reportField(const QString &token)
     return ReportField::Unknown;
 }
 
-void setFieldEnabled(NetworkHydraulic &network, ReportField field, bool enabled)
+void setFieldEnabled(NetworkHydraulicDistribution &network, ReportField field, bool enabled)
 {
     switch (field)
     {
@@ -441,7 +441,7 @@ void setFieldEnabled(NetworkHydraulic &network, ReportField field, bool enabled)
     }
 }
 
-void setFieldPrecision(NetworkHydraulic &network, ReportField field, int precision)
+void setFieldPrecision(NetworkHydraulicDistribution &network, ReportField field, int precision)
 {
     switch (field)
     {
@@ -473,7 +473,7 @@ QString canonicalBackendThresholdCommand(
 }
 
 void setPhysicalThreshold(
-    NetworkHydraulic &network,
+    NetworkHydraulicDistribution &network,
     ReportField field,
     bool below,
     double value,
@@ -600,7 +600,7 @@ HydraulicSimulationStatus importReport(
                 .arg(file.errorString()));
     }
 
-    NetworkHydraulic &network = result.request.network;
+    NetworkHydraulicDistribution &network = result.request.network;
     initializeReportDefaults(network, project);
     const QHash<QString, QUuid> node_uuids_by_id = nodeUuidsById(network);
     const QHash<QString, QUuid> link_uuids_by_id = linkUuidsById(network);

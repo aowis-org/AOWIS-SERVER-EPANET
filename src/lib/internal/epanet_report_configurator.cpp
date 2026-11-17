@@ -10,7 +10,7 @@
 #include <QStringList>
 #include <QUuid>
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 namespace
 {
@@ -29,7 +29,7 @@ QString reportStatusCommand(HydraulicSimulationReportStatus status)
     return QStringLiteral("STATUS YES");
 }
 
-QHash<QUuid, QString> reportNodeIdsByUuid(const NetworkHydraulic &network)
+QHash<QUuid, QString> reportNodeIdsByUuid(const NetworkHydraulicDistribution &network)
 {
     QHash<QUuid, QString> ids_by_uuid;
     for (const HydraulicNodeJunction &junction : network.nodes_junctions)
@@ -41,7 +41,7 @@ QHash<QUuid, QString> reportNodeIdsByUuid(const NetworkHydraulic &network)
     return ids_by_uuid;
 }
 
-QHash<QUuid, QString> reportLinkIdsByUuid(const NetworkHydraulic &network)
+QHash<QUuid, QString> reportLinkIdsByUuid(const NetworkHydraulicDistribution &network)
 {
     QHash<QUuid, QString> ids_by_uuid;
     for (const HydraulicLinkPipe &pipe : network.links_pipes)
@@ -160,7 +160,7 @@ HydraulicSimulationStatus reportSelectionCommand(const QString &entity_name, Hyd
 
 HydraulicSimulationStatus configureEpanetReport(
     EpanetProject &project,
-    const NetworkHydraulic &request)
+    const NetworkHydraulicDistribution &request)
 {
     const HydraulicSimulationReportOptions &options = request.options_report;
     const QHash<QUuid, QString> node_ids_by_uuid = reportNodeIdsByUuid(request);

@@ -1,7 +1,7 @@
 #ifndef AOWIS_EPANET_GENERATED_NETWORK_STRESS_FIXTURE_H
 #define AOWIS_EPANET_GENERATED_NETWORK_STRESS_FIXTURE_H
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 #include <QString>
 
@@ -31,7 +31,7 @@ struct GeneratedStressCase
 
 struct GeneratedStressFixture
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     QString native_inp_text;
     int expected_junction_count = 0;
     int expected_reservoir_count = 0;

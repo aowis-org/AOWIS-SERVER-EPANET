@@ -2,7 +2,7 @@
 #define AOWIS_EPANET_NETWORK_BUILDER_SUPPORT_H
 
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 #include <QByteArray>
 #include <QHash>
@@ -23,7 +23,7 @@ HydraulicSimulationStatus registerBackendId(
     HydraulicSimulationStatusStage stage,
     HydraulicSimulationStatusEntityType entity_type,
     const QString &entity_name);
-HydraulicSimulationStatus validateSupportedFeatures(const NetworkHydraulic &request);
+HydraulicSimulationStatus validateSupportedFeatures(const NetworkHydraulicDistribution &request);
 int controlLinkSettingValueCount(const HydraulicControlLinkSetting &setting);
 int rulePremiseNumericValueCount(const HydraulicControlRulePremise &premise);
 bool resolveSimpleControlType(HydraulicControlSimpleType type, int &backend_type);

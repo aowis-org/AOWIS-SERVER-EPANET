@@ -5,7 +5,7 @@
 #include "epanet_project.h"
 #include "epanet_report_collector.h"
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 class EpanetPreparedProject
 {
@@ -14,19 +14,19 @@ public:
     EpanetPreparedProject(const EpanetPreparedProject &) = delete;
     EpanetPreparedProject &operator=(const EpanetPreparedProject &) = delete;
 
-    HydraulicSimulationStatus prepare(const NetworkHydraulic &request);
+    HydraulicSimulationStatus prepare(const NetworkHydraulicDistribution &request);
 
     EpanetProject &project();
     const EpanetProject &project() const;
-    NetworkHydraulic &network();
-    const NetworkHydraulic &network() const;
+    NetworkHydraulicDistribution &network();
+    const NetworkHydraulicDistribution &network() const;
     EpanetIndexRegistry &indices();
     const EpanetIndexRegistry &indices() const;
     EpanetReportCollector &reportCollector();
     const EpanetReportCollector &reportCollector() const;
 
 private:
-    NetworkHydraulic prepared_network_;
+    NetworkHydraulicDistribution prepared_network_;
     EpanetReportCollector report_collector_;
     EpanetProject project_;
     EpanetIndexRegistry indices_;

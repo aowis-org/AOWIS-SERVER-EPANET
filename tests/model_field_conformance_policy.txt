@@ -1,7 +1,7 @@
 # AOWIS hydraulic and water-quality model-field conformance policy.
 # Format: header|struct|fields_csv|state|evidence_scenarios_csv|note
 # States: complete, excluded-non-epanet, excluded-runtime-metadata, in-progress
-@headers|entity.h,hydraulic_types.h,hydraulic_demands.h,hydraulic_demand_point.h,hydraulic_nodes.h,hydraulic_links.h,hydraulic_pipe_materials.h,hydraulic_curves.h,hydraulic_controls.h,hydraulic_simulation_options.h,hydraulic_simulation_results.h,water_quality_simulation_results.h,hydraulic_simulation_status.h,hydraulic_simulation_diagnostics.h,hydraulic_map.h,network_hydraulic.h
+@headers|entity.h,hydraulic_types.h,hydraulic_demands.h,hydraulic_demand_point.h,hydraulic_nodes.h,hydraulic_links.h,hydraulic_pipe_materials.h,hydraulic_curves.h,hydraulic_controls.h,hydraulic_simulation_options.h,hydraulic_simulation_results.h,water_quality_simulation_results.h,hydraulic_simulation_status.h,hydraulic_simulation_diagnostics.h,hydraulic_map.h,network_hydraulic_distribution.h
 entity.h|EntityMetadata|enabled|complete|conformance-negative-disabled-entity-pruning,conformance-demand-point-node-projection|
 entity.h|EntityMetadata|model_role,date_added,date_installed,description|excluded-non-epanet||AOWIS lifecycle and descriptive metadata is not an EPANET simulation input.
 entity.h|EntityMetadata|comment|complete|conformance-export-titles-comments-tags,conformance-import-metadata-report-fidelity|
@@ -143,28 +143,29 @@ hydraulic_simulation_diagnostics.h|HydraulicSimulationDiagnostic|severity,stage,
 hydraulic_map.h|HydraulicMapLabel|id,uuid|excluded-non-epanet||AOWIS map-label identity is not serialized by EPANET.
 hydraulic_map.h|HydraulicMapLabel|coordinate_wgs84,text,anchor_node_uuid|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84,conformance-negative-invalid-map-numeric,conformance-negative-missing-map-label-anchor|
 hydraulic_map.h|HydraulicMapBackdrop|enabled,lower_left_wgs84,upper_right_wgs84,file,offset_longitude_deg,offset_latitude_deg|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84|
-network_hydraulic.h|NetworkHydraulic|id,uuid|excluded-non-epanet||Network application identity is not an EPANET simulation input.
-network_hydraulic.h|NetworkHydraulic|title_line_1,title_line_2,title_line_3|complete|conformance-export-titles-comments-tags,conformance-import-project-globals-net1,conformance-import-metadata-report-fidelity|
-network_hydraulic.h|NetworkHydraulic|duration_s|complete|conformance-options-time-duration|
-network_hydraulic.h|NetworkHydraulic|timestep_hydraulic_s|complete|conformance-options-time-hydraulic-step|
-network_hydraulic.h|NetworkHydraulic|timestep_quality_s|complete|conformance-options-time-quality-step|
-network_hydraulic.h|NetworkHydraulic|timestep_pattern_s|complete|conformance-options-time-pattern-step|
-network_hydraulic.h|NetworkHydraulic|start_pattern_s|complete|conformance-options-time-pattern-start|
-network_hydraulic.h|NetworkHydraulic|timestep_report_s|complete|conformance-options-time-report-step|
-network_hydraulic.h|NetworkHydraulic|start_report_s|complete|conformance-options-time-report-start|
-network_hydraulic.h|NetworkHydraulic|timestep_rule_s|complete|conformance-options-time-rule-step|
-network_hydraulic.h|NetworkHydraulic|start_time_of_day_s|complete|conformance-options-time-start-clock|
-network_hydraulic.h|NetworkHydraulic|report_statistic|complete|conformance-options-report-statistic-series,conformance-options-report-statistic-average,conformance-options-report-statistic-minimum,conformance-options-report-statistic-maximum,conformance-options-report-statistic-range|
-network_hydraulic.h|NetworkHydraulic|options_hydraulic|complete|conformance-options-hydraulic-demand-model-dda,conformance-options-hydraulic-accuracy|
-network_hydraulic.h|NetworkHydraulic|options_reaction|complete|conformance-quality-input-chemical,conformance-quality-input-tank-mixing-models,conformance-quality-input-reactions|Water-quality reaction configuration is fully mapped into the prepared EPANET project.
-network_hydraulic.h|NetworkHydraulic|options_energy|complete|conformance-upstream-pump-global-energy|
-network_hydraulic.h|NetworkHydraulic|options_report|complete|conformance-export-report-options|
-network_hydraulic.h|NetworkHydraulic|pipe_materials|complete|conformance-pipe-material-roughness-resolution|The network material library is consumed before EPANET network construction for material-backed pipes.
-network_hydraulic.h|NetworkHydraulic|multi_species|in-progress||The multi-species (MSX) model now has exporter coverage, a hydraulic-handoff proof using MSXusehydfile, public EpanetRunner execution returning multi_species_result, sequential coexistence with standard EPANET quality runs against the same solved hydraulics, structured backend diagnostics, preserved simulation-start provenance, partial cancellation semantics, and output-only species selection proven not to prune coupled chemistry, and first-class AOWIS validation for MSX identities, references, assignments, numerics, patterns, and expression dependencies. This remains in-progress until broader MSX 2.0 model coverage is implemented and proven.
-network_hydraulic.h|NetworkHydraulic|patterns_time|complete|conformance-export-patterns-curves,conformance-upstream-demand-pattern|
-network_hydraulic.h|NetworkHydraulic|curves_tank_volume,curves_pump_head,curves_pump_efficiency,curves_valve_headloss,curves_valve_characteristic,curves_generic|complete|conformance-export-patterns-curves|
-network_hydraulic.h|NetworkHydraulic|nodes_reservoirs,nodes_junctions,nodes_tanks,links_pipes,links_pumps,links_valves|complete|conformance-net1,conformance-negative-disabled-entity-pruning|
-network_hydraulic.h|NetworkHydraulic|controls_simple|complete|conformance-controls-simple-low-level,conformance-controls-simple-disabled|
-network_hydraulic.h|NetworkHydraulic|controls_rules|complete|conformance-controls-rule-logical-if,conformance-controls-rule-disabled|
-network_hydraulic.h|NetworkHydraulic|map_labels,map_backdrop|complete|conformance-export-coordinates-vertices|
-network_hydraulic.h|NetworkHydraulic|demand_points|complete|conformance-demand-point-node-projection|Demand Points are resolved into transient junction demands before the EPANET-specific build.
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|id,uuid|excluded-non-epanet||Network application identity is not an EPANET simulation input.
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|title_line_1,title_line_2,title_line_3|complete|conformance-export-titles-comments-tags,conformance-import-project-globals-net1,conformance-import-metadata-report-fidelity|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|duration_s|complete|conformance-options-time-duration|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|timestep_hydraulic_s|complete|conformance-options-time-hydraulic-step|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|timestep_quality_s|complete|conformance-options-time-quality-step|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|timestep_pattern_s|complete|conformance-options-time-pattern-step|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|start_pattern_s|complete|conformance-options-time-pattern-start|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|timestep_report_s|complete|conformance-options-time-report-step|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|start_report_s|complete|conformance-options-time-report-start|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|timestep_rule_s|complete|conformance-options-time-rule-step|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|start_time_of_day_s|complete|conformance-options-time-start-clock|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|report_statistic|complete|conformance-options-report-statistic-series,conformance-options-report-statistic-average,conformance-options-report-statistic-minimum,conformance-options-report-statistic-maximum,conformance-options-report-statistic-range|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|options_hydraulic|complete|conformance-options-hydraulic-demand-model-dda,conformance-options-hydraulic-accuracy|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|options_reaction|complete|conformance-quality-input-chemical,conformance-quality-input-tank-mixing-models,conformance-quality-input-reactions|Water-quality reaction configuration is fully mapped into the prepared EPANET project.
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|options_energy|complete|conformance-upstream-pump-global-energy|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|options_report|complete|conformance-export-report-options|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|pipe_materials|complete|conformance-pipe-material-roughness-resolution|The network material library is consumed before EPANET network construction for material-backed pipes.
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|multi_species|in-progress||The multi-species (MSX) model now has exporter coverage, a hydraulic-handoff proof using MSXusehydfile, public EpanetRunner execution returning multi_species_result, sequential coexistence with standard EPANET quality runs against the same solved hydraulics, structured backend diagnostics, preserved simulation-start provenance, partial cancellation semantics, and output-only species selection proven not to prune coupled chemistry, and first-class AOWIS validation for MSX identities, references, assignments, numerics, patterns, and expression dependencies. This remains in-progress until broader MSX 2.0 model coverage is implemented and proven.
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|patterns_time|complete|conformance-export-patterns-curves,conformance-upstream-demand-pattern|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|curves_tank_volume,curves_pump_head,curves_pump_efficiency,curves_valve_headloss,curves_valve_characteristic,curves_generic|complete|conformance-export-patterns-curves|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|nodes_reservoirs,nodes_junctions,nodes_tanks,links_pipes,links_pumps,links_valves|complete|conformance-net1,conformance-negative-disabled-entity-pruning|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|controls_simple|complete|conformance-controls-simple-low-level,conformance-controls-simple-disabled|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|controls_rules|complete|conformance-controls-rule-logical-if,conformance-controls-rule-disabled|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|map_labels,map_backdrop|complete|conformance-export-coordinates-vertices|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|demand_points|complete|conformance-demand-point-node-projection|Demand Points are resolved into transient junction demands before the EPANET-specific build.
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|presentation_units|excluded-non-epanet||Network presentation units are versioned AOWIS display metadata and not EPANET solver inputs. Physical values are passed in canonical units.

@@ -592,7 +592,7 @@ get_target_property(
 )
 
 if(NOT AOWIS_SERVER_MODEL_SOURCE_ROOT
-   OR NOT EXISTS "${AOWIS_SERVER_MODEL_SOURCE_ROOT}/include/aowis/model/hydraulic/network_hydraulic.h")
+   OR NOT EXISTS "${AOWIS_SERVER_MODEL_SOURCE_ROOT}/include/aowis/model/hydraulic/network_hydraulic_distribution.h")
     get_target_property(
         AOWIS_SERVER_MODEL_INTERFACE_INCLUDE_DIRS
         ${AOWIS_SERVER_MODEL_REAL_TARGET}
@@ -606,7 +606,7 @@ if(NOT AOWIS_SERVER_MODEL_SOURCE_ROOT
             continue()
         endif()
 
-        if(EXISTS "${AOWIS_SERVER_MODEL_INCLUDE_DIR}/aowis/model/hydraulic/network_hydraulic.h")
+        if(EXISTS "${AOWIS_SERVER_MODEL_INCLUDE_DIR}/aowis/model/hydraulic/network_hydraulic_distribution.h")
             get_filename_component(
                 AOWIS_SERVER_MODEL_SOURCE_ROOT
                 "${AOWIS_SERVER_MODEL_INCLUDE_DIR}"
@@ -618,7 +618,7 @@ if(NOT AOWIS_SERVER_MODEL_SOURCE_ROOT
 endif()
 
 if(NOT AOWIS_SERVER_MODEL_SOURCE_ROOT
-   OR NOT EXISTS "${AOWIS_SERVER_MODEL_SOURCE_ROOT}/include/aowis/model/hydraulic/network_hydraulic.h")
+   OR NOT EXISTS "${AOWIS_SERVER_MODEL_SOURCE_ROOT}/include/aowis/model/hydraulic/network_hydraulic_distribution.h")
     message(FATAL_ERROR
         "The model-field conformance audit requires readable AOWIS-SERVER-MODEL hydraulic and water-quality headers."
     )

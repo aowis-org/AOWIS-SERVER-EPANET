@@ -27,7 +27,7 @@ void collectQualityFailure(WaterQualitySimulationResultTimeline &timeline, Hydra
 }
 }
 
-EpanetQualitySolver::EpanetQualitySolver(EpanetProject &project, const NetworkHydraulic &network, const EpanetQualityResultReader &result_reader)
+EpanetQualitySolver::EpanetQualitySolver(EpanetProject &project, const NetworkHydraulicDistribution &network, const EpanetQualityResultReader &result_reader)
     : project(project), network(network), result_reader(result_reader)
 {
 }

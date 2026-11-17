@@ -14,13 +14,13 @@
 
 namespace EpanetNetworkValidatorParts
 {
-QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulic &network)
+QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulicDistribution &network)
 {
     QList<HydraulicSimulationStatus> failures;
     const QSet<QUuid> all_nodes = EpanetNetworkValidatorSupport::nodeUuids(network);
     const QSet<QUuid> all_links = EpanetNetworkValidatorSupport::linkUuids(network);
 
-    NetworkHydraulic enabled_network = network;
+    NetworkHydraulicDistribution enabled_network = network;
     enabled_network.nodes_junctions = EpanetNetworkValidatorSupport::enabledEntities(network.nodes_junctions);
     enabled_network.nodes_reservoirs = EpanetNetworkValidatorSupport::enabledEntities(network.nodes_reservoirs);
     enabled_network.nodes_tanks = EpanetNetworkValidatorSupport::enabledEntities(network.nodes_tanks);

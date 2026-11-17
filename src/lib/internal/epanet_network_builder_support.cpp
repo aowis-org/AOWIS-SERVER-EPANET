@@ -56,7 +56,7 @@ HydraulicSimulationStatus registerBackendId(QHash<QUuid, QString> &ids_by_uuid, 
     return makeEpanetSuccess();
 }
 
-HydraulicSimulationStatus validateSupportedFeatures(const NetworkHydraulic &request)
+HydraulicSimulationStatus validateSupportedFeatures(const NetworkHydraulicDistribution &request)
 {
     QStringList details;
 

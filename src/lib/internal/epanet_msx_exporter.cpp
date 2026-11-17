@@ -9,7 +9,7 @@
 #include <QUuid>
 #include <QtGlobal>
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 namespace
 {
@@ -134,7 +134,7 @@ QHash<QUuid, QString> idsByUuid(const QList<Entity> &entities)
     return ids;
 }
 
-QHash<QUuid, QString> nodeIdsByUuid(const NetworkHydraulic &network)
+QHash<QUuid, QString> nodeIdsByUuid(const NetworkHydraulicDistribution &network)
 {
     QHash<QUuid, QString> ids;
     for (const HydraulicNodeJunction &junction : network.nodes_junctions)
@@ -146,7 +146,7 @@ QHash<QUuid, QString> nodeIdsByUuid(const NetworkHydraulic &network)
     return ids;
 }
 
-QHash<QUuid, QString> tankIdsByUuid(const NetworkHydraulic &network)
+QHash<QUuid, QString> tankIdsByUuid(const NetworkHydraulicDistribution &network)
 {
     QHash<QUuid, QString> ids;
     for (const HydraulicNodeTank &tank : network.nodes_tanks)
@@ -154,7 +154,7 @@ QHash<QUuid, QString> tankIdsByUuid(const NetworkHydraulic &network)
     return ids;
 }
 
-QHash<QUuid, QString> pipeIdsByUuid(const NetworkHydraulic &network)
+QHash<QUuid, QString> pipeIdsByUuid(const NetworkHydraulicDistribution &network)
 {
     return idsByUuid(network.links_pipes);
 }
@@ -171,7 +171,7 @@ struct MsxLookups
     QHash<QUuid, MultiSpeciesSpecies> species_by_uuid;
 };
 
-MsxLookups buildLookups(const NetworkHydraulic &network)
+MsxLookups buildLookups(const NetworkHydraulicDistribution &network)
 {
     MsxLookups lookups;
     lookups.node_ids = nodeIdsByUuid(network);
@@ -192,7 +192,7 @@ MsxLookups buildLookups(const NetworkHydraulic &network)
 HydraulicSimulationStatus resolveOrFail(
     const QHash<QUuid, QString> &ids,
     const QUuid &uuid,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const QString &what,
     QString &resolved_id)
 {
@@ -213,7 +213,7 @@ HydraulicSimulationStatus resolveOrFail(
     return makeEpanetSuccess();
 }
 
-void appendTitleSection(QStringList &lines, const NetworkHydraulic &network)
+void appendTitleSection(QStringList &lines, const NetworkHydraulicDistribution &network)
 {
     if (network.title_line_1.isEmpty())
         return;
@@ -238,7 +238,7 @@ void appendOptionsSection(QStringList &lines, const MultiSpeciesOptions &options
 
 void appendSpeciesSection(
     QStringList &lines,
-    const NetworkHydraulic &network)
+    const NetworkHydraulicDistribution &network)
 {
     const MultiSpeciesOptions &options = network.multi_species.options;
 
@@ -291,7 +291,7 @@ HydraulicSimulationStatus appendReactionSection(
     QStringList &lines,
     const QString &section_name,
     MultiSpeciesReactionLocation location,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const MsxLookups &lookups)
 {
     lines.append(QStringLiteral("[%1]").arg(section_name));
@@ -318,7 +318,7 @@ HydraulicSimulationStatus appendReactionSection(
 
 HydraulicSimulationStatus appendSourcesSection(
     QStringList &lines,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const MsxLookups &lookups)
 {
     lines.append(QStringLiteral("[SOURCES]"));
@@ -360,7 +360,7 @@ HydraulicSimulationStatus appendSourcesSection(
 
 HydraulicSimulationStatus appendQualitySection(
     QStringList &lines,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const MsxLookups &lookups)
 {
     lines.append(QStringLiteral("[QUALITY]"));
@@ -420,7 +420,7 @@ HydraulicSimulationStatus appendQualitySection(
 
 HydraulicSimulationStatus appendParametersSection(
     QStringList &lines,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const MsxLookups &lookups)
 {
     lines.append(QStringLiteral("[PARAMETERS]"));
@@ -517,7 +517,7 @@ void appendPatternsSection(QStringList &lines, const NetworkMultiSpecies &model)
 }
 
 HydraulicSimulationStatus retrieveEpanetMsxText(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const MultiSpeciesRunOptions &run_options,
     QString &msx_text)
 {

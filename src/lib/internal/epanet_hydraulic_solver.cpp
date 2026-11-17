@@ -40,7 +40,7 @@ struct FlowBalanceAccumulator
     double storage_flow = 0.0;
 };
 
-double patternFactor(const NetworkHydraulic &network, const QUuid &pattern_uuid, quint64 time_s)
+double patternFactor(const NetworkHydraulicDistribution &network, const QUuid &pattern_uuid, quint64 time_s)
 {
     if (pattern_uuid.isNull() || network.timestep_pattern_s == 0)
         return 1.0;
@@ -58,7 +58,7 @@ double patternFactor(const NetworkHydraulic &network, const QUuid &pattern_uuid,
     return 1.0;
 }
 
-double pumpEnergyCost(const NetworkHydraulic &network, const HydraulicLinkPump &pump, quint64 time_s)
+double pumpEnergyCost(const NetworkHydraulicDistribution &network, const HydraulicLinkPump &pump, quint64 time_s)
 {
     double cost = network.options_energy.global_energy_price_per_kw_h;
     QUuid pattern_uuid = network.options_energy.global_energy_price_pattern_uuid;
@@ -71,7 +71,7 @@ double pumpEnergyCost(const NetworkHydraulic &network, const HydraulicLinkPump &
     return cost * patternFactor(network, pattern_uuid, time_s);
 }
 
-void accumulatePumpEnergy(const NetworkHydraulic &network, const HydraulicSimulationResult &result, double interval_hours, QList<PumpEnergyAccumulator> &accumulators, SystemEnergyAccumulator &system_accumulator)
+void accumulatePumpEnergy(const NetworkHydraulicDistribution &network, const HydraulicSimulationResult &result, double interval_hours, QList<PumpEnergyAccumulator> &accumulators, SystemEnergyAccumulator &system_accumulator)
 {
     double simultaneous_power_kw = 0.0;
     for (int index = 0; index < result.links_pumps.size(); index++)
@@ -99,7 +99,7 @@ void accumulatePumpEnergy(const NetworkHydraulic &network, const HydraulicSimula
         system_accumulator.peak_power_kw = simultaneous_power_kw;
 }
 
-void storePumpEnergyUsage(const NetworkHydraulic &network, const QList<PumpEnergyAccumulator> &accumulators, const SystemEnergyAccumulator &system_accumulator, HydraulicSimulationResult &result)
+void storePumpEnergyUsage(const NetworkHydraulicDistribution &network, const QList<PumpEnergyAccumulator> &accumulators, const SystemEnergyAccumulator &system_accumulator, HydraulicSimulationResult &result)
 {
     const double duration_hours = static_cast<double>(network.duration_s) / 3600.0;
     for (int index = 0; index < network.links_pumps.size(); index++)
@@ -236,7 +236,7 @@ bool cancellationRequested(const std::function<bool()> &cancellation_requested)
 }
 }
 
-EpanetHydraulicSolver::EpanetHydraulicSolver(EpanetProject &project, const NetworkHydraulic &network, const EpanetResultReader &result_reader)
+EpanetHydraulicSolver::EpanetHydraulicSolver(EpanetProject &project, const NetworkHydraulicDistribution &network, const EpanetResultReader &result_reader)
     : project(project), network(network), result_reader(result_reader)
 {
 }

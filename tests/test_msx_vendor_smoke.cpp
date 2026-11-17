@@ -124,7 +124,7 @@ MSX non-pipe link semantics fixture
 // Mirrors the identically-named helper in other test files (e.g.
 // test_export_fidelity_conformance.cpp): each file defines its own, since
 // it is a small anonymous-namespace convenience, not a shared fixture.
-NetworkHydraulic cleanNet1()
+NetworkHydraulicDistribution cleanNet1()
 {
     AowisEpanetTests::Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     fixture.network.controls_simple.clear();
@@ -132,7 +132,7 @@ NetworkHydraulic cleanNet1()
     return fixture.network;
 }
 
-void addSimpleChlorineMsxModel(NetworkHydraulic &network)
+void addSimpleChlorineMsxModel(NetworkHydraulicDistribution &network)
 {
     const HydraulicNodeReservoir &source_node = network.nodes_reservoirs.first();
 
@@ -166,7 +166,7 @@ void addSimpleChlorineMsxModel(NetworkHydraulic &network)
     network.multi_species.initial_quality_nodes.append(initial_quality);
 }
 
-std::pair<QUuid, QUuid> addCoupledTwoSpeciesMsxModel(NetworkHydraulic &network)
+std::pair<QUuid, QUuid> addCoupledTwoSpeciesMsxModel(NetworkHydraulicDistribution &network)
 {
     MultiSpeciesSpecies species_one;
     species_one.id = QStringLiteral("S1");
@@ -547,7 +547,7 @@ void scenarioMsxVendorZeroVolumeLinkQualitySemantics(AowisEpanetTests::TestConte
 // the public EpanetRunner integration scenarios below.
 void scenarioMsxAowisHydraulicHandoff(AowisEpanetTests::TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     addSimpleChlorineMsxModel(network);
 
     EpanetPreparedProject prepared_project;
@@ -589,7 +589,7 @@ void scenarioMsxAowisHydraulicHandoff(AowisEpanetTests::TestContext &context)
 
 void scenarioMsxConfiguredInpRoughnessKc(AowisEpanetTests::TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.headloss_formula = HydraulicHeadlossFormula::ChezyManning;
     constexpr double expected_roughness = 0.017;
     for (HydraulicLinkPipe &pipe : network.links_pipes)
@@ -670,9 +670,9 @@ void scenarioMsxConfiguredInpRoughnessKc(AowisEpanetTests::TestContext &context)
         "The configured INP snapshot opened by MSX must expose the hydraulically configured roughness rather than the construction-time placeholder 1.0");
 }
 
-NetworkHydraulic combinedQualityMsxNetwork()
+NetworkHydraulicDistribution combinedQualityMsxNetwork()
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     if (!network.nodes_reservoirs.isEmpty())
         network.nodes_reservoirs.first().initial_chemical_concentration_mg_per_l = 1.0;
     addSimpleChlorineMsxModel(network);
@@ -957,14 +957,14 @@ void compareMsxTimelines(
 
 // Runs a real reaction model through AOWIS's own EpanetRunner -- not the raw
 // MSX toolkit directly, as above, but the actual translation path a caller
-// of this adapter would use: NetworkHydraulic with multi_species attached,
+// of this adapter would use: NetworkHydraulicDistribution with multi_species attached,
 // EpanetRunRequest::multi_species_run set, EpanetRunner::run(). Proves
 // EpanetMsxProject's export -> MSXENopen/MSXopen/MSXusehydfile/MSXinit/MSXstep
 // -> result-reading sequence produces real, non-trivial species
 // concentrations, not just that the pieces individually work in isolation.
 void scenarioMsxIntegrationEndToEnd(AowisEpanetTests::TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const HydraulicNodeReservoir &source_node = network.nodes_reservoirs.first();
 
     MultiSpeciesSpecies chlorine;
@@ -1051,7 +1051,7 @@ bool runMsxSolverDecayFixture(
     const std::string &solver_name,
     double &final_tank_value)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 1;
     network.timestep_hydraulic_s = 1;
     network.timestep_quality_s = 1;
@@ -1161,7 +1161,7 @@ bool runMsxCouplingFixture(
     double &pipe_rate_value,
     double &pipe_equilibrium_value)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 1;
     network.timestep_hydraulic_s = 1;
     network.timestep_quality_s = 1;
@@ -1318,9 +1318,9 @@ bool runMsxCouplingFixture(
 
 
 
-NetworkHydraulic moleAreaRoundTripNetwork(MultiSpeciesAreaUnits area_units)
+NetworkHydraulicDistribution moleAreaRoundTripNetwork(MultiSpeciesAreaUnits area_units)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 1;
     network.timestep_hydraulic_s = 1;
     network.timestep_quality_s = 1;
@@ -1399,7 +1399,7 @@ void verifyMoleAreaRoundTrip(
     MultiSpeciesAreaUnits area_units,
     const std::string &area_name)
 {
-    const NetworkHydraulic network = moleAreaRoundTripNetwork(area_units);
+    const NetworkHydraulicDistribution network = moleAreaRoundTripNetwork(area_units);
     const MultiSpeciesSpecies &bulk_species = network.multi_species.species.at(0);
     const MultiSpeciesSpecies &wall_species = network.multi_species.species.at(1);
     const HydraulicNodeTank &tank = network.nodes_tanks.first();
@@ -1522,7 +1522,7 @@ void scenarioMsxMoleAreaUnitCanonicalRoundTrip(AowisEpanetTests::TestContext &co
 
 void scenarioMsxInitialQualityPrecedenceRuntime(AowisEpanetTests::TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 1;
     network.timestep_hydraulic_s = 1;
     network.timestep_quality_s = 1;
@@ -1864,7 +1864,7 @@ bool runMsxRateUnitsDecayFixture(
     const std::string &rate_units_name,
     double &final_tank_value)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = duration_s;
     network.timestep_hydraulic_s = duration_s;
     network.timestep_quality_s = duration_s;
@@ -2032,7 +2032,7 @@ void scenarioMsxRateUnitsKnownAnswer(AowisEpanetTests::TestContext &context)
 
 void scenarioMsxKnownAnswerFractionalMicrogramDecay(AowisEpanetTests::TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 1;
     network.timestep_hydraulic_s = 1;
     network.timestep_quality_s = 1;
@@ -2160,9 +2160,9 @@ void scenarioMsxKnownAnswerFractionalMicrogramDecay(AowisEpanetTests::TestContex
 
 
 
-NetworkHydraulic parameterTermOverrideNetwork(bool pipe_override)
+NetworkHydraulicDistribution parameterTermOverrideNetwork(bool pipe_override)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 1;
     network.timestep_hydraulic_s = 1;
     network.timestep_quality_s = 1;
@@ -2251,11 +2251,11 @@ const MultiSpeciesSimulationResultNodeJunction *findMsxJunctionResult(
 
 
 
-NetworkHydraulic hydraulicFlowExpressionNetwork(
+NetworkHydraulicDistribution hydraulicFlowExpressionNetwork(
     double demand_m3_per_h,
     MultiSpeciesSolverMethod solver_method)
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.id = QStringLiteral("msx-hydraulic-q-expression");
     network.uuid = QUuid::createUuid();
     network.duration_s = 1;
@@ -2345,7 +2345,7 @@ bool hydraulicFlowExpressionPipeValue(
     double &value,
     double &hydraulic_flow_m3_per_h)
 {
-    const NetworkHydraulic network =
+    const NetworkHydraulicDistribution network =
         hydraulicFlowExpressionNetwork(demand_m3_per_h, solver_method);
     const QUuid species_uuid = network.multi_species.species.first().uuid;
     const HydraulicLinkPipe &pipe = network.links_pipes.first();
@@ -2501,9 +2501,9 @@ void scenarioMsxHydraulicQExpressionKnownAnswer(AowisEpanetTests::TestContext &c
         "with no RATE equations, RK5 and ROS2 must produce the same formula-only hydraulic Q result");
 }
 
-NetworkHydraulic molecularDiffusivityLaminarNetwork(bool enable_molecular_diffusivity)
+NetworkHydraulicDistribution molecularDiffusivityLaminarNetwork(bool enable_molecular_diffusivity)
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.id = QStringLiteral("msx-molecular-diffusivity-laminar");
     network.uuid = QUuid::createUuid();
     network.duration_s = 18000;
@@ -2590,7 +2590,7 @@ bool finalMolecularDiffusivityPipeValue(
     const std::string &case_name,
     double &value)
 {
-    const NetworkHydraulic network =
+    const NetworkHydraulicDistribution network =
         molecularDiffusivityLaminarNetwork(enable_molecular_diffusivity);
     const QUuid species_uuid = network.multi_species.species.first().uuid;
     const HydraulicLinkPipe &pipe = network.links_pipes.first();
@@ -2673,9 +2673,9 @@ void scenarioMsxMolecularDiffusivityLaminarRuntime(AowisEpanetTests::TestContext
         "the laminar molecular-dispersion response must remain below the 1 mg/L reservoir boundary concentration");
 }
 
-NetworkHydraulic fixedDispersionPecletNetwork(double peclet_limit)
+NetworkHydraulicDistribution fixedDispersionPecletNetwork(double peclet_limit)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 1800;
     network.timestep_hydraulic_s = 300;
     network.timestep_quality_s = 60;
@@ -2728,8 +2728,8 @@ NetworkHydraulic fixedDispersionPecletNetwork(double peclet_limit)
 
 void scenarioMsxFixedDispersionPecletRuntime(AowisEpanetTests::TestContext &context)
 {
-    const NetworkHydraulic gated_network = fixedDispersionPecletNetwork(1.0);
-    const NetworkHydraulic enabled_network = fixedDispersionPecletNetwork(1.0e9);
+    const NetworkHydraulicDistribution gated_network = fixedDispersionPecletNetwork(1.0);
+    const NetworkHydraulicDistribution enabled_network = fixedDispersionPecletNetwork(1.0e9);
     const QString downstream_node_id = gated_network.nodes_junctions.at(1).id;
 
     EpanetRunRequest gated_request;
@@ -2828,7 +2828,7 @@ void scenarioMsxFixedDispersionPecletRuntime(AowisEpanetTests::TestContext &cont
 
 void scenarioMsxFormulaEquilibriumKnownAnswer(AowisEpanetTests::TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 1;
     network.timestep_hydraulic_s = 1;
     network.timestep_quality_s = 1;
@@ -3038,7 +3038,7 @@ void scenarioMsxParameterTermOverridesKnownAnswer(AowisEpanetTests::TestContext 
     const AowisEpanetTests::NumericTolerance concentration_tolerance{1.0e-8, 1.0e-6};
 
     {
-        const NetworkHydraulic network = parameterTermOverrideNetwork(false);
+        const NetworkHydraulicDistribution network = parameterTermOverrideNetwork(false);
         const QUuid species_uuid = network.multi_species.species.first().uuid;
         const QUuid tank_uuid = network.nodes_tanks.first().uuid;
 
@@ -3099,7 +3099,7 @@ void scenarioMsxParameterTermOverridesKnownAnswer(AowisEpanetTests::TestContext 
     }
 
     {
-        const NetworkHydraulic network = parameterTermOverrideNetwork(true);
+        const NetworkHydraulicDistribution network = parameterTermOverrideNetwork(true);
         const QUuid species_uuid = network.multi_species.species.first().uuid;
         const QUuid overridden_pipe_uuid = network.links_pipes.first().uuid;
         const QUuid default_pipe_uuid = network.links_pipes.at(1).uuid;
@@ -3190,7 +3190,7 @@ void scenarioMsxParameterTermOverridesKnownAnswer(AowisEpanetTests::TestContext 
 
 void scenarioMsxMassBalanceFinalSummary(AowisEpanetTests::TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 1;
     network.timestep_hydraulic_s = 1;
     network.timestep_quality_s = 1;
@@ -3298,7 +3298,7 @@ void scenarioMsxMassBalanceFinalSummary(AowisEpanetTests::TestContext &context)
 
 void scenarioMsxWallReactionKnownAnswer(AowisEpanetTests::TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 1;
     network.timestep_hydraulic_s = 1;
     network.timestep_quality_s = 1;
@@ -3450,7 +3450,7 @@ void scenarioMsxWallReactionKnownAnswer(AowisEpanetTests::TestContext &context)
 
 void scenarioMsxWallSpeciesPipeOnlyResults(AowisEpanetTests::TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 1;
     network.timestep_hydraulic_s = 1;
     network.timestep_quality_s = 1;
@@ -3611,7 +3611,7 @@ void scenarioMsxWallSpeciesPipeOnlyResults(AowisEpanetTests::TestContext &contex
 
 void scenarioMsxBackendDiagnostics(AowisEpanetTests::TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     addSimpleChlorineMsxModel(network);
 
     EpanetPreparedProject prepared_project;
@@ -3673,7 +3673,7 @@ void scenarioMsxBackendDiagnostics(AowisEpanetTests::TestContext &context)
 
 void scenarioMsxCancellationPartial(AowisEpanetTests::TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     addSimpleChlorineMsxModel(network);
 
     EpanetPreparedProject prepared_project;
@@ -3723,7 +3723,7 @@ void scenarioMsxCancellationPartial(AowisEpanetTests::TestContext &context)
 
 void scenarioMsxOutputSpeciesFilterPreservesCoupledChemistry(AowisEpanetTests::TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const std::pair<QUuid, QUuid> species = addCoupledTwoSpeciesMsxModel(network);
 
     EpanetRunRequest full_request;
@@ -3795,11 +3795,11 @@ void scenarioMsxOutputSpeciesFilterPreservesCoupledChemistry(AowisEpanetTests::T
 }
 
 
-NetworkHydraulic patternedMassSourceNetwork(
+NetworkHydraulicDistribution patternedMassSourceNetwork(
     MultiSpeciesUnits units,
     double pattern_multiplier)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 3600;
     network.timestep_hydraulic_s = 900;
     network.timestep_quality_s = 300;
@@ -3864,13 +3864,13 @@ const MultiSpeciesSimulationResultNodeJunction *findMsxJunctionResult(
 
 void scenarioMsxPatternedMassSourceCanonicalUnits(AowisEpanetTests::TestContext &context)
 {
-    const NetworkHydraulic full_mg_network = patternedMassSourceNetwork(
+    const NetworkHydraulicDistribution full_mg_network = patternedMassSourceNetwork(
         MultiSpeciesUnits::Milligrams,
         1.0);
-    const NetworkHydraulic half_mg_network = patternedMassSourceNetwork(
+    const NetworkHydraulicDistribution half_mg_network = patternedMassSourceNetwork(
         MultiSpeciesUnits::Milligrams,
         0.5);
-    const NetworkHydraulic half_ug_network = patternedMassSourceNetwork(
+    const NetworkHydraulicDistribution half_ug_network = patternedMassSourceNetwork(
         MultiSpeciesUnits::Micrograms,
         0.5);
 
@@ -4011,12 +4011,12 @@ void scenarioMsxPatternedMassSourceCanonicalUnits(AowisEpanetTests::TestContext 
 }
 
 
-NetworkHydraulic nonMassSourceNetwork(
+NetworkHydraulicDistribution nonMassSourceNetwork(
     MultiSpeciesUnits units,
     MultiSpeciesSourceType source_type,
     bool negative_source_demand)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 1800;
     network.timestep_hydraulic_s = 300;
     network.timestep_quality_s = 60;
@@ -4075,9 +4075,9 @@ void compareNonMassSourceCanonicalUnits(
     bool expect_positive,
     const std::string &case_name)
 {
-    const NetworkHydraulic mg_network =
+    const NetworkHydraulicDistribution mg_network =
         nonMassSourceNetwork(MultiSpeciesUnits::Milligrams, source_type, negative_source_demand);
-    const NetworkHydraulic ug_network =
+    const NetworkHydraulicDistribution ug_network =
         nonMassSourceNetwork(MultiSpeciesUnits::Micrograms, source_type, negative_source_demand);
     const QString source_node_id = mg_network.nodes_junctions.at(1).id;
 
@@ -4206,7 +4206,7 @@ void scenarioMsxRemainingSourceModesCanonicalUnits(AowisEpanetTests::TestContext
 
 void scenarioMsxWithStandardQuality(AowisEpanetTests::TestContext &context)
 {
-    const NetworkHydraulic network = combinedQualityMsxNetwork();
+    const NetworkHydraulicDistribution network = combinedQualityMsxNetwork();
     EpanetRunRequest request;
     request.network = network;
     request.quality_runs = {chemicalQualityOptions(), waterAgeQualityOptions()};
@@ -4236,7 +4236,7 @@ void scenarioMsxWithStandardQuality(AowisEpanetTests::TestContext &context)
 
 void scenarioMsxStandardQualityIsolatedEquivalence(AowisEpanetTests::TestContext &context)
 {
-    const NetworkHydraulic network = combinedQualityMsxNetwork();
+    const NetworkHydraulicDistribution network = combinedQualityMsxNetwork();
     const WaterQualitySolverOptions chemical = chemicalQualityOptions();
     const WaterQualitySolverOptions water_age = waterAgeQualityOptions();
 
@@ -4291,7 +4291,7 @@ void scenarioMsxStandardQualityIsolatedEquivalence(AowisEpanetTests::TestContext
 
 void scenarioMsxStandardQualityFailureIsolation(AowisEpanetTests::TestContext &context)
 {
-    const NetworkHydraulic network = combinedQualityMsxNetwork();
+    const NetworkHydraulicDistribution network = combinedQualityMsxNetwork();
 
     WaterQualitySolverOptions invalid_trace;
     invalid_trace.analysis = WaterQualityAnalysisType::SourceTrace;

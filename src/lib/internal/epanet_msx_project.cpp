@@ -111,7 +111,7 @@ HydraulicSimulationStatus msxSolverErrorStatus(
     HydraulicSimulationStatusStage stage,
     HydraulicSimulationStatusOperation operation,
     const QString &backend_operation,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const QString &message,
     bool from_legacy_epanet = false)
 {
@@ -324,7 +324,7 @@ HydraulicSimulationStatus readSpeciesValues(
 }
 
 HydraulicSimulationStatus EpanetMsxProject::run(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const MultiSpeciesRunOptions &run_options,
     const QString &configured_inp_text,
     const QString &hydraulic_file_path,

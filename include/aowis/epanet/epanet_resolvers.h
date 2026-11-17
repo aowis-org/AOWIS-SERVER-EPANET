@@ -1,7 +1,7 @@
 #ifndef AOWIS_EPANET_RESOLVERS_H
 #define AOWIS_EPANET_RESOLVERS_H
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 class EpanetResolvers
 {

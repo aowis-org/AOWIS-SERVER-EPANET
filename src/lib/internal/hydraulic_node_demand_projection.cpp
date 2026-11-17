@@ -32,7 +32,7 @@ HydraulicSimulationStatus demandPointFailure(
     return status;
 }
 
-const HydraulicLinkPipe *pipeByUuid(const NetworkHydraulic &network, const QUuid &uuid)
+const HydraulicLinkPipe *pipeByUuid(const NetworkHydraulicDistribution &network, const QUuid &uuid)
 {
     for (const HydraulicLinkPipe &pipe : network.links_pipes)
     {
@@ -45,7 +45,7 @@ const HydraulicLinkPipe *pipeByUuid(const NetworkHydraulic &network, const QUuid
 
 HydraulicSimulationStatus appendScaledDemands(
     const HydraulicDemandPoint &demand_point,
-    NetworkHydraulic &projected,
+    NetworkHydraulicDistribution &projected,
     const QHash<QUuid, qsizetype> &enabled_junction_indices,
     const QUuid &junction_uuid,
     double fraction)
@@ -115,8 +115,8 @@ bool demandProjectionKeyMatches(
 }
 
 HydraulicSimulationStatus aggregateProjectedDemands(
-    const NetworkHydraulic &source,
-    NetworkHydraulic &projected)
+    const NetworkHydraulicDistribution &source,
+    NetworkHydraulicDistribution &projected)
 {
     QHash<QUuid, qsizetype> original_demand_counts;
     original_demand_counts.reserve(source.nodes_junctions.size());
@@ -177,8 +177,8 @@ HydraulicSimulationStatus aggregateProjectedDemands(
 }
 
 HydraulicSimulationStatus buildHydraulicNodeDemandProjection(
-    const NetworkHydraulic &source,
-    NetworkHydraulic &projected)
+    const NetworkHydraulicDistribution &source,
+    NetworkHydraulicDistribution &projected)
 {
     projected = source;
 

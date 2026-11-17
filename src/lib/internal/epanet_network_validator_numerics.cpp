@@ -19,7 +19,7 @@ void collectReportThresholdFailures(
     QList<HydraulicSimulationStatus> &failures,
     const std::optional<double> &threshold,
     const QString &field_name,
-    const NetworkHydraulic &network)
+    const NetworkHydraulicDistribution &network)
 {
     if (!threshold.has_value() || std::isfinite(threshold.value()))
         return;
@@ -32,7 +32,7 @@ void collectReportThresholdFailures(
         QStringLiteral("must be finite when configured")));
 }
 
-QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulic &network)
+QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulicDistribution &network)
 {
     QList<HydraulicSimulationStatus> failures;
     HydraulicSimulationStatus status;

@@ -12,7 +12,7 @@ namespace
 {
 using namespace AowisEpanetTests;
 
-NetworkHydraulic cleanNet1()
+NetworkHydraulicDistribution cleanNet1()
 {
     Net1Fixture fixture = makeNet1Fixture();
     fixture.network.controls_simple.clear();
@@ -49,7 +49,7 @@ MultiSpeciesSpecies species(const QString &id, MultiSpeciesSpeciesType type = Mu
 
 void scenarioMsxValidationIdentities(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
 
     MultiSpeciesSpecies reserved = species(QStringLiteral("Q"));
     network.multi_species.species.append(reserved);
@@ -82,7 +82,7 @@ void scenarioMsxValidationIdentities(TestContext &context)
 
 void scenarioMsxValidationReferencesAssignments(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const HydraulicNodeJunction &junction = network.nodes_junctions.first();
 
     MultiSpeciesSpecies bulk = species(QStringLiteral("S1"));
@@ -163,7 +163,7 @@ void scenarioMsxValidationReferencesAssignments(TestContext &context)
 
 void scenarioMsxValidationNumericsExpressions(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     MultiSpeciesSpecies s1 = species(QStringLiteral("S1"));
     s1.molecular_diffusivity_m2_per_s = 1.0e-9;
     s1.longitudinal_dispersion_coefficient_m2_per_s = 2.0e-6;
@@ -228,7 +228,7 @@ void scenarioMsxValidationNumericsExpressions(TestContext &context)
 
 void scenarioMsxValidationPublicPreflight(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     MultiSpeciesSpecies s1 = species(QStringLiteral("S1"));
     network.multi_species.species.append(s1);
 

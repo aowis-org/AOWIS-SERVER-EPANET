@@ -2,7 +2,7 @@
 #define AOWIS_EPANET_QUALITY_SOLVER_H
 
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 #include <aowis/model/hydraulic/water_quality_simulation_results.h>
 
 #include <functional>
@@ -13,7 +13,7 @@ class EpanetQualityResultReader;
 class EpanetQualitySolver
 {
 public:
-    EpanetQualitySolver(EpanetProject &project, const NetworkHydraulic &network, const EpanetQualityResultReader &result_reader);
+    EpanetQualitySolver(EpanetProject &project, const NetworkHydraulicDistribution &network, const EpanetQualityResultReader &result_reader);
 
     HydraulicSimulationStatus run(
         WaterQualitySimulationResultTimeline &timeline,
@@ -22,7 +22,7 @@ public:
 
 private:
     EpanetProject &project;
-    const NetworkHydraulic &network;
+    const NetworkHydraulicDistribution &network;
     const EpanetQualityResultReader &result_reader;
 };
 

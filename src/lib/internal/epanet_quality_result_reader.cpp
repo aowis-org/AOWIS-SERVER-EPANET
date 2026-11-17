@@ -57,7 +57,7 @@ void assignQualityValue(WaterQualityAnalysisType analysis, double backend_value,
 
 EpanetQualityResultReader::EpanetQualityResultReader(
     const EpanetProject &project,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const EpanetIndexRegistry &indices,
     WaterQualityAnalysisType analysis)
     : project(project), network(network), indices(indices), analysis(analysis)

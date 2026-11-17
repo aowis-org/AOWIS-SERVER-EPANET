@@ -17,14 +17,14 @@ HydraulicSimulationStatus qualityRunValidationStatus(HydraulicSimulationStatus s
 }
 
 QList<HydraulicSimulationStatus> validateQualityRunReferences(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const WaterQualitySolverOptions &options)
 {
     QList<HydraulicSimulationStatus> failures;
     if (options.analysis != WaterQualityAnalysisType::SourceTrace)
         return failures;
 
-    NetworkHydraulic enabled_network = network;
+    NetworkHydraulicDistribution enabled_network = network;
     enabled_network.nodes_junctions = EpanetNetworkValidatorSupport::enabledEntities(network.nodes_junctions);
     enabled_network.nodes_reservoirs = EpanetNetworkValidatorSupport::enabledEntities(network.nodes_reservoirs);
     enabled_network.nodes_tanks = EpanetNetworkValidatorSupport::enabledEntities(network.nodes_tanks);
@@ -42,7 +42,7 @@ QList<HydraulicSimulationStatus> validateQualityRunReferences(
 }
 
 QList<HydraulicSimulationStatus> validateQualityRunNumerics(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const WaterQualitySolverOptions &options)
 {
     QList<HydraulicSimulationStatus> failures;
@@ -90,7 +90,7 @@ QList<HydraulicSimulationStatus> validateQualityRunNumerics(
 }
 
 HydraulicSimulationStatus validateQualityRun(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const WaterQualitySolverOptions &options,
     QList<HydraulicSimulationStatus> *validation_failures)
 {
@@ -104,7 +104,7 @@ HydraulicSimulationStatus validateQualityRun(
 }
 
 HydraulicSimulationStatus validateNetwork(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     QList<HydraulicSimulationStatus> *validation_failures)
 {
     QList<HydraulicSimulationStatus> failures = EpanetNetworkValidatorParts::validateIdentities(network);
@@ -124,14 +124,14 @@ HydraulicSimulationStatus validateNetwork(
 }
 
 HydraulicSimulationStatus validateEpanetNetwork(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     QList<HydraulicSimulationStatus> *validation_failures)
 {
     return validateNetwork(network, validation_failures);
 }
 
 HydraulicSimulationStatus validateEpanetQualityRun(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const WaterQualitySolverOptions &options,
     QList<HydraulicSimulationStatus> *validation_failures)
 {

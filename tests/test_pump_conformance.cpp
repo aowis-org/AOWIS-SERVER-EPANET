@@ -54,7 +54,7 @@ NativeReferenceConfiguration nativeConfiguration(NativeReferenceVariant variant,
     return configuration;
 }
 
-HydraulicLinkPump *findModelPump(NetworkHydraulic &network, const QString &id)
+HydraulicLinkPump *findModelPump(NetworkHydraulicDistribution &network, const QString &id)
 {
     for (HydraulicLinkPump &pump : network.links_pumps)
     {

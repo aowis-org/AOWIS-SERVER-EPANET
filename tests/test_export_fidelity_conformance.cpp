@@ -52,7 +52,7 @@ void checkEpanet(int error, const char *operation)
     throw std::runtime_error(std::string(operation) + " failed with EPANET code " + std::to_string(error) + ": " + message.data());
 }
 
-NetworkHydraulic cleanNet1()
+NetworkHydraulicDistribution cleanNet1()
 {
     Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     fixture.network.controls_simple.clear();
@@ -60,7 +60,7 @@ NetworkHydraulic cleanNet1()
     return fixture.network;
 }
 
-HydraulicLinkValve replacePipeWithMetadataValve(NetworkHydraulic &network, const QString &pipe_id)
+HydraulicLinkValve replacePipeWithMetadataValve(NetworkHydraulicDistribution &network, const QString &pipe_id)
 {
     HydraulicLinkValve valve;
     for (int index = 0; index < network.links_pipes.size(); index++)
@@ -90,12 +90,12 @@ HydraulicLinkValve replacePipeWithMetadataValve(NetworkHydraulic &network, const
 class NativeSavedProject
 {
 public:
-    explicit NativeSavedProject(const NetworkHydraulic &network)
+    explicit NativeSavedProject(const NetworkHydraulicDistribution &network)
     {
         initialize(AowisEpanetTests::makeRunRequest(network));
     }
 
-    NativeSavedProject(const NetworkHydraulic &network, const WaterQualitySolverOptions &quality_options)
+    NativeSavedProject(const NetworkHydraulicDistribution &network, const WaterQualitySolverOptions &quality_options)
     {
         initialize(AowisEpanetTests::makeRunRequest(network, quality_options));
     }
@@ -251,7 +251,7 @@ bool sectionContainsCommand(const QString &section, const QString &command)
 
 void scenarioGeneratedInpNativeReopen(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 0;
 
     NativeSavedProject native(network);
@@ -277,7 +277,7 @@ void scenarioGeneratedInpNativeReopen(TestContext &context)
 
 void scenarioTitlesCommentsTags(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.title_line_1 = QStringLiteral("export fidelity title line one");
     network.title_line_2 = QStringLiteral("export fidelity title line two");
     network.title_line_3 = QStringLiteral("export fidelity title line three");
@@ -331,7 +331,7 @@ void scenarioTitlesCommentsTags(TestContext &context)
 
 void scenarioPatternsCurves(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.patterns_time.first().comment = QStringLiteral("pattern export comment");
     network.curves_pump_head.first().comment = QStringLiteral("pump head export comment");
 
@@ -495,7 +495,7 @@ void expectLinkVertices(EN_Project project, const QString &link_id, const QList<
 
 void scenarioCoordinatesVertices(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.nodes_junctions.first().coordinate_wgs84.longitude_deg = 8.123456;
     network.nodes_junctions.first().coordinate_wgs84.latitude_deg = 50.654321;
     network.nodes_reservoirs.first().coordinate_wgs84.longitude_deg = 8.223456;
@@ -599,7 +599,7 @@ void scenarioCoordinatesVertices(TestContext &context)
 
 void scenarioCoordinatesWithoutBackdropRoundTrip(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.map_backdrop.enabled = false;
     network.nodes_junctions.first().coordinate_wgs84.longitude_deg = 18.192000;
     network.nodes_junctions.first().coordinate_wgs84.latitude_deg = 11.981190;
@@ -668,7 +668,7 @@ void scenarioCoordinatesWithoutBackdropRoundTrip(TestContext &context)
 
 void scenarioReportOptions(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.report_statistic = HydraulicSimulationReportStatistic::Maximum;
     HydraulicSimulationReportOptions &options = network.options_report;
     options.page_size = 77;
@@ -756,7 +756,7 @@ void scenarioReportOptions(TestContext &context)
 
 void scenarioQualityInputNone(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
 
     NativeSavedProject native(network);
     int quality_type = -1;
@@ -768,7 +768,7 @@ void scenarioQualityInputNone(TestContext &context)
 
 void scenarioInpRejectsMultipleQualityAnalyses(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
 
     WaterQualitySolverOptions chemical;
     chemical.analysis = WaterQualityAnalysisType::Chemical;
@@ -805,7 +805,7 @@ void scenarioQualityTankMixingModels(TestContext &context)
 
     for (const MixingCase &mixing_case : cases)
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(!network.nodes_tanks.isEmpty(), "tank-mixing fixture requires a tank");
         if (network.nodes_tanks.isEmpty())
             return;
@@ -855,7 +855,7 @@ void scenarioQualityReactionMapping(TestContext &context)
 
     for (const RoughnessCase &roughness_case : cases)
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(!network.links_pipes.isEmpty(), "reaction-mapping fixture requires a pipe");
         context.expect(!network.nodes_tanks.isEmpty(), "reaction-mapping fixture requires a tank");
         if (network.links_pipes.isEmpty() || network.nodes_tanks.isEmpty())
@@ -893,7 +893,7 @@ void scenarioQualityReactionMapping(TestContext &context)
 
 void scenarioQualityInputChemical(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     WaterQualitySolverOptions quality_options;
     quality_options.analysis = WaterQualityAnalysisType::Chemical;
     quality_options.chemical_name = QStringLiteral("Chlorine");
@@ -1087,7 +1087,7 @@ void scenarioQualityInputChemical(TestContext &context)
 
 void scenarioQualityInputWaterAge(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     WaterQualitySolverOptions quality_options;
     quality_options.analysis = WaterQualityAnalysisType::WaterAge;
     quality_options.water_age_tolerance_h = 0.025;
@@ -1108,7 +1108,7 @@ void scenarioQualityInputWaterAge(TestContext &context)
 
 void scenarioQualityInputSourceTrace(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const HydraulicNodeReservoir &trace_source = network.nodes_reservoirs.first();
     WaterQualitySolverOptions quality_options;
     quality_options.analysis = WaterQualityAnalysisType::SourceTrace;
@@ -1131,7 +1131,7 @@ void scenarioQualityInputSourceTrace(TestContext &context)
 
 void scenarioMsxExportBasicSections(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const HydraulicNodeJunction &junction = network.nodes_junctions.first();
     const HydraulicLinkPipe &pipe = network.links_pipes.first();
     network.multi_species.options.timestep_s = 0.125;
@@ -1270,7 +1270,7 @@ void scenarioMsxExportBasicSections(TestContext &context)
 
 void scenarioMsxExportCanonicalSpeciesTolerances(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.multi_species.options.area_units = MultiSpeciesAreaUnits::SquareFeet;
     network.multi_species.options.default_absolute_tolerance = 0.01;
     network.multi_species.options.default_relative_tolerance = 0.001;
@@ -1343,7 +1343,7 @@ void scenarioMsxExportCanonicalSpeciesTolerances(TestContext &context)
 
 void scenarioMsxExportSpeciesSelection(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const HydraulicNodeJunction &junction = network.nodes_junctions.first();
 
     MultiSpeciesSpecies chlorine;
@@ -1410,7 +1410,7 @@ void scenarioMsxExportSpeciesSelection(TestContext &context)
 
 void scenarioMsxExportRejectsUnknownSpeciesSelection(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
 
     MultiSpeciesSpecies chlorine;
     chlorine.id = QStringLiteral("CL2");
@@ -1431,7 +1431,7 @@ void scenarioMsxExportRejectsUnknownSpeciesSelection(TestContext &context)
 
 void scenarioMsxExportRejectsBrokenReactionReference(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
 
     MultiSpeciesReaction orphan_reaction;
     orphan_reaction.uuid = QUuid::createUuid();

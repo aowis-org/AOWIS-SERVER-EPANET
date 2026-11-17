@@ -32,7 +32,7 @@ QString valveTypeName(HydraulicLinkValveType type)
     return QStringLiteral("unknown valve type");
 }
 
-QHash<QUuid, QString> nodeIds(const NetworkHydraulic &network)
+QHash<QUuid, QString> nodeIds(const NetworkHydraulicDistribution &network)
 {
     QHash<QUuid, QString> ids;
     for (const HydraulicNodeJunction &junction : network.nodes_junctions)
@@ -221,7 +221,7 @@ bool illegalValvePair(
 
 namespace EpanetNetworkValidatorParts
 {
-QList<HydraulicSimulationStatus> validateTopology(const NetworkHydraulic &network)
+QList<HydraulicSimulationStatus> validateTopology(const NetworkHydraulicDistribution &network)
 {
     QList<HydraulicSimulationStatus> failures;
     const QList<HydraulicLinkValve> valves = EpanetNetworkValidatorSupport::enabledEntities(network.links_valves);

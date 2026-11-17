@@ -24,7 +24,7 @@ struct GeneratedQualityStressCase
 
 struct GeneratedQualityStressFixture
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     WaterQualitySolverOptions quality_options;
     QString native_inp_text;
     int expected_quality_sample_count = 0;

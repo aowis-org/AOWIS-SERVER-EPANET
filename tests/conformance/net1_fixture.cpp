@@ -21,7 +21,7 @@ double gallonsPerMinuteToCubicMetresPerHour(double gallons_per_minute)
         * kCubicMetresPerHourPerCubicFootPerSecond;
 }
 
-QUuid appendJunction(NetworkHydraulic &network, const QString &id, double elevation_ft, double demand_gpm)
+QUuid appendJunction(NetworkHydraulicDistribution &network, const QString &id, double elevation_ft, double demand_gpm)
 {
     HydraulicNodeJunction junction;
     junction.id = id;
@@ -38,7 +38,7 @@ QUuid appendJunction(NetworkHydraulic &network, const QString &id, double elevat
     return junction.uuid;
 }
 
-QUuid appendPipe(NetworkHydraulic &network, const QString &id, const QUuid &node_from, const QUuid &node_to, double length_ft, double diameter_in)
+QUuid appendPipe(NetworkHydraulicDistribution &network, const QString &id, const QUuid &node_from, const QUuid &node_to, double length_ft, double diameter_in)
 {
     HydraulicLinkPipe pipe;
     pipe.id = id;
@@ -58,7 +58,7 @@ QUuid appendPipe(NetworkHydraulic &network, const QString &id, const QUuid &node
 Net1Fixture makeNet1Fixture()
 {
     Net1Fixture fixture;
-    NetworkHydraulic &network = fixture.network;
+    NetworkHydraulicDistribution &network = fixture.network;
     network.id = QStringLiteral("upstream-net1");
     network.uuid = QUuid::createUuid();
     network.title_line_1 = QStringLiteral("EPANET Example Network 1");

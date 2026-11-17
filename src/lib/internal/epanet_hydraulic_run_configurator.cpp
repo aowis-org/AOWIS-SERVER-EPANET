@@ -5,7 +5,7 @@
 #include "epanet_project.h"
 #include "epanet_status_helpers.h"
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 namespace
 {
@@ -64,7 +64,7 @@ void collectConfigurationFailure(
 
 HydraulicSimulationStatus configureEpanetHydraulicRun(
     EpanetProject &project,
-    const NetworkHydraulic &request,
+    const NetworkHydraulicDistribution &request,
     const EpanetIndexRegistry &indices)
 {
     HydraulicSimulationStatus first_failure = makeEpanetSuccess();

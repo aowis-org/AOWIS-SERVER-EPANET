@@ -6,7 +6,7 @@
 
 namespace EpanetNetworkValidatorSupport
 {
-QSet<QUuid> nodeUuids(const NetworkHydraulic &network)
+QSet<QUuid> nodeUuids(const NetworkHydraulicDistribution &network)
 {
     QSet<QUuid> uuids = entityUuids(network.nodes_junctions);
     uuids.unite(entityUuids(network.nodes_reservoirs));
@@ -14,7 +14,7 @@ QSet<QUuid> nodeUuids(const NetworkHydraulic &network)
     return uuids;
 }
 
-QSet<QUuid> linkUuids(const NetworkHydraulic &network)
+QSet<QUuid> linkUuids(const NetworkHydraulicDistribution &network)
 {
     QSet<QUuid> uuids = entityUuids(network.links_pipes);
     uuids.unite(entityUuids(network.links_pumps));

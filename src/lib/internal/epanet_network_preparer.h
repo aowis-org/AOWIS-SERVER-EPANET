@@ -4,11 +4,11 @@
 #include <QList>
 
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 HydraulicSimulationStatus prepareEpanetNetwork(
-    const NetworkHydraulic &source,
-    NetworkHydraulic &prepared,
+    const NetworkHydraulicDistribution &source,
+    NetworkHydraulicDistribution &prepared,
     QList<HydraulicSimulationStatus> *validation_failures = nullptr);
 
 #endif // AOWIS_EPANET_NETWORK_PREPARER_H

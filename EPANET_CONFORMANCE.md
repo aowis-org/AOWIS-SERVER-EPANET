@@ -6,7 +6,7 @@ This document defines the evidence used to verify that the AOWIS model-driven ad
 
 The conformance target is the public `EpanetRunner` contract:
 
-- translate supported `NetworkHydraulic` inputs into a native EPANET project;
+- translate supported `NetworkHydraulicDistribution` inputs into a native EPANET project;
 - execute one complete hydraulic analysis;
 - execute zero or more chemical, water-age, or source-trace analyses against the saved hydraulic solution;
 - return all modeled hydraulic and quality results, statuses, diagnostics, and partial-result states;

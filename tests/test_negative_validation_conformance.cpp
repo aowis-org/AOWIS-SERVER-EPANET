@@ -18,7 +18,7 @@ using AowisEpanetTests::ScenarioDefinition;
 using AowisEpanetTests::ScenarioRegistry;
 using AowisEpanetTests::TestContext;
 
-NetworkHydraulic cleanNet1()
+NetworkHydraulicDistribution cleanNet1()
 {
     Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     fixture.network.controls_simple.clear();
@@ -26,7 +26,7 @@ NetworkHydraulic cleanNet1()
     return fixture.network;
 }
 
-HydraulicLinkPipe *findPipe(NetworkHydraulic &network, const QString &id)
+HydraulicLinkPipe *findPipe(NetworkHydraulicDistribution &network, const QString &id)
 {
     for (HydraulicLinkPipe &pipe : network.links_pipes)
     {
@@ -36,7 +36,7 @@ HydraulicLinkPipe *findPipe(NetworkHydraulic &network, const QString &id)
     return nullptr;
 }
 
-HydraulicLinkPump *firstPump(NetworkHydraulic &network)
+HydraulicLinkPump *firstPump(NetworkHydraulicDistribution &network)
 {
     if (network.links_pumps.isEmpty())
         return nullptr;
@@ -44,7 +44,7 @@ HydraulicLinkPump *firstPump(NetworkHydraulic &network)
 }
 
 HydraulicLinkValve replacePipeWithValve(
-    NetworkHydraulic &network,
+    NetworkHydraulicDistribution &network,
     const QString &pipe_id,
     const QString &valve_id,
     HydraulicLinkValveType type,
@@ -118,7 +118,7 @@ bool inpSectionContainsId(const QString &inp_text, const QString &section_name, 
 
 void expectRejected(
     TestContext &context,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     HydraulicSimulationStatusEntityType expected_entity_type,
     const QString &expected_entity_id,
     const QUuid &expected_entity_uuid,
@@ -152,7 +152,7 @@ void expectRejected(
 
 void expectValveTopologyRejected(
     TestContext &context,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const HydraulicLinkValve &first,
     const HydraulicLinkValve &second,
     const QString &junction_id,
@@ -181,7 +181,7 @@ void expectValveTopologyRejected(
 
 void expectQualityRejected(
     TestContext &context,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const WaterQualitySolverOptions &options,
     const QString &message_fragment)
 {
@@ -218,7 +218,7 @@ void expectQualityRejected(
 void scenarioInvalidIdentifiers(TestContext &context)
 {
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(!network.nodes_junctions.isEmpty(), "invalid-node-ID fixture requires a junction");
         if (network.nodes_junctions.isEmpty())
             return;
@@ -235,7 +235,7 @@ void scenarioInvalidIdentifiers(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(!network.links_pipes.isEmpty(), "invalid-link-ID fixture requires a pipe");
         if (network.links_pipes.isEmpty())
             return;
@@ -252,7 +252,7 @@ void scenarioInvalidIdentifiers(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(!network.patterns_time.isEmpty(), "invalid-pattern-ID fixture requires a time pattern");
         if (network.patterns_time.isEmpty())
             return;
@@ -269,7 +269,7 @@ void scenarioInvalidIdentifiers(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(!network.curves_pump_head.isEmpty(), "invalid-curve-ID fixture requires a pump curve");
         if (network.curves_pump_head.isEmpty())
             return;
@@ -288,7 +288,7 @@ void scenarioInvalidIdentifiers(TestContext &context)
 
 void scenarioDuplicateNodeId(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     context.expect(!network.nodes_junctions.isEmpty() && !network.nodes_reservoirs.isEmpty(), "Net1 duplicate-node fixture requires junction and reservoir");
     if (network.nodes_junctions.isEmpty() || network.nodes_reservoirs.isEmpty())
         return;
@@ -301,7 +301,7 @@ void scenarioDuplicateNodeId(TestContext &context)
 
 void scenarioDuplicateLinkId(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     context.expect(!network.links_pipes.isEmpty() && !network.links_pumps.isEmpty(), "Net1 duplicate-link fixture requires pipe and pump");
     if (network.links_pipes.isEmpty() || network.links_pumps.isEmpty())
         return;
@@ -313,7 +313,7 @@ void scenarioDuplicateLinkId(TestContext &context)
 
 void scenarioDuplicateUuidAcrossFamilies(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     context.expect(!network.nodes_junctions.isEmpty() && !network.patterns_time.isEmpty(), "Net1 duplicate-UUID fixture requires junction and pattern");
     if (network.nodes_junctions.isEmpty() || network.patterns_time.isEmpty())
         return;
@@ -325,7 +325,7 @@ void scenarioDuplicateUuidAcrossFamilies(TestContext &context)
 
 void scenarioDuplicateCurveId(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     context.expect(!network.curves_pump_head.isEmpty(), "duplicate-curve fixture requires a pump curve");
     if (network.curves_pump_head.isEmpty())
         return;
@@ -344,7 +344,7 @@ void scenarioDuplicateCurveId(TestContext &context)
 
 void scenarioBrokenNodeReference(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     context.expect(!network.links_pipes.isEmpty(), "Net1 broken-reference fixture requires a pipe");
     if (network.links_pipes.isEmpty())
         return;
@@ -356,7 +356,7 @@ void scenarioBrokenNodeReference(TestContext &context)
 
 void scenarioDisabledNodeReference(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     context.expect(!network.links_pipes.isEmpty(), "Net1 disabled-reference fixture requires a pipe");
     if (network.links_pipes.isEmpty())
         return;
@@ -383,7 +383,7 @@ void scenarioDisabledNodeReference(TestContext &context)
 
 void scenarioDisabledEntityPruning(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     HydraulicLinkPipe *pipe = findPipe(network, QStringLiteral("112"));
     context.expect(pipe != nullptr, "Net1 disabled-entity fixture requires pipe 112");
     if (pipe == nullptr)
@@ -466,7 +466,7 @@ void scenarioDisabledEntityPruning(TestContext &context)
 
 void scenarioDisabledControlLinkReference(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     HydraulicLinkPipe *pipe = findPipe(network, QStringLiteral("112"));
     context.expect(pipe != nullptr, "disabled-control-reference fixture requires pipe 112");
     if (pipe == nullptr)
@@ -488,7 +488,7 @@ void scenarioDisabledControlLinkReference(TestContext &context)
 
 void scenarioDisabledRuleLinkReference(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     HydraulicLinkPipe *pipe = findPipe(network, QStringLiteral("112"));
     context.expect(pipe != nullptr, "disabled-rule-reference fixture requires pipe 112");
     if (pipe == nullptr)
@@ -519,7 +519,7 @@ void scenarioDisabledRuleLinkReference(TestContext &context)
 
 void scenarioMissingDemandPattern(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     context.expect(!network.nodes_junctions.isEmpty(), "missing-pattern fixture requires a junction");
     if (network.nodes_junctions.isEmpty())
         return;
@@ -541,7 +541,7 @@ void scenarioMissingDemandPattern(TestContext &context)
 
 void scenarioMissingPumpCurve(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     HydraulicLinkPump *pump = firstPump(network);
     context.expect(pump != nullptr, "missing-curve fixture requires a pump");
     if (pump == nullptr)
@@ -553,7 +553,7 @@ void scenarioMissingPumpCurve(TestContext &context)
 
 void scenarioMissingValveCurve(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     HydraulicLinkPipe *pipe = findPipe(network, QStringLiteral("112"));
     context.expect(pipe != nullptr, "missing-valve-curve fixture requires pipe 112");
     if (pipe == nullptr)
@@ -585,7 +585,7 @@ void scenarioMissingValveCurve(TestContext &context)
 
 void scenarioInvalidPatternNumeric(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
 
     HydraulicPatternTime pattern;
     pattern.id = QStringLiteral("BAD_PATTERN");
@@ -598,7 +598,7 @@ void scenarioInvalidPatternNumeric(TestContext &context)
 
 void scenarioInvalidCurveNumeric(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
 
     HydraulicCurveGeneric curve;
     curve.id = QStringLiteral("BAD_CURVE");
@@ -616,7 +616,7 @@ void scenarioInvalidCurveNumeric(TestContext &context)
 void scenarioInvalidCurveShape(TestContext &context)
 {
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         HydraulicCurveTankVolume curve;
         curve.id = QStringLiteral("BAD_TANK_CURVE_SHAPE");
         curve.uuid = QUuid::createUuid();
@@ -633,7 +633,7 @@ void scenarioInvalidCurveShape(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         HydraulicCurveTankVolume curve;
         curve.id = QStringLiteral("BAD_TANK_CURVE_VOLUME_SHAPE");
         curve.uuid = QUuid::createUuid();
@@ -650,7 +650,7 @@ void scenarioInvalidCurveShape(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         HydraulicCurvePumpHead curve;
         curve.id = QStringLiteral("BAD_PUMP_CURVE_SHAPE");
         curve.uuid = QUuid::createUuid();
@@ -667,7 +667,7 @@ void scenarioInvalidCurveShape(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         HydraulicCurvePumpEfficiency curve;
         curve.id = QStringLiteral("BAD_EFFICIENCY_CURVE_SHAPE");
         curve.uuid = QUuid::createUuid();
@@ -681,7 +681,7 @@ void scenarioInvalidCurveShape(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         HydraulicCurveValveHeadloss curve;
         curve.id = QStringLiteral("BAD_HEADLOSS_CURVE_SHAPE");
         curve.uuid = QUuid::createUuid();
@@ -695,7 +695,7 @@ void scenarioInvalidCurveShape(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         HydraulicCurveValveCharacteristic curve;
         curve.id = QStringLiteral("BAD_CHARACTERISTIC_CURVE_SHAPE");
         curve.uuid = QUuid::createUuid();
@@ -709,7 +709,7 @@ void scenarioInvalidCurveShape(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         HydraulicCurveGeneric curve;
         curve.id = QStringLiteral("BAD_GENERIC_CURVE_SHAPE");
         curve.uuid = QUuid::createUuid();
@@ -729,7 +729,7 @@ void scenarioInvalidCurveShape(TestContext &context)
 void scenarioMissingTypedCurveReferences(TestContext &context)
 {
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(!network.nodes_tanks.isEmpty(), "missing-typed-curve fixture requires a tank");
         if (!network.nodes_tanks.isEmpty())
         {
@@ -742,7 +742,7 @@ void scenarioMissingTypedCurveReferences(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         HydraulicLinkPump *pump = firstPump(network);
         context.expect(pump != nullptr, "missing-typed-curve fixture requires a pump");
         if (pump != nullptr)
@@ -755,7 +755,7 @@ void scenarioMissingTypedCurveReferences(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(!network.links_pipes.isEmpty(), "missing-typed-curve fixture requires a pipe");
         if (!network.links_pipes.isEmpty())
         {
@@ -779,7 +779,7 @@ void scenarioMissingTypedCurveReferences(TestContext &context)
 
 void scenarioInvalidPipeNumeric(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     context.expect(!network.links_pipes.isEmpty(), "invalid-pipe-numeric fixture requires a pipe");
     if (network.links_pipes.isEmpty())
         return;
@@ -791,7 +791,7 @@ void scenarioInvalidPipeNumeric(TestContext &context)
 
 void scenarioInvalidNodeNumeric(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     context.expect(!network.nodes_junctions.isEmpty(), "invalid-node-numeric fixture requires a junction");
     if (network.nodes_junctions.isEmpty())
         return;
@@ -804,7 +804,7 @@ void scenarioInvalidNodeNumeric(TestContext &context)
 void scenarioInvalidEmitterConfiguration(TestContext &context)
 {
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(!network.nodes_junctions.isEmpty(), "invalid-emitter fixture requires a junction");
         if (network.nodes_junctions.isEmpty())
             return;
@@ -816,7 +816,7 @@ void scenarioInvalidEmitterConfiguration(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(network.nodes_junctions.size() >= 2, "inconsistent-emitter fixture requires two junctions");
         if (network.nodes_junctions.size() < 2)
             return;
@@ -834,7 +834,7 @@ void scenarioInvalidEmitterConfiguration(TestContext &context)
 void scenarioInvalidQualityConfiguration(TestContext &context)
 {
     {
-        const NetworkHydraulic network = cleanNet1();
+        const NetworkHydraulicDistribution network = cleanNet1();
         WaterQualitySolverOptions options;
         options.analysis = WaterQualityAnalysisType::SourceTrace;
         context.expect(options.trace_node_uuid.isNull(), "default source-trace fixture must have no origin UUID");
@@ -842,7 +842,7 @@ void scenarioInvalidQualityConfiguration(TestContext &context)
     }
 
     {
-        const NetworkHydraulic network = cleanNet1();
+        const NetworkHydraulicDistribution network = cleanNet1();
         WaterQualitySolverOptions options;
         options.analysis = WaterQualityAnalysisType::SourceTrace;
         options.trace_node_uuid = QUuid::createUuid();
@@ -850,7 +850,7 @@ void scenarioInvalidQualityConfiguration(TestContext &context)
     }
 
     {
-        const NetworkHydraulic network = cleanNet1();
+        const NetworkHydraulicDistribution network = cleanNet1();
         WaterQualitySolverOptions options;
         options.analysis = WaterQualityAnalysisType::Chemical;
         options.chemical_name.clear();
@@ -858,7 +858,7 @@ void scenarioInvalidQualityConfiguration(TestContext &context)
     }
 
     {
-        const NetworkHydraulic network = cleanNet1();
+        const NetworkHydraulicDistribution network = cleanNet1();
         WaterQualitySolverOptions options;
         options.analysis = WaterQualityAnalysisType::Chemical;
         options.chemical_name = QStringLiteral("Chlorine");
@@ -867,7 +867,7 @@ void scenarioInvalidQualityConfiguration(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(!network.nodes_junctions.isEmpty(), "quality-source pattern fixture requires a junction");
         if (network.nodes_junctions.isEmpty())
             return;
@@ -879,7 +879,7 @@ void scenarioInvalidQualityConfiguration(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(!network.nodes_tanks.isEmpty(), "tank mixing fixture requires a tank");
         if (network.nodes_tanks.isEmpty())
             return;
@@ -889,7 +889,7 @@ void scenarioInvalidQualityConfiguration(TestContext &context)
     }
 
     {
-        NetworkHydraulic network = cleanNet1();
+        NetworkHydraulicDistribution network = cleanNet1();
         context.expect(!network.links_pipes.isEmpty(), "reaction-order fixture requires a pipe");
         if (network.links_pipes.isEmpty())
             return;
@@ -902,7 +902,7 @@ void scenarioInvalidQualityConfiguration(TestContext &context)
 
 void scenarioInvalidMapNumeric(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
 
     HydraulicMapLabel label;
     label.id = QStringLiteral("BAD_MAP_LABEL");
@@ -917,7 +917,7 @@ void scenarioInvalidMapNumeric(TestContext &context)
 
 void scenarioMissingMapLabelAnchor(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
 
     HydraulicMapLabel label;
     label.id = QStringLiteral("BAD_MAP_ANCHOR");
@@ -933,7 +933,7 @@ void scenarioMissingMapLabelAnchor(TestContext &context)
 
 void scenarioInvalidPumpNumeric(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     HydraulicLinkPump *pump = firstPump(network);
     context.expect(pump != nullptr, "invalid-pump-numeric fixture requires a pump");
     if (pump == nullptr)
@@ -945,7 +945,7 @@ void scenarioInvalidPumpNumeric(TestContext &context)
 
 void scenarioIllegalPrvSharedDownstream(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("10"), QStringLiteral("PRV_A"), HydraulicLinkValveType::PRV);
     const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("111"), QStringLiteral("PRV_B"), HydraulicLinkValveType::PRV, true);
     expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("same downstream junction"));
@@ -953,7 +953,7 @@ void scenarioIllegalPrvSharedDownstream(TestContext &context)
 
 void scenarioIllegalPrvSeries(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("10"), QStringLiteral("PRV_A"), HydraulicLinkValveType::PRV);
     const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("11"), QStringLiteral("PRV_B"), HydraulicLinkValveType::PRV);
     expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("series"));
@@ -961,7 +961,7 @@ void scenarioIllegalPrvSeries(TestContext &context)
 
 void scenarioIllegalPsvSharedUpstream(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("11"), QStringLiteral("PSV_A"), HydraulicLinkValveType::PSV);
     const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("111"), QStringLiteral("PSV_B"), HydraulicLinkValveType::PSV);
     expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("same upstream junction"));
@@ -969,7 +969,7 @@ void scenarioIllegalPsvSharedUpstream(TestContext &context)
 
 void scenarioIllegalPsvSeries(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("10"), QStringLiteral("PSV_A"), HydraulicLinkValveType::PSV);
     const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("11"), QStringLiteral("PSV_B"), HydraulicLinkValveType::PSV);
     expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("series"));
@@ -977,7 +977,7 @@ void scenarioIllegalPsvSeries(TestContext &context)
 
 void scenarioIllegalPrvToPsv(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("10"), QStringLiteral("PRV_A"), HydraulicLinkValveType::PRV);
     const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("11"), QStringLiteral("PSV_B"), HydraulicLinkValveType::PSV);
     expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("downstream junction of a PRV"));
@@ -985,7 +985,7 @@ void scenarioIllegalPrvToPsv(TestContext &context)
 
 void scenarioIllegalPrvToFcv(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("10"), QStringLiteral("PRV_A"), HydraulicLinkValveType::PRV);
     const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("11"), QStringLiteral("FCV_B"), HydraulicLinkValveType::FCV);
     expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("upstream junction of an FCV"));
@@ -993,7 +993,7 @@ void scenarioIllegalPrvToFcv(TestContext &context)
 
 void scenarioIllegalFcvToPsv(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     const HydraulicLinkValve first = replacePipeWithValve(network, QStringLiteral("10"), QStringLiteral("FCV_A"), HydraulicLinkValveType::FCV);
     const HydraulicLinkValve second = replacePipeWithValve(network, QStringLiteral("11"), QStringLiteral("PSV_B"), HydraulicLinkValveType::PSV);
     expectValveTopologyRejected(context, network, first, second, QStringLiteral("11"), QStringLiteral("downstream junction of an FCV"));
@@ -1001,7 +1001,7 @@ void scenarioIllegalFcvToPsv(TestContext &context)
 
 void scenarioInvalidValveNumeric(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     HydraulicLinkPipe *pipe = findPipe(network, QStringLiteral("112"));
     context.expect(pipe != nullptr, "invalid-valve-numeric fixture requires pipe 112");
     if (pipe == nullptr)
@@ -1022,7 +1022,7 @@ void scenarioInvalidValveNumeric(TestContext &context)
 
 void scenarioInvalidControlNumeric(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     HydraulicLinkPump *pump = firstPump(network);
     context.expect(pump != nullptr, "invalid-control-numeric fixture requires a pump");
     if (pump == nullptr)
@@ -1043,7 +1043,7 @@ void scenarioInvalidControlNumeric(TestContext &context)
 
 void scenarioInvalidSolverNumeric(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.accuracy = std::numeric_limits<double>::quiet_NaN();
 
     expectRejected(
@@ -1057,7 +1057,7 @@ void scenarioInvalidSolverNumeric(TestContext &context)
 
 void scenarioInvalidReportNumeric(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_report.fields_link.flow.below_m3_per_h = std::numeric_limits<double>::quiet_NaN();
 
     expectRejected(
@@ -1071,7 +1071,7 @@ void scenarioInvalidReportNumeric(TestContext &context)
 
 void scenarioUnsupportedConfiguration(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.headloss_formula = static_cast<HydraulicHeadlossFormula>(999);
 
     const EpanetResultRun run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(network));
@@ -1102,7 +1102,7 @@ bool hasErrorDiagnosticForEntity(
 
 void scenarioMultipleValidationDiagnostics(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     context.expect(!network.nodes_junctions.isEmpty(), "multiple-diagnostic fixture requires a junction");
     context.expect(!network.nodes_reservoirs.isEmpty(), "multiple-diagnostic fixture requires a reservoir");
     context.expect(!network.links_pipes.isEmpty(), "multiple-diagnostic fixture requires a pipe");
@@ -1134,7 +1134,7 @@ void scenarioMultipleValidationDiagnostics(TestContext &context)
 
 void scenarioStructuredDiagnosticDetails(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     context.expect(!network.links_pipes.isEmpty(), "structured-diagnostic fixture requires a pipe");
     if (network.links_pipes.isEmpty())
         return;

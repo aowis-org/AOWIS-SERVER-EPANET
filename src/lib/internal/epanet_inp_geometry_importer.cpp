@@ -626,7 +626,7 @@ LinkType *linkById(QList<LinkType> &links, const QString &id)
     return nullptr;
 }
 
-QUuid nodeUuidById(const NetworkHydraulic &network, const QString &id)
+QUuid nodeUuidById(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicNodeJunction &node : network.nodes_junctions)
     {
@@ -646,7 +646,7 @@ QUuid nodeUuidById(const NetworkHydraulic &network, const QString &id)
     return QUuid();
 }
 
-void assignNodeCoordinate(NetworkHydraulic &network, const QString &id, const CoordinateWGS84 &coordinate)
+void assignNodeCoordinate(NetworkHydraulicDistribution &network, const QString &id, const CoordinateWGS84 &coordinate)
 {
     HydraulicNodeJunction *junction = nodeById(network.nodes_junctions, id);
     if (junction != nullptr)
@@ -665,7 +665,7 @@ void assignNodeCoordinate(NetworkHydraulic &network, const QString &id, const Co
         tank->coordinate_wgs84 = coordinate;
 }
 
-void assignLinkVertices(NetworkHydraulic &network, const QString &id, const QList<HydraulicLinkVertex> &vertices)
+void assignLinkVertices(NetworkHydraulicDistribution &network, const QString &id, const QList<HydraulicLinkVertex> &vertices)
 {
     HydraulicLinkPipe *pipe = linkById(network.links_pipes, id);
     if (pipe != nullptr)
@@ -825,7 +825,7 @@ void retainSourceGeometry(
 }
 
 void generateMissingNodeCoordinates(
-    NetworkHydraulic &network,
+    NetworkHydraulicDistribution &network,
     const QList<ImportedNodeCoordinate> &nodes,
     EpanetResultImport &result)
 {
@@ -925,7 +925,7 @@ HydraulicSimulationStatus importEpanetInpGeometry(
     GeometryTransform transform = makeGeometryTransform(
         metadata.units, nodes, links, metadata, result);
 
-    NetworkHydraulic &network = result.request.network;
+    NetworkHydraulicDistribution &network = result.request.network;
     for (const ImportedNodeCoordinate &node : nodes)
     {
         if (node.point.has_value())

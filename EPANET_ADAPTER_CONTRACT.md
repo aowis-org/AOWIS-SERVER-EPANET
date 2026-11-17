@@ -91,7 +91,7 @@ EPANET reaction orders are network-wide. Enabled entity overrides must therefore
 
 One `EpanetRunRequest` performs exactly one hydraulic analysis. Its ordered `quality_runs` list may be empty or contain any number of quality analyses. The hydraulic solution is saved once and reused by every quality child.
 
-Water-quality analysis selection is execution state. `NetworkHydraulic` stores the network's quality inputs and reaction data, while each `WaterQualitySolverOptions` entry in `EpanetRunRequest::quality_runs` supplies the active analysis mode, chemical name, trace node, tolerance, and diffusivity for one child run. The adapter does not mutate the prepared network between quality children.
+Water-quality analysis selection is execution state. `NetworkHydraulicDistribution` stores the network's quality inputs and reaction data, while each `WaterQualitySolverOptions` entry in `EpanetRunRequest::quality_runs` supplies the active analysis mode, chemical name, trace node, tolerance, and diffusivity for one child run. The adapter does not mutate the prepared network between quality children.
 
 Hydraulic and quality results use separate timelines because their timesteps and event boundaries can differ. Quality execution uses `EN_stepQ`, so every configured quality timestep is represented rather than only hydraulic event times.
 

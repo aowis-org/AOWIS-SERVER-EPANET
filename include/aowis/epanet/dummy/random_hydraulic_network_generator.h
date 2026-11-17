@@ -3,16 +3,16 @@
 
 #include <QtGlobal>
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 class RandomHydraulicNetworkGenerator
 {
 public:
-    static NetworkHydraulic generate();
-    static NetworkHydraulic generate(quint64 seed);
+    static NetworkHydraulicDistribution generate();
+    static NetworkHydraulicDistribution generate(quint64 seed);
 
-    static NetworkHydraulic generateFractal();
-    static NetworkHydraulic generateFractal(quint64 seed);
+    static NetworkHydraulicDistribution generateFractal();
+    static NetworkHydraulicDistribution generateFractal(quint64 seed);
 };
 
 #endif // RANDOM_HYDRAULIC_NETWORK_GENERATOR_H

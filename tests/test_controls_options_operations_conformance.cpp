@@ -59,7 +59,7 @@ void checkEpanet(int error, const char *operation)
 class NativeSavedProject
 {
 public:
-    explicit NativeSavedProject(const NetworkHydraulic &network)
+    explicit NativeSavedProject(const NetworkHydraulicDistribution &network)
     {
         const EpanetResultInp result = EpanetRunner().retrieveInp(AowisEpanetTests::makeRunRequest(network));
         if (!result.status.success)
@@ -151,7 +151,7 @@ PremiseReadback readPremise(EN_Project project, int rule_index, int premise_inde
     return result;
 }
 
-NetworkHydraulic cleanNet1()
+NetworkHydraulicDistribution cleanNet1()
 {
     Net1Fixture fixture = AowisEpanetTests::makeNet1Fixture();
     fixture.network.controls_simple.clear();
@@ -159,7 +159,7 @@ NetworkHydraulic cleanNet1()
     return fixture.network;
 }
 
-QUuid nodeUuid(const NetworkHydraulic &network, const QString &id)
+QUuid nodeUuid(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicNodeJunction &node : network.nodes_junctions)
     {
@@ -179,7 +179,7 @@ QUuid nodeUuid(const NetworkHydraulic &network, const QString &id)
     throw std::runtime_error((QStringLiteral("Could not resolve node ") + id).toStdString());
 }
 
-QUuid linkUuid(const NetworkHydraulic &network, const QString &id)
+QUuid linkUuid(const NetworkHydraulicDistribution &network, const QString &id)
 {
     for (const HydraulicLinkPipe &link : network.links_pipes)
     {
@@ -200,7 +200,7 @@ QUuid linkUuid(const NetworkHydraulic &network, const QString &id)
 }
 
 HydraulicControlSimple makeSimpleControl(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     HydraulicControlSimpleType type,
     HydraulicControlActionType action,
     bool enabled = true)
@@ -232,7 +232,7 @@ HydraulicControlSimple makeSimpleControl(
     return control;
 }
 
-HydraulicControlRuleAction closePumpAction(const NetworkHydraulic &network)
+HydraulicControlRuleAction closePumpAction(const NetworkHydraulicDistribution &network)
 {
     HydraulicControlRuleAction action;
     action.link_uuid = linkUuid(network, QStringLiteral("9"));
@@ -240,7 +240,7 @@ HydraulicControlRuleAction closePumpAction(const NetworkHydraulic &network)
     return action;
 }
 
-HydraulicControlRuleAction openPumpAction(const NetworkHydraulic &network)
+HydraulicControlRuleAction openPumpAction(const NetworkHydraulicDistribution &network)
 {
     HydraulicControlRuleAction action;
     action.link_uuid = linkUuid(network, QStringLiteral("9"));
@@ -249,7 +249,7 @@ HydraulicControlRuleAction openPumpAction(const NetworkHydraulic &network)
 }
 
 HydraulicControlRule makeRule(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const QList<HydraulicControlRulePremise> &premises,
     bool with_else = false,
     double priority = 0.0,
@@ -360,7 +360,7 @@ void testSimpleControlType(
     int expected_type,
     double expected_level)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.controls_simple.append(makeSimpleControl(network, type, HydraulicControlActionType::Open));
     const NativeSavedProject native_project(network);
     const ControlReadback readback = readControl(native_project.handle(), 1);
@@ -389,7 +389,7 @@ void testSimpleHighLevel(TestContext &context)
 
 void testSimpleTimer(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 3600;
     network.timestep_hydraulic_s = 3600;
     network.controls_simple.append(makeSimpleControl(network, HydraulicControlSimpleType::Timer, HydraulicControlActionType::Close));
@@ -412,7 +412,7 @@ void testSimpleTimer(TestContext &context)
 
 void testSimpleTimeOfDay(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 7200;
     network.timestep_hydraulic_s = 7200;
     network.timestep_report_s = 7200;
@@ -440,7 +440,7 @@ void testSimpleTimeOfDay(TestContext &context)
 
 void testSimpleAction(TestContext &context, HydraulicControlActionType action, double expected_setting)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 0;
     if (action == HydraulicControlActionType::Open && !network.links_pumps.isEmpty())
         network.links_pumps.first().initial_status = HydraulicLinkPumpInitialStatus::Off;
@@ -485,14 +485,14 @@ void testActionSetting(TestContext &context)
 
 void testDisabledSimpleControl(TestContext &context)
 {
-    NetworkHydraulic enabled_network = cleanNet1();
+    NetworkHydraulicDistribution enabled_network = cleanNet1();
     enabled_network.duration_s = 0;
     HydraulicControlSimple enabled_control = makeSimpleControl(
         enabled_network, HydraulicControlSimpleType::Timer, HydraulicControlActionType::Close, true);
     enabled_control.trigger_elapsed_time_s = 0;
     enabled_network.controls_simple.append(enabled_control);
 
-    NetworkHydraulic disabled_network = enabled_network;
+    NetworkHydraulicDistribution disabled_network = enabled_network;
     disabled_network.controls_simple[0].enabled = false;
 
     const EpanetResultRun enabled_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(enabled_network));
@@ -510,7 +510,7 @@ void testRulePremiseRoundTrip(
     int expected_variable,
     int expected_comparison)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
 
     QUuid object_uuid;
     if (object == HydraulicControlRuleObject::Node)
@@ -653,7 +653,7 @@ void testOperatorIsNot(TestContext &context)
 
 void testRuleLogicalIf(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     QList<HydraulicControlRulePremise> premises;
     premises.append(numericPremise(
         HydraulicControlRuleLogicalOperator::If,
@@ -671,7 +671,7 @@ void testRuleLogicalIf(TestContext &context)
 
 void testRuleLogicalCompound(TestContext &context, HydraulicControlRuleLogicalOperator logical_operator, int expected_operator)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     QList<HydraulicControlRulePremise> premises;
     premises.append(numericPremise(
         HydraulicControlRuleLogicalOperator::If,
@@ -712,7 +712,7 @@ void testRuleLogicalOr(TestContext &context)
 
 void testRuleThenAction(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     QList<HydraulicControlRulePremise> premises;
     premises.append(numericPremise(
         HydraulicControlRuleLogicalOperator::If,
@@ -734,7 +734,7 @@ void testRuleThenAction(TestContext &context)
 
 void testRuleElseAction(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     QList<HydraulicControlRulePremise> premises;
     premises.append(numericPremise(
         HydraulicControlRuleLogicalOperator::If,
@@ -757,7 +757,7 @@ void testRuleElseAction(TestContext &context)
 
 void testRuleSettingAction(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     QList<HydraulicControlRulePremise> premises;
     premises.append(numericPremise(
         HydraulicControlRuleLogicalOperator::If,
@@ -788,7 +788,7 @@ void testRuleSettingAction(TestContext &context)
 
 void testRuleActiveAction(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     int pipe_index = -1;
     for (int index = 0; index < network.links_pipes.size(); index++)
     {
@@ -845,7 +845,7 @@ void testRuleActiveAction(TestContext &context)
 
 void testRuleStructuredSerialization(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
 
     QList<HydraulicControlRulePremise> premises;
     premises.append(numericPremise(
@@ -891,7 +891,7 @@ void testRuleStructuredSerialization(TestContext &context)
 
 void testRulePriority(TestContext &context)
 {
-    NetworkHydraulic open_wins = cleanNet1();
+    NetworkHydraulicDistribution open_wins = cleanNet1();
     open_wins.duration_s = 3600;
     open_wins.timestep_hydraulic_s = 3600;
     open_wins.timestep_rule_s = 60;
@@ -936,7 +936,7 @@ void testRulePriority(TestContext &context)
     }
     context.expect(saw_open_at_priority_event, "higher-priority OPEN rule must win a conflicting rule event");
 
-    NetworkHydraulic close_wins = open_wins;
+    NetworkHydraulicDistribution close_wins = open_wins;
     close_wins.controls_rules[0].priority = 5.0;
     close_wins.controls_rules[1].priority = 1.0;
     const EpanetResultRun close_wins_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(close_wins));
@@ -953,7 +953,7 @@ void testRulePriority(TestContext &context)
 
 void testDisabledRule(TestContext &context)
 {
-    NetworkHydraulic enabled_network = cleanNet1();
+    NetworkHydraulicDistribution enabled_network = cleanNet1();
     enabled_network.duration_s = 3600;
     enabled_network.timestep_hydraulic_s = 3600;
     enabled_network.timestep_rule_s = 60;
@@ -967,7 +967,7 @@ void testDisabledRule(TestContext &context)
         1800.0));
     enabled_network.controls_rules.append(makeRule(enabled_network, premises, false, 0.0, true));
 
-    NetworkHydraulic disabled_network = enabled_network;
+    NetworkHydraulicDistribution disabled_network = enabled_network;
     disabled_network.controls_rules[0].enabled = false;
 
     const EpanetResultRun enabled_run = EpanetRunner().run(AowisEpanetTests::makeRunRequest(enabled_network));
@@ -996,7 +996,7 @@ void testDisabledRule(TestContext &context)
 
 void testNextHydraulicEvent(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 3600;
     network.timestep_hydraulic_s = 3600;
     HydraulicControlSimple control = makeSimpleControl(network, HydraulicControlSimpleType::Timer, HydraulicControlActionType::Close);
@@ -1017,7 +1017,7 @@ void testNextHydraulicEvent(TestContext &context)
 
 void testControlEventIdentification(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.duration_s = 3600;
     network.timestep_hydraulic_s = 3600;
     HydraulicControlSimple control = makeSimpleControl(network, HydraulicControlSimpleType::Timer, HydraulicControlActionType::Close);
@@ -1050,7 +1050,7 @@ enum class TimeParameterCase
 
 void testTimeParameter(TestContext &context, TimeParameterCase test_case)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     int backend_parameter = EN_DURATION;
     std::int64_t expected = 0;
 
@@ -1129,7 +1129,7 @@ DEFINE_TIME_TEST(testTimeStartTimeOfDay, StartTimeOfDay)
 
 void testReportStatistic(TestContext &context, HydraulicSimulationReportStatistic statistic, int expected_statistic)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.report_statistic = statistic;
     const NativeSavedProject native_project(network);
     long actual = -1;
@@ -1162,7 +1162,7 @@ void testReportStatisticRange(TestContext &context)
     testReportStatistic(context, HydraulicSimulationReportStatistic::Range, EN_RANGE);
 }
 
-double readOption(const NetworkHydraulic &network, int option)
+double readOption(const NetworkHydraulicDistribution &network, int option)
 {
     const NativeSavedProject native_project(network);
     double value = 0.0;
@@ -1170,21 +1170,21 @@ double readOption(const NetworkHydraulic &network, int option)
     return value;
 }
 
-void expectOption(TestContext &context, const NetworkHydraulic &network, int option, double expected)
+void expectOption(TestContext &context, const NetworkHydraulicDistribution &network, int option, double expected)
 {
     context.expectNear(readOption(network, option), expected, NumericTolerance{1.0e-12, 1.0e-12}, comparison("option"));
 }
 
 void testHeadlossHazenWilliams(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.headloss_formula = HydraulicHeadlossFormula::HazenWilliams;
     expectOption(context, network, EN_HEADLOSSFORM, EN_HW);
 }
 
 void testDemandModel(TestContext &context, HydraulicDemandModel model, int expected_model)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.demand_model = model;
     network.options_hydraulic.minimum_pressure_head_m = 2.0;
     network.options_hydraulic.required_pressure_head_m = 20.0;
@@ -1218,7 +1218,7 @@ enum class DemandParameterCase
 
 void testDemandParameter(TestContext &context, DemandParameterCase test_case)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.demand_model = HydraulicDemandModel::PressureDriven;
     network.options_hydraulic.minimum_pressure_head_m = 2.75;
     network.options_hydraulic.required_pressure_head_m = 24.5;
@@ -1256,28 +1256,28 @@ void testDemandPressureExponent(TestContext &context)
 
 void testOptionMaximumTrials(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.maximum_trials = 73;
     expectOption(context, network, EN_TRIALS, 73.0);
 }
 
 void testOptionAccuracy(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.accuracy = 0.00037;
     expectOption(context, network, EN_ACCURACY, 0.00037);
 }
 
 void testOptionUnbalancedStop(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.unbalanced_action = HydraulicUnbalancedAction::Stop;
     expectOption(context, network, EN_UNBALANCED, -1.0);
 }
 
 void testOptionUnbalancedContinue(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.unbalanced_action = HydraulicUnbalancedAction::Continue;
     network.options_hydraulic.unbalanced_extra_trials = 17;
     expectOption(context, network, EN_UNBALANCED, 17.0);
@@ -1285,84 +1285,84 @@ void testOptionUnbalancedContinue(TestContext &context)
 
 void testOptionCheckFrequency(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.check_frequency = 5;
     expectOption(context, network, EN_CHECKFREQ, 5.0);
 }
 
 void testOptionMaximumCheck(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.maximum_check = 19;
     expectOption(context, network, EN_MAXCHECK, 19.0);
 }
 
 void testOptionDampingLimit(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.damping_limit = 0.35;
     expectOption(context, network, EN_DAMPLIMIT, 0.35);
 }
 
 void testOptionMaximumHeadError(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.maximum_head_error_m = 0.0042;
     expectOption(context, network, EN_HEADERROR, 0.0042);
 }
 
 void testOptionMaximumFlowChange(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.maximum_flow_change_m3_per_h = 0.27;
     expectOption(context, network, EN_FLOWCHANGE, 0.27);
 }
 
 void testOptionDemandMultiplier(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.demand_multiplier = 1.37;
     expectOption(context, network, EN_DEMANDMULT, 1.37);
 }
 
 void testOptionEmitterBackflowDisabled(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.emitters_can_backflow = false;
     expectOption(context, network, EN_EMITBACKFLOW, EN_FALSE);
 }
 
 void testOptionEmitterBackflowEnabled(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.emitters_can_backflow = true;
     expectOption(context, network, EN_EMITBACKFLOW, EN_TRUE);
 }
 
 void testOptionSpecificGravity(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.specific_gravity = 1.08;
     expectOption(context, network, EN_SP_GRAVITY, 1.08);
 }
 
 void testOptionRelativeViscosity(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.relative_viscosity = 1.17;
     expectOption(context, network, EN_SP_VISCOS, 1.17);
 }
 
 void testOptionDefaultDemandPatternNone(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     network.options_hydraulic.default_demand_pattern_uuid = QUuid();
     expectOption(context, network, EN_DEMANDPATTERN, 0.0);
 }
 
 void testOptionDefaultDemandPattern(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     context.expect(!network.patterns_time.isEmpty(), "Net1 must provide its demand pattern");
     if (network.patterns_time.isEmpty())
         return;
@@ -1453,7 +1453,7 @@ void testWarningDiagnostics(TestContext &context)
 
 void testErrorDiagnostics(TestContext &context)
 {
-    NetworkHydraulic network = cleanNet1();
+    NetworkHydraulicDistribution network = cleanNet1();
     HydraulicControlRule rule;
     rule.id = QStringLiteral("BROKEN_RULE_REFERENCE");
     rule.uuid = QUuid::createUuid();

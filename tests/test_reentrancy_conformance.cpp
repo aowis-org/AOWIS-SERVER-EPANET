@@ -214,9 +214,9 @@ void compareRunToBaseline(
     }
 }
 
-NetworkHydraulic reentrancyNetwork(double source_head_m, double sink_demand_m3_per_h)
+NetworkHydraulicDistribution reentrancyNetwork(double source_head_m, double sink_demand_m3_per_h)
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.id = QStringLiteral("reentrancy-conformance");
     network.uuid = QUuid::createUuid();
     network.duration_s = 6 * 3600;

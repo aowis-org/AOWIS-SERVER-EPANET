@@ -56,7 +56,7 @@ NativeReferenceConfiguration nativeConfiguration(NativeReferenceVariant variant,
     return configuration;
 }
 
-HydraulicNodeJunction *findModelJunction(NetworkHydraulic &network, const QString &id)
+HydraulicNodeJunction *findModelJunction(NetworkHydraulicDistribution &network, const QString &id)
 {
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
@@ -66,7 +66,7 @@ HydraulicNodeJunction *findModelJunction(NetworkHydraulic &network, const QStrin
     return nullptr;
 }
 
-HydraulicNodeJunction *findModelJunctionByUuid(NetworkHydraulic &network, const QUuid &uuid)
+HydraulicNodeJunction *findModelJunctionByUuid(NetworkHydraulicDistribution &network, const QUuid &uuid)
 {
     for (HydraulicNodeJunction &junction : network.nodes_junctions)
     {
@@ -76,7 +76,7 @@ HydraulicNodeJunction *findModelJunctionByUuid(NetworkHydraulic &network, const 
     return nullptr;
 }
 
-HydraulicNodeReservoir *findModelReservoir(NetworkHydraulic &network, const QString &id)
+HydraulicNodeReservoir *findModelReservoir(NetworkHydraulicDistribution &network, const QString &id)
 {
     for (HydraulicNodeReservoir &reservoir : network.nodes_reservoirs)
     {
@@ -86,7 +86,7 @@ HydraulicNodeReservoir *findModelReservoir(NetworkHydraulic &network, const QStr
     return nullptr;
 }
 
-HydraulicNodeTank *findModelTank(NetworkHydraulic &network, const QString &id)
+HydraulicNodeTank *findModelTank(NetworkHydraulicDistribution &network, const QString &id)
 {
     for (HydraulicNodeTank &tank : network.nodes_tanks)
     {
@@ -96,7 +96,7 @@ HydraulicNodeTank *findModelTank(NetworkHydraulic &network, const QString &id)
     return nullptr;
 }
 
-HydraulicLinkPipe *findModelPipe(NetworkHydraulic &network, const QString &id)
+HydraulicLinkPipe *findModelPipe(NetworkHydraulicDistribution &network, const QString &id)
 {
     for (HydraulicLinkPipe &pipe : network.links_pipes)
     {
@@ -570,7 +570,7 @@ void testPipeMaterialRoughnessResolution(TestContext &context)
     if (roughness.has_value())
         context.expectNear(roughness.value(), 0.013, NumericTolerance{1.0e-9, 0.0}, comparison("material_library.chezy_manning", 0, "Pipe", "111"));
 
-    NetworkHydraulic missing_material = fixture.network;
+    NetworkHydraulicDistribution missing_material = fixture.network;
     HydraulicLinkPipe *missing_material_pipe = findModelPipe(missing_material, QStringLiteral("111"));
     missing_material_pipe->material_uuid = QUuid();
     const EpanetResultInp missing_material_inp = EpanetRunner().retrieveInp(
@@ -578,7 +578,7 @@ void testPipeMaterialRoughnessResolution(TestContext &context)
     context.expect(!missing_material_inp.status.success,
         "material-library roughness must reject a missing material reference");
 
-    NetworkHydraulic unknown_material = fixture.network;
+    NetworkHydraulicDistribution unknown_material = fixture.network;
     HydraulicLinkPipe *unknown_material_pipe = findModelPipe(unknown_material, QStringLiteral("111"));
     unknown_material_pipe->material_uuid = QUuid::createUuid();
     const EpanetResultInp unknown_material_inp = EpanetRunner().retrieveInp(
@@ -586,7 +586,7 @@ void testPipeMaterialRoughnessResolution(TestContext &context)
     context.expect(!unknown_material_inp.status.success,
         "material-library roughness must reject an unknown material reference");
 
-    NetworkHydraulic missing_date = fixture.network;
+    NetworkHydraulicDistribution missing_date = fixture.network;
     HydraulicLinkPipe *missing_date_pipe = findModelPipe(missing_date, QStringLiteral("111"));
     missing_date_pipe->metadata.date_installed.reset();
     const EpanetResultInp missing_date_inp = EpanetRunner().retrieveInp(
@@ -594,7 +594,7 @@ void testPipeMaterialRoughnessResolution(TestContext &context)
     context.expect(!missing_date_inp.status.success,
         "material-library roughness must reject a missing installation date");
 
-    NetworkHydraulic future_date = fixture.network;
+    NetworkHydraulicDistribution future_date = fixture.network;
     HydraulicLinkPipe *future_date_pipe = findModelPipe(future_date, QStringLiteral("111"));
     future_date_pipe->metadata.date_installed = QDate(QDate::currentDate().year() + 1, 1, 1);
     const EpanetResultInp future_date_inp = EpanetRunner().retrieveInp(
@@ -602,7 +602,7 @@ void testPipeMaterialRoughnessResolution(TestContext &context)
     context.expect(!future_date_inp.status.success,
         "material-library roughness must reject a future installation year");
 
-    NetworkHydraulic missing_formula = fixture.network;
+    NetworkHydraulicDistribution missing_formula = fixture.network;
     missing_formula.options_hydraulic.headloss_formula = HydraulicHeadlossFormula::DarcyWeisbach;
     for (HydraulicPipeMaterialRoughnessAtAge &entry : missing_formula.pipe_materials[0].roughness_by_age)
         entry.roughness_darcy_weisbach_mm.reset();
@@ -611,7 +611,7 @@ void testPipeMaterialRoughnessResolution(TestContext &context)
     context.expect(!missing_formula_inp.status.success,
         "material-library roughness must reject missing data for the active headloss formula");
 
-    NetworkHydraulic explicit_network = fixture.network;
+    NetworkHydraulicDistribution explicit_network = fixture.network;
     explicit_network.options_hydraulic.headloss_formula = HydraulicHeadlossFormula::HazenWilliams;
     HydraulicLinkPipe *explicit_pipe = findModelPipe(explicit_network, QStringLiteral("111"));
     explicit_pipe->roughness_mode = HydraulicPipeRoughnessMode::Explicit;
@@ -692,7 +692,7 @@ void testDemandPointNodeProjection(TestContext &context)
     junction_demand_point.attachment.type = HydraulicDemandPointAttachmentType::Junction;
     junction_demand_point.attachment.junction_uuid = junction_12->uuid;
 
-    NetworkHydraulic equivalent_direct_network = fixture.network;
+    NetworkHydraulicDistribution equivalent_direct_network = fixture.network;
     HydraulicNodeJunction *equivalent_junction_11 =
         findModelJunction(equivalent_direct_network, QStringLiteral("11"));
     HydraulicNodeJunction *equivalent_junction_12 =
@@ -748,7 +748,7 @@ void testDemandPointNodeProjection(TestContext &context)
             "solver projection must aggregate equivalent projected demand categories per junction");
     }
 
-    NetworkHydraulic disabled_network = fixture.network;
+    NetworkHydraulicDistribution disabled_network = fixture.network;
     for (HydraulicDemandPoint &disabled_demand_point : disabled_network.demand_points)
         disabled_demand_point.metadata.enabled = false;
     const EpanetResultInp disabled_inp = EpanetRunner().retrieveInp(
@@ -768,7 +768,7 @@ void testDemandPointNodeProjection(TestContext &context)
             "disabled demand points must not alter the solver-facing model");
     }
 
-    NetworkHydraulic unattached_network = fixture.network;
+    NetworkHydraulicDistribution unattached_network = fixture.network;
     unattached_network.demand_points.first().attachment =
         HydraulicDemandPointAttachment();
     const EpanetResultInp unattached_inp = EpanetRunner().retrieveInp(
@@ -779,14 +779,14 @@ void testDemandPointNodeProjection(TestContext &context)
         unattached_inp.status.entity.type == HydraulicSimulationStatusEntityType::DemandPoint,
         "invalid demand-point projection must identify the demand point as the failing entity type");
 
-    NetworkHydraulic invalid_position_network = fixture.network;
+    NetworkHydraulicDistribution invalid_position_network = fixture.network;
     invalid_position_network.demand_points.first().attachment.pipe_position = 1.5;
     const EpanetResultInp invalid_position_inp = EpanetRunner().retrieveInp(
         AowisEpanetTests::makeRunRequest(invalid_position_network));
     context.expect(!invalid_position_inp.status.success,
         "demand-point pipe positions outside the normalized range must be rejected");
 
-    NetworkHydraulic missing_assigned_junction_network = fixture.network;
+    NetworkHydraulicDistribution missing_assigned_junction_network = fixture.network;
     missing_assigned_junction_network.demand_points[1].attachment.pipe_assigned_junction_uuid = QUuid();
     const EpanetResultInp missing_assigned_junction_inp = EpanetRunner().retrieveInp(
         AowisEpanetTests::makeRunRequest(missing_assigned_junction_network));
@@ -796,7 +796,7 @@ void testDemandPointNodeProjection(TestContext &context)
         missing_assigned_junction_inp.status.entity.type == HydraulicSimulationStatusEntityType::DemandPoint,
         "missing assigned junction must identify the demand point as the failing entity type");
 
-    NetworkHydraulic non_endpoint_assigned_junction_network = fixture.network;
+    NetworkHydraulicDistribution non_endpoint_assigned_junction_network = fixture.network;
     const QUuid non_endpoint_junction_uuid = junction_11->uuid == pipe_11->node_uuid_from
             || junction_11->uuid == pipe_11->node_uuid_to
         ? QUuid::createUuid()

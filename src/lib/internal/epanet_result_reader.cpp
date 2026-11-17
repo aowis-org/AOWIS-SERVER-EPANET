@@ -99,7 +99,7 @@ bool resolvePumpState(double backend_state, HydraulicSimulationPumpState &state)
 }
 }
 
-EpanetResultReader::EpanetResultReader(const EpanetProject &project, const NetworkHydraulic &network, const EpanetIndexRegistry &indices)
+EpanetResultReader::EpanetResultReader(const EpanetProject &project, const NetworkHydraulicDistribution &network, const EpanetIndexRegistry &indices)
     : project(project), network(network), indices(indices)
 {
 }

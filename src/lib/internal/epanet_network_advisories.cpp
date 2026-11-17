@@ -6,7 +6,7 @@
 namespace
 {
 void collectTankStorageRangeAdvisories(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     QList<HydraulicSimulationDiagnostic> &advisories)
 {
     for (const HydraulicNodeTank &tank : network.nodes_tanks)
@@ -49,7 +49,7 @@ void collectTankStorageRangeAdvisories(
 }
 }
 
-QList<HydraulicSimulationDiagnostic> collectEpanetNetworkAdvisories(const NetworkHydraulic &network)
+QList<HydraulicSimulationDiagnostic> collectEpanetNetworkAdvisories(const NetworkHydraulicDistribution &network)
 {
     QList<HydraulicSimulationDiagnostic> advisories;
     collectTankStorageRangeAdvisories(network, advisories);

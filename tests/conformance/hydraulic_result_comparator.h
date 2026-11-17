@@ -5,18 +5,18 @@
 #include "native_epanet_reference_runner.h"
 
 #include <aowis/epanet/epanet_result_run.h>
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 namespace AowisEpanetTests
 {
 void compareHydraulicTimelines(const NativeHydraulicTimeline &expected,
     const EpanetResultRun &actual,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     TestContext &context);
 
 void compareHydraulicTimelines(const NativeHydraulicTimeline &expected,
     const EpanetResultRun &actual,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     TestContext &context,
     double tolerance_scale);
 }

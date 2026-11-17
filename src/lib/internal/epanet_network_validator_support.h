@@ -2,7 +2,7 @@
 #define AOWIS_EPANET_NETWORK_VALIDATOR_SUPPORT_H
 
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 #include <QList>
 #include <QSet>
@@ -39,8 +39,8 @@ QSet<QUuid> entityUuids(const QList<Entity> &entities)
     return uuids;
 }
 
-QSet<QUuid> nodeUuids(const NetworkHydraulic &network);
-QSet<QUuid> linkUuids(const NetworkHydraulic &network);
+QSet<QUuid> nodeUuids(const NetworkHydraulicDistribution &network);
+QSet<QUuid> linkUuids(const NetworkHydraulicDistribution &network);
 HydraulicSimulationStatus validationStatus(
     HydraulicSimulationStatusOperation operation,
     HydraulicSimulationStatusEntityType entity_type,

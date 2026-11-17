@@ -13,11 +13,11 @@
 #include <QUuid>
 #include <QtGlobal>
 
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 namespace
 {
-QHash<QUuid, QString> reportNodeIdsByUuid(const NetworkHydraulic &network)
+QHash<QUuid, QString> reportNodeIdsByUuid(const NetworkHydraulicDistribution &network)
 {
     QHash<QUuid, QString> ids_by_uuid;
     for (const HydraulicNodeJunction &junction : network.nodes_junctions)
@@ -92,7 +92,7 @@ QString mapNumber(double value)
     return QString::number(value, 'g', 15);
 }
 
-QString internalConstantDemandPatternId(const NetworkHydraulic &network)
+QString internalConstantDemandPatternId(const NetworkHydraulicDistribution &network)
 {
     if (network.options_hydraulic.default_demand_pattern_uuid.isNull())
         return QString();
@@ -133,7 +133,7 @@ QString internalConstantDemandPatternId(const NetworkHydraulic &network)
     }
 }
 
-QHash<QUuid, QString> demandPatternIdsByUuid(const NetworkHydraulic &network)
+QHash<QUuid, QString> demandPatternIdsByUuid(const NetworkHydraulicDistribution &network)
 {
     QHash<QUuid, QString> pattern_ids;
     for (const HydraulicPatternTime &pattern : network.patterns_time)
@@ -141,7 +141,7 @@ QHash<QUuid, QString> demandPatternIdsByUuid(const NetworkHydraulic &network)
     return pattern_ids;
 }
 
-QString preserveDemandCategories(QString inp_text, const NetworkHydraulic &network)
+QString preserveDemandCategories(QString inp_text, const NetworkHydraulicDistribution &network)
 {
     QStringList lines = inp_text.split(QChar('\n'));
     int demands_section_index = -1;
@@ -207,7 +207,7 @@ QString preserveDemandCategories(QString inp_text, const NetworkHydraulic &netwo
     return lines.join(QChar('\n'));
 }
 
-QString preserveMapLayoutSections(QString inp_text, const NetworkHydraulic &network)
+QString preserveMapLayoutSections(QString inp_text, const NetworkHydraulicDistribution &network)
 {
     QStringList lines = inp_text.split(QChar('\n'));
     QStringList retained_lines;
@@ -496,7 +496,7 @@ QString preserveNoDefaultDemandPattern(QString inp_text, const QString &unused_p
 
 HydraulicSimulationStatus retrieveEpanetInpText(
     EpanetProject &project,
-    const NetworkHydraulic &request,
+    const NetworkHydraulicDistribution &request,
     QString &inp_text)
 {
     inp_text.clear();

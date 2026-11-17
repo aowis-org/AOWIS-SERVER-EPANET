@@ -3,7 +3,7 @@
 
 #include <aowis/model/hydraulic/hydraulic_simulation_results.h>
 #include <aowis/model/hydraulic/hydraulic_simulation_status.h>
-#include <aowis/model/hydraulic/network_hydraulic.h>
+#include <aowis/model/hydraulic/network_hydraulic_distribution.h>
 
 class EpanetProject;
 struct EpanetIndexRegistry;
@@ -11,7 +11,7 @@ struct EpanetIndexRegistry;
 class EpanetResultReader
 {
 public:
-    EpanetResultReader(const EpanetProject &project, const NetworkHydraulic &network, const EpanetIndexRegistry &indices);
+    EpanetResultReader(const EpanetProject &project, const NetworkHydraulicDistribution &network, const EpanetIndexRegistry &indices);
 
     HydraulicSimulationStatus read(HydraulicSimulationResult &result) const;
 
@@ -26,7 +26,7 @@ private:
     HydraulicSimulationStatus readNextEvent(HydraulicSimulationResult &result) const;
 
     const EpanetProject &project;
-    const NetworkHydraulic &network;
+    const NetworkHydraulicDistribution &network;
     const EpanetIndexRegistry &indices;
 };
 

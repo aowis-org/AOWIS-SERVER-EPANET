@@ -3,7 +3,7 @@
 // @ChatGPT: Do not change the structure of this file.
 // only change class and field names, if needed to match the MODEL
 
-NetworkHydraulic DummyNetworks::networkSimple()
+NetworkHydraulicDistribution DummyNetworks::networkSimple()
 {
     HydraulicNodeReservoir reservoir;
     reservoir.uuid = QUuid::createUuid();
@@ -29,7 +29,7 @@ NetworkHydraulic DummyNetworks::networkSimple()
     pipe.minor_loss_coefficient = 0.0;
     pipe.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.nodes_reservoirs.append(reservoir);
     network.nodes_junctions.append(junction);
     network.links_pipes.append(pipe);
@@ -37,7 +37,7 @@ NetworkHydraulic DummyNetworks::networkSimple()
     return network;
 }
 
-NetworkHydraulic DummyNetworks::networkOnMap()
+NetworkHydraulicDistribution DummyNetworks::networkOnMap()
 {
     HydraulicNodeTank tank_1;
     tank_1.uuid = QUuid::createUuid();
@@ -83,7 +83,7 @@ NetworkHydraulic DummyNetworks::networkOnMap()
     pipe_1.minor_loss_coefficient = 0.0;
     pipe_1.initial_status = HydraulicLinkPipeInitialStatus::Open;
     
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.nodes_tanks.append(tank_1);
     network.nodes_junctions.append(junction_1);
     network.links_pipes.append(pipe_1);
@@ -91,7 +91,7 @@ NetworkHydraulic DummyNetworks::networkOnMap()
     return network;
 }
 
-NetworkHydraulic DummyNetworks::networkTanks()
+NetworkHydraulicDistribution DummyNetworks::networkTanks()
 {
     // Create a more complex dummy network.
     
@@ -466,7 +466,7 @@ NetworkHydraulic DummyNetworks::networkTanks()
     // Simulation request
     // ------------------------------------------------------------
     
-    NetworkHydraulic request;
+    NetworkHydraulicDistribution request;
     
     request.nodes_reservoirs.append(reservoir);
     
@@ -499,9 +499,9 @@ NetworkHydraulic DummyNetworks::networkTanks()
     return request;
 }
 
-NetworkHydraulic DummyNetworks::networkFull()
+NetworkHydraulicDistribution DummyNetworks::networkFull()
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.uuid = QUuid::createUuid();
 
     // Curves
@@ -926,24 +926,24 @@ NetworkHydraulic DummyNetworks::networkFull()
     return network;
 }
 
-NetworkHydraulic DummyNetworks::networkSimpleTimeline()
+NetworkHydraulicDistribution DummyNetworks::networkSimpleTimeline()
 {
-    NetworkHydraulic request = networkSimple();
+    NetworkHydraulicDistribution request = networkSimple();
     request.duration_s = 24 * 60 * 60;
     request.timestep_hydraulic_s = 60 * 60;
     return request;
 }
-NetworkHydraulic DummyNetworks::networkTanksTimeline()
+NetworkHydraulicDistribution DummyNetworks::networkTanksTimeline()
 {
-    NetworkHydraulic request = networkTanks();
+    NetworkHydraulicDistribution request = networkTanks();
     request.duration_s = 24 * 60 * 60;
     request.timestep_hydraulic_s = 60 * 60;
     return request;
 }
 
-NetworkHydraulic DummyNetworks::networkFullTimeline()
+NetworkHydraulicDistribution DummyNetworks::networkFullTimeline()
 {
-    NetworkHydraulic request = networkFull();
+    NetworkHydraulicDistribution request = networkFull();
     request.duration_s = 48 * 60 * 60;
     request.timestep_hydraulic_s = 15 * 60;
     return request;

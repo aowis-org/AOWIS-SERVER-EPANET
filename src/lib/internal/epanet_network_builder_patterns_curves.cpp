@@ -61,7 +61,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::addPatternTime(const HydraulicPa
     return makeEpanetSuccess();
 }
 
-HydraulicSimulationStatus EpanetNetworkBuilder::configureConstantDemandPattern(const NetworkHydraulic &request)
+HydraulicSimulationStatus EpanetNetworkBuilder::configureConstantDemandPattern(const NetworkHydraulicDistribution &request)
 {
     // A demand with no explicit pattern is already constant when the project has
     // no default demand pattern. Only create the private factor-1 pattern when
@@ -135,7 +135,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::configureConstantDemandPattern(c
     return makeEpanetSuccess();
 }
 
-HydraulicSimulationStatus EpanetNetworkBuilder::configureDefaultDemandPattern(const NetworkHydraulic &request)
+HydraulicSimulationStatus EpanetNetworkBuilder::configureDefaultDemandPattern(const NetworkHydraulicDistribution &request)
 {
     const QUuid pattern_uuid = request.options_hydraulic.default_demand_pattern_uuid;
     if (pattern_uuid.isNull())
@@ -156,7 +156,7 @@ HydraulicSimulationStatus EpanetNetworkBuilder::configureDefaultDemandPattern(co
     return makeEpanetSuccess();
 }
 
-HydraulicSimulationStatus EpanetNetworkBuilder::configureGlobalEnergyPattern(const NetworkHydraulic &request)
+HydraulicSimulationStatus EpanetNetworkBuilder::configureGlobalEnergyPattern(const NetworkHydraulicDistribution &request)
 {
     const QUuid pattern_uuid = request.options_energy.global_energy_price_pattern_uuid;
     if (pattern_uuid.isNull())

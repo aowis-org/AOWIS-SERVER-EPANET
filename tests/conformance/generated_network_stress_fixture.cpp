@@ -279,9 +279,9 @@ StressSpecification generateSpecification(const GeneratedStressCase &definition)
     return specification;
 }
 
-NetworkHydraulic buildModel(const StressSpecification &specification, const GeneratedStressCase &definition)
+NetworkHydraulicDistribution buildModel(const StressSpecification &specification, const GeneratedStressCase &definition)
 {
-    NetworkHydraulic network;
+    NetworkHydraulicDistribution network;
     network.id = QString::fromUtf8(definition.scenario_name);
     network.uuid = deterministicUuid(definition.seed, 9U, 1U);
     network.title_line_1 = specification.title;

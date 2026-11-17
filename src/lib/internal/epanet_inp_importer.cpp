@@ -785,7 +785,7 @@ EpanetResultImport finishImport(
     return result;
 }
 
-HydraulicSimulationStatus importTitles(EpanetProject &project, NetworkHydraulic &network)
+HydraulicSimulationStatus importTitles(EpanetProject &project, NetworkHydraulicDistribution &network)
 {
     std::array<char, 256> line_1{};
     std::array<char, 256> line_2{};
@@ -1151,25 +1151,25 @@ HydraulicSimulationStatus importCurves(
     return makeEpanetSuccess();
 }
 
-HydraulicSimulationStatus importTimes(EpanetProject &project, NetworkHydraulic &network)
+HydraulicSimulationStatus importTimes(EpanetProject &project, NetworkHydraulicDistribution &network)
 {
     struct TimeField
     {
         int parameter;
-        quint64 NetworkHydraulic::*member;
+        quint64 NetworkHydraulicDistribution::*member;
         const char *name;
     };
 
     const std::array<TimeField, 9> fields = {{
-        {EN_DURATION, &NetworkHydraulic::duration_s, "EN_DURATION"},
-        {EN_HYDSTEP, &NetworkHydraulic::timestep_hydraulic_s, "EN_HYDSTEP"},
-        {EN_QUALSTEP, &NetworkHydraulic::timestep_quality_s, "EN_QUALSTEP"},
-        {EN_PATTERNSTEP, &NetworkHydraulic::timestep_pattern_s, "EN_PATTERNSTEP"},
-        {EN_PATTERNSTART, &NetworkHydraulic::start_pattern_s, "EN_PATTERNSTART"},
-        {EN_REPORTSTEP, &NetworkHydraulic::timestep_report_s, "EN_REPORTSTEP"},
-        {EN_REPORTSTART, &NetworkHydraulic::start_report_s, "EN_REPORTSTART"},
-        {EN_RULESTEP, &NetworkHydraulic::timestep_rule_s, "EN_RULESTEP"},
-        {EN_STARTTIME, &NetworkHydraulic::start_time_of_day_s, "EN_STARTTIME"}
+        {EN_DURATION, &NetworkHydraulicDistribution::duration_s, "EN_DURATION"},
+        {EN_HYDSTEP, &NetworkHydraulicDistribution::timestep_hydraulic_s, "EN_HYDSTEP"},
+        {EN_QUALSTEP, &NetworkHydraulicDistribution::timestep_quality_s, "EN_QUALSTEP"},
+        {EN_PATTERNSTEP, &NetworkHydraulicDistribution::timestep_pattern_s, "EN_PATTERNSTEP"},
+        {EN_PATTERNSTART, &NetworkHydraulicDistribution::start_pattern_s, "EN_PATTERNSTART"},
+        {EN_REPORTSTEP, &NetworkHydraulicDistribution::timestep_report_s, "EN_REPORTSTEP"},
+        {EN_REPORTSTART, &NetworkHydraulicDistribution::start_report_s, "EN_REPORTSTART"},
+        {EN_RULESTEP, &NetworkHydraulicDistribution::timestep_rule_s, "EN_RULESTEP"},
+        {EN_STARTTIME, &NetworkHydraulicDistribution::start_time_of_day_s, "EN_STARTTIME"}
     }};
 
     for (const TimeField &field : fields)
@@ -1202,7 +1202,7 @@ HydraulicSimulationStatus importTimes(EpanetProject &project, NetworkHydraulic &
 
 HydraulicSimulationStatus importHydraulicOptions(
     EpanetProject &project,
-    NetworkHydraulic &network,
+    NetworkHydraulicDistribution &network,
     const ImportReferences &references)
 {
     double value = 0.0;
@@ -1330,7 +1330,7 @@ HydraulicSimulationStatus importHydraulicOptions(
 
 HydraulicSimulationStatus importEnergyOptions(
     EpanetProject &project,
-    NetworkHydraulic &network,
+    NetworkHydraulicDistribution &network,
     const ImportReferences &references)
 {
     struct EnergyOption
@@ -1389,7 +1389,7 @@ HydraulicSimulationStatus importEnergyOptions(
     return makeEpanetSuccess();
 }
 
-HydraulicSimulationStatus importReportStatus(EpanetProject &project, NetworkHydraulic &network)
+HydraulicSimulationStatus importReportStatus(EpanetProject &project, NetworkHydraulicDistribution &network)
 {
     double backend_status_value = 0.0;
     const HydraulicSimulationStatus status = readOption(
@@ -1836,7 +1836,7 @@ HydraulicSimulationStatus importPipe(
     return makeEpanetSuccess();
 }
 
-int pumpHeadCurvePointCount(const NetworkHydraulic &network, const QUuid &curve_uuid)
+int pumpHeadCurvePointCount(const NetworkHydraulicDistribution &network, const QUuid &curve_uuid)
 {
     for (const HydraulicCurvePumpHead &curve : network.curves_pump_head)
     {
@@ -2440,7 +2440,7 @@ HydraulicSimulationStatus importCoreTopology(
 
 HydraulicSimulationStatus importSimpleControls(
     EpanetProject &project,
-    NetworkHydraulic &network,
+    NetworkHydraulicDistribution &network,
     const ImportReferences &references,
     const QString &input_file_path)
 {
@@ -3096,7 +3096,7 @@ bool reactionRangeContainsId(
 }
 
 void collectPipeReactionOverrideIds(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const QStringList &tokens,
     QSet<QString> &ids)
 {
@@ -3127,7 +3127,7 @@ void collectPipeReactionOverrideIds(
 }
 
 void collectTankReactionOverrideIds(
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     const QStringList &tokens,
     QSet<QString> &ids)
 {
@@ -3159,7 +3159,7 @@ void collectTankReactionOverrideIds(
 
 HydraulicSimulationStatus readReactionSourceMetadata(
     const QString &input_file_path,
-    const NetworkHydraulic &network,
+    const NetworkHydraulicDistribution &network,
     ReactionSourceMetadata &metadata)
 {
     QFile file(input_file_path);
@@ -3448,7 +3448,7 @@ HydraulicSimulationStatus importInitialQualityForNodes(
 
 HydraulicSimulationStatus importTankMixing(
     EpanetProject &project,
-    NetworkHydraulic &network)
+    NetworkHydraulicDistribution &network)
 {
     for (HydraulicNodeTank &tank : network.nodes_tanks)
     {
@@ -3495,7 +3495,7 @@ HydraulicSimulationStatus importTankMixing(
 HydraulicSimulationStatus importQualityReactions(
     EpanetProject &project,
     const QString &input_file_path,
-    NetworkHydraulic &network,
+    NetworkHydraulicDistribution &network,
     double chemical_scale_to_canonical_mg,
     int source_flow_units)
 {
@@ -3740,7 +3740,7 @@ HydraulicSimulationStatus importWaterQualityConfiguration(
     if (options.analysis == WaterQualityAnalysisType::Chemical
         || options.analysis == WaterQualityAnalysisType::WaterAge)
     {
-        NetworkHydraulic &network = result.request.network;
+        NetworkHydraulicDistribution &network = result.request.network;
         status = importInitialQualityForNodes(
             project,
             network.nodes_junctions,
@@ -3769,7 +3769,7 @@ HydraulicSimulationStatus importWaterQualityConfiguration(
 
     if (options.analysis == WaterQualityAnalysisType::Chemical)
     {
-        NetworkHydraulic &network = result.request.network;
+        NetworkHydraulicDistribution &network = result.request.network;
         status = importQualitySourcesForNodes(
             project, network.nodes_junctions, chemical_concentration_scale,
             HydraulicSimulationStatusEntityType::Junction, references);
@@ -3787,7 +3787,7 @@ HydraulicSimulationStatus importWaterQualityConfiguration(
             return status;
     }
 
-    NetworkHydraulic &network = result.request.network;
+    NetworkHydraulicDistribution &network = result.request.network;
     status = importTankMixing(project, network);
     if (!status.success)
         return status;
@@ -3866,7 +3866,7 @@ EpanetResultImport importEpanetInp(const QString &input_file_path)
     if (!status.success)
         return finishImport(std::move(result), status, project);
 
-    NetworkHydraulic &network = result.request.network;
+    NetworkHydraulicDistribution &network = result.request.network;
     ImportReferences references;
     references.pump_initial_speed_ratios_by_id = source_pump_initial_speed_ratios_by_id;
     references.junction_ids_with_explicit_demands =

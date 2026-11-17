@@ -105,7 +105,7 @@ ComparisonContext comparison(std::string field)
     return value;
 }
 
-QHash<int, QString> controlIdsByNativeIndex(const NetworkHydraulic &network)
+QHash<int, QString> controlIdsByNativeIndex(const NetworkHydraulicDistribution &network)
 {
     QHash<int, QString> ids;
     for (int index = 0; index < network.controls_simple.size(); index++)
@@ -344,7 +344,7 @@ InputInventory nativeInventory(const QString &input_file)
     return inventory;
 }
 
-InputInventory modelInventory(const NetworkHydraulic &network)
+InputInventory modelInventory(const NetworkHydraulicDistribution &network)
 {
     InputInventory inventory;
     inventory.junctions = network.nodes_junctions.size();
@@ -441,7 +441,7 @@ void compareStringList(
 void compareInventory(
     TestContext &context,
     const InputInventory &expected,
-    const NetworkHydraulic &actual,
+    const NetworkHydraulicDistribution &actual,
     const std::string &phase)
 {
     const InputInventory model = modelInventory(actual);
