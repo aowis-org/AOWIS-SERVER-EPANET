@@ -41,11 +41,21 @@ if(NOT TARGET AOWIS::ServerModel)
             )
         endif()
 
-        add_subdirectory(
-            "${AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE}"
-            "${CMAKE_CURRENT_BINARY_DIR}/_deps/aowis-server-model-build"
-            EXCLUDE_FROM_ALL
-        )
+        # MODEL registers its own CTest cases when testing is enabled. Include
+        # their executables in the default build for EPANET test configurations,
+        # otherwise CTest sees the tests but cannot find their binaries.
+        if(AOWIS_SERVER_EPANET_BUILD_TESTS)
+            add_subdirectory(
+                "${AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE}"
+                "${CMAKE_CURRENT_BINARY_DIR}/_deps/aowis-server-model-build"
+            )
+        else()
+            add_subdirectory(
+                "${AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE}"
+                "${CMAKE_CURRENT_BINARY_DIR}/_deps/aowis-server-model-build"
+                EXCLUDE_FROM_ALL
+            )
+        endif()
     elseif(AOWIS_SERVER_EPANET_FETCH_MODEL)
         include(FetchContent)
 
