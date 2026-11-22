@@ -283,7 +283,7 @@ set(AOWIS_SERVER_EPANET_CONFORMANCE_TEST_SCENARIOS
     conformance-negative-invalid-emitter-configuration
     conformance-negative-invalid-quality-configuration
     conformance-negative-invalid-map-numeric
-    conformance-negative-missing-map-label-anchor
+    conformance-negative-missing-map-annotation-anchor
     conformance-negative-invalid-pump-numeric
     conformance-negative-valve-prv-shared-downstream
     conformance-negative-valve-prv-series
@@ -514,7 +514,7 @@ foreach(AOWIS_SERVER_EPANET_TEST_SCENARIO IN LISTS AOWIS_SERVER_EPANET_CONFORMAN
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "stress")
     endif()
 
-    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "coordinates-vertices|map-label|^conformance-import-geometry-"
+    if(AOWIS_SERVER_EPANET_TEST_SCENARIO MATCHES "coordinates-vertices|map-annotation|map-label|^conformance-import-geometry-"
        OR AOWIS_SERVER_EPANET_TEST_SCENARIO STREQUAL "conformance-export-coordinates-without-backdrop-roundtrip")
         list(APPEND AOWIS_SERVER_EPANET_TEST_LABELS "coordinate")
     endif()

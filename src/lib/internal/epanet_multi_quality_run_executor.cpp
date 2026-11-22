@@ -251,9 +251,12 @@ HydraulicSimulationStatus EpanetMultiQualityRunExecutor::saveHydraulics()
             QStringLiteral("EPANET reported success while persisting hydraulics, but no reusable hydraulic file was created"));
     }
 
+    // Internal solver input: map annotations ([LABELS]) are not needed.
     HydraulicSimulationStatus status = retrieveEpanetInpText(
         this->prepared_project_.project(),
         this->prepared_project_.network(),
+        this->prepared_project_.network(),
+        QList<MapAnnotation>(),
         this->hydraulic_inp_text_);
     if (!status.success)
     {

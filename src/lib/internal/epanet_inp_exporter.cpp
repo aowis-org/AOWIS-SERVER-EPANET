@@ -1,4 +1,5 @@
 #include "epanet_inp_exporter.h"
+#include "epanet_map_annotations.h"
 
 #include "epanet_project.h"
 #include "epanet_status_helpers.h"
@@ -207,7 +208,22 @@ QString preserveDemandCategories(QString inp_text, const NetworkHydraulicDistrib
     return lines.join(QChar('\n'));
 }
 
-QString preserveMapLayoutSections(QString inp_text, const NetworkHydraulicDistribution &network)
+// INP label text is one double-quoted token on one line.
+QString inpLabelText(const QString &text)
+{
+    QString single_line = text;
+    single_line.replace(QChar('"'), QChar('\''));
+    single_line.replace(QStringLiteral("\r\n"), QStringLiteral(" "));
+    single_line.replace(QChar('\r'), QChar(' '));
+    single_line.replace(QChar('\n'), QChar(' '));
+    return single_line;
+}
+
+QString preserveMapLayoutSections(
+    QString inp_text,
+    const NetworkHydraulicDistribution &network,
+    const NetworkHydraulicDistribution &annotation_network,
+    const QList<MapAnnotation> &annotations)
 {
     QStringList lines = inp_text.split(QChar('\n'));
     QStringList retained_lines;
@@ -232,18 +248,25 @@ QString preserveMapLayoutSections(QString inp_text, const NetworkHydraulicDistri
     QStringList layout_lines;
     const QHash<QUuid, QString> node_ids_by_uuid = reportNodeIdsByUuid(network);
 
-    if (!network.map_labels.isEmpty())
+    // Map annotations of the network's layer (MODEL A3). An anchored one is
+    // written at its displayed position (anchor + geodesic offset, resolved
+    // in the complete network) and names its anchor only when that node is
+    // part of this INP (a disabled node is not exported). Text size,
+    // background and visibility have no INP representation.
+    if (!annotations.isEmpty())
     {
         layout_lines.append(QStringLiteral("[LABELS]"));
-        for (const HydraulicMapLabel &label : network.map_labels)
+        for (const MapAnnotation &annotation : annotations)
         {
+            const CoordinateWGS84 position =
+                epanetAnnotationDisplayPosition(annotation_network, annotation);
             QString row = QStringLiteral("%1 %2 \"%3\"")
-                .arg(mapNumber(label.coordinate_wgs84.longitude_deg),
-                    mapNumber(label.coordinate_wgs84.latitude_deg),
-                    label.text);
-            if (!label.anchor_node_uuid.isNull())
+                .arg(mapNumber(position.longitude_deg),
+                    mapNumber(position.latitude_deg),
+                    inpLabelText(annotation.text));
+            if (annotation.anchor)
             {
-                const QString anchor_id = node_ids_by_uuid.value(label.anchor_node_uuid);
+                const QString anchor_id = node_ids_by_uuid.value(annotation.anchor->entity_uuid);
                 if (!anchor_id.isEmpty())
                     row += QStringLiteral(" %1").arg(anchor_id);
             }
@@ -497,6 +520,8 @@ QString preserveNoDefaultDemandPattern(QString inp_text, const QString &unused_p
 HydraulicSimulationStatus retrieveEpanetInpText(
     EpanetProject &project,
     const NetworkHydraulicDistribution &request,
+    const NetworkHydraulicDistribution &annotation_network,
+    const QList<MapAnnotation> &annotations,
     QString &inp_text)
 {
     inp_text.clear();
@@ -579,7 +604,7 @@ HydraulicSimulationStatus retrieveEpanetInpText(
     // [COORDINATES], [VERTICES], [LABELS], and [BACKDROP] therefore share that
     // same degree-based map space in generated INP files. Always retain a
     // [BACKDROP] UNITS DEGREES declaration, even when no backdrop image is active.
-    inp_text = preserveMapLayoutSections(inp_text, request);
+    inp_text = preserveMapLayoutSections(inp_text, request, annotation_network, annotations);
 
     return makeEpanetSuccess();
 }

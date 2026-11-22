@@ -210,14 +210,6 @@ QList<HydraulicSimulationStatus> validateNumerics(const NetworkHydraulicDistribu
         }
     }
 
-    for (const HydraulicMapLabel &label : network.map_labels)
-    {
-        status = EpanetNetworkValidatorSupport::validateLongitudeDeg(label.coordinate_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Network, label.id, label.uuid, QStringLiteral("map_labels.coordinate_wgs84.longitude_deg"));
-        EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);
-        status = EpanetNetworkValidatorSupport::validateLatitudeDeg(label.coordinate_wgs84.latitude_deg, HydraulicSimulationStatusEntityType::Network, label.id, label.uuid, QStringLiteral("map_labels.coordinate_wgs84.latitude_deg"));
-        EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);
-    }
-
     if (network.map_backdrop.enabled)
     {
         status = EpanetNetworkValidatorSupport::validateLongitudeDeg(network.map_backdrop.lower_left_wgs84.longitude_deg, HydraulicSimulationStatusEntityType::Network, network.id, network.uuid, QStringLiteral("map_backdrop.lower_left_wgs84.longitude_deg"));

@@ -1,4 +1,5 @@
 #include <aowis/epanet/epanet_runner.h>
+#include <aowis/model/map/map_annotation.h>
 
 #include "conformance/conformance_test_framework.h"
 #include "conformance/epanet_test_requests.h"
@@ -900,35 +901,105 @@ void scenarioInvalidQualityConfiguration(TestContext &context)
     }
 }
 
-void scenarioInvalidMapNumeric(TestContext &context)
+// Map annotations (MODEL A3 replacement of map labels) do not affect
+// hydraulics: an invalid annotation must never block run(), but INP export,
+// which writes them as [LABELS], must refuse it with a structured status.
+void expectInpAnnotationRejected(
+    TestContext &context,
+    const NetworkHydraulicDistribution &network,
+    const MapAnnotation &annotation,
+    const QString &message_fragment)
 {
-    NetworkHydraulicDistribution network = cleanNet1();
+    EpanetRunRequest request = AowisEpanetTests::makeRunRequest(network);
+    request.map_annotations.append(annotation);
+    const EpanetResultInp inp = EpanetRunner().retrieveInp(request);
+    context.expect(!inp.status.success, "invalid map annotation must fail INP export");
+    context.expect(inp.inp_text.isEmpty(), "rejected INP export must not return partial text");
+    context.expect(inp.status.stage == HydraulicSimulationStatusStage::BuildNetwork,
+                   "map annotation rejection must identify the build stage");
+    context.expect(inp.status.entity.type == HydraulicSimulationStatusEntityType::Network,
+                   "map annotation rejection must identify the network scope");
+    context.expect(inp.status.entity.uuid == annotation.uuid,
+                   "map annotation rejection must identify the annotation UUID");
+    context.expect(inp.status.message.contains(message_fragment, Qt::CaseInsensitive),
+                   "map annotation rejection must contain an actionable reason");
 
-    HydraulicMapLabel label;
-    label.id = QStringLiteral("BAD_MAP_LABEL");
-    label.uuid = QUuid::createUuid();
-    label.coordinate_wgs84.longitude_deg = 181.0;
-    label.coordinate_wgs84.latitude_deg = 50.0;
-    label.text = QStringLiteral("Invalid map label");
-    network.map_labels.append(label);
-
-    expectRejected(context, network, HydraulicSimulationStatusEntityType::Network, label.id, label.uuid, QStringLiteral("invalid numeric"));
+    const EpanetResultRun run = EpanetRunner().run(request);
+    context.expect(run.result_timeline.status.success,
+                   "an invalid map annotation must not block a hydraulic run");
 }
 
-void scenarioMissingMapLabelAnchor(TestContext &context)
+MapAnnotation validAnnotation()
 {
-    NetworkHydraulicDistribution network = cleanNet1();
+    MapAnnotation annotation;
+    annotation.uuid = QUuid::createUuid();
+    annotation.text = QStringLiteral("Annotation");
+    annotation.position_wgs84.longitude_deg = 8.0;
+    annotation.position_wgs84.latitude_deg = 50.0;
+    return annotation;
+}
 
-    HydraulicMapLabel label;
-    label.id = QStringLiteral("BAD_MAP_ANCHOR");
-    label.uuid = QUuid::createUuid();
-    label.coordinate_wgs84.longitude_deg = 8.0;
-    label.coordinate_wgs84.latitude_deg = 50.0;
-    label.text = QStringLiteral("Missing anchor");
-    label.anchor_node_uuid = QUuid::createUuid();
-    network.map_labels.append(label);
+void scenarioInvalidMapNumeric(TestContext &context)
+{
+    const NetworkHydraulicDistribution network = cleanNet1();
 
-    expectRejected(context, network, HydraulicSimulationStatusEntityType::Network, label.id, label.uuid, QStringLiteral("missing map-label anchor node"));
+    MapAnnotation out_of_range = validAnnotation();
+    out_of_range.position_wgs84.longitude_deg = 181.0;
+    expectInpAnnotationRejected(context, network, out_of_range, QStringLiteral("invalid map annotation"));
+
+    MapAnnotation blank = validAnnotation();
+    blank.text = QStringLiteral("   ");
+    expectInpAnnotationRejected(context, network, blank, QStringLiteral("invalid map annotation"));
+
+    MapAnnotation infinite_offset = validAnnotation();
+    context.expect(!network.nodes_junctions.isEmpty(), "map annotation fixture requires a junction");
+    if (network.nodes_junctions.isEmpty())
+        return;
+    MapAnnotationAnchor anchor;
+    anchor.entity_uuid = network.nodes_junctions.first().uuid;
+    anchor.entity_type = QStringLiteral("HydraulicNodeJunction");
+    anchor.offset_east_m = std::numeric_limits<double>::infinity();
+    infinite_offset.anchor = anchor;
+    expectInpAnnotationRejected(context, network, infinite_offset, QStringLiteral("invalid map annotation"));
+
+    // Two annotations with one UUID.
+    EpanetRunRequest request = AowisEpanetTests::makeRunRequest(network);
+    const MapAnnotation duplicate = validAnnotation();
+    request.map_annotations = {duplicate, duplicate};
+    const EpanetResultInp inp = EpanetRunner().retrieveInp(request);
+    context.expect(!inp.status.success && inp.status.message.contains(QStringLiteral("Duplicate"), Qt::CaseInsensitive),
+                   "duplicate map annotation UUIDs must fail INP export");
+}
+
+void scenarioMissingMapAnnotationAnchor(TestContext &context)
+{
+    const NetworkHydraulicDistribution network = cleanNet1();
+
+    MapAnnotation missing = validAnnotation();
+    MapAnnotationAnchor anchor;
+    anchor.entity_uuid = QUuid::createUuid();
+    anchor.entity_type = QStringLiteral("HydraulicNodeJunction");
+    missing.anchor = anchor;
+    expectInpAnnotationRejected(context, network, missing, QStringLiteral("missing map annotation anchor"));
+
+    context.expect(!network.nodes_junctions.isEmpty(), "map annotation fixture requires a junction");
+    if (network.nodes_junctions.isEmpty())
+        return;
+    MapAnnotation wrong_type = validAnnotation();
+    anchor.entity_uuid = network.nodes_junctions.first().uuid;
+    anchor.entity_type = QStringLiteral("HydraulicNodeTank");
+    wrong_type.anchor = anchor;
+    expectInpAnnotationRejected(context, network, wrong_type, QStringLiteral("does not match"));
+
+    // A pipe is not a point-position anchor target.
+    context.expect(!network.links_pipes.isEmpty(), "map annotation fixture requires a pipe");
+    if (network.links_pipes.isEmpty())
+        return;
+    MapAnnotation link_anchor = validAnnotation();
+    anchor.entity_uuid = network.links_pipes.first().uuid;
+    anchor.entity_type = QStringLiteral("HydraulicLinkPipe");
+    link_anchor.anchor = anchor;
+    expectInpAnnotationRejected(context, network, link_anchor, QStringLiteral("invalid map annotation"));
 }
 
 void scenarioInvalidPumpNumeric(TestContext &context)
@@ -1268,14 +1339,14 @@ void registerNegativeValidationScenarios(ScenarioRegistry &registry)
         &scenarioInvalidQualityConfiguration});
     registry.add(ScenarioDefinition{
         "conformance-negative-invalid-map-numeric",
-        "Reject out-of-range canonical WGS84 map-label coordinates before EPANET export.",
+        "Reject invalid map annotations (WGS84 range, blank text, non-finite offset, duplicate UUID) in INP export without blocking hydraulic runs.",
         {"conformance", "hydraulic", "negative", "coordinate"},
         &scenarioInvalidMapNumeric});
     registry.add(ScenarioDefinition{
-        "conformance-negative-missing-map-label-anchor",
-        "Reject a map label whose anchor UUID does not resolve to an enabled node.",
+        "conformance-negative-missing-map-annotation-anchor",
+        "Reject a map annotation whose anchor does not resolve to a point entity of the declared type in INP export.",
         {"conformance", "hydraulic", "negative", "coordinate"},
-        &scenarioMissingMapLabelAnchor});
+        &scenarioMissingMapAnnotationAnchor});
     registry.add(ScenarioDefinition{
         "conformance-negative-invalid-pump-numeric",
         "Reject a non-finite pump hydraulic input before calling EPANET.",

@@ -4,6 +4,7 @@
 #include "internal/epanet_hydraulic_run_configurator.h"
 #include "internal/epanet_inp_exporter.h"
 #include "internal/epanet_inp_importer.h"
+#include "internal/epanet_map_annotations.h"
 #include "internal/epanet_multi_quality_run_executor.h"
 #include "internal/epanet_msx_project.h"
 #include "internal/epanet_msx_validator.h"
@@ -306,7 +307,13 @@ EpanetResultInp EpanetRunner::retrieveInp(const EpanetRunRequest &request) const
         return finishInp(std::move(result), status, prepared_project);
     }
 
-    HydraulicSimulationStatus status = prepared_project.prepare(request.network);
+    // Map annotations do not affect hydraulics, so only INP export (which
+    // writes them as [LABELS]) requires them to be valid.
+    HydraulicSimulationStatus status = validateEpanetMapAnnotations(request.network, request.map_annotations);
+    if (!status.success)
+        return finishInp(std::move(result), status, prepared_project);
+
+    status = prepared_project.prepare(request.network);
     if (!status.success)
         return finishInp(std::move(result), status, prepared_project);
 
@@ -329,7 +336,8 @@ EpanetResultInp EpanetRunner::retrieveInp(const EpanetRunRequest &request) const
     if (!status.success)
         return finishInp(std::move(result), status, prepared_project);
 
-    status = retrieveEpanetInpText(prepared_project.project(), prepared_project.network(), result.inp_text);
+    status = retrieveEpanetInpText(prepared_project.project(), prepared_project.network(),
+                                   request.network, request.map_annotations, result.inp_text);
     return finishInp(std::move(result), status, prepared_project);
 }
 

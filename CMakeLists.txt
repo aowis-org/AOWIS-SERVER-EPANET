@@ -41,21 +41,11 @@ if(NOT TARGET AOWIS::ServerModel)
             )
         endif()
 
-        # MODEL registers its own CTest cases when testing is enabled. Include
-        # their executables in the default build for EPANET test configurations,
-        # otherwise CTest sees the tests but cannot find their binaries.
-        if(AOWIS_SERVER_EPANET_BUILD_TESTS)
-            add_subdirectory(
-                "${AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE}"
-                "${CMAKE_CURRENT_BINARY_DIR}/_deps/aowis-server-model-build"
-            )
-        else()
-            add_subdirectory(
-                "${AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE}"
-                "${CMAKE_CURRENT_BINARY_DIR}/_deps/aowis-server-model-build"
-                EXCLUDE_FROM_ALL
-            )
-        endif()
+        add_subdirectory(
+            "${AOWIS_SERVER_MODEL_SOURCE_DIR_ABSOLUTE}"
+            "${CMAKE_CURRENT_BINARY_DIR}/_deps/aowis-server-model-build"
+            EXCLUDE_FROM_ALL
+        )
     elseif(AOWIS_SERVER_EPANET_FETCH_MODEL)
         include(FetchContent)
 
@@ -156,6 +146,9 @@ else()
         "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/src/Geocentric.cpp"
         "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/src/LocalCartesian.cpp"
         "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/src/LambertConformalConic.cpp"
+        # WGS84 geodesics for map-annotation anchor offsets ([LABELS]).
+        "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/src/Geodesic.cpp"
+        "${AOWIS_SERVER_EPANET_GEOGRAPHICLIB_SOURCE_DIR}/src/GeodesicLine.cpp"
     )
     target_include_directories(aowis-server-epanet-geographiclib
         PUBLIC

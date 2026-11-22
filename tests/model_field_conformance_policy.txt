@@ -1,7 +1,7 @@
 # AOWIS hydraulic and water-quality model-field conformance policy.
 # Format: header|struct|fields_csv|state|evidence_scenarios_csv|note
 # States: complete, excluded-non-epanet, excluded-runtime-metadata, in-progress
-@headers|entity.h,hydraulic_types.h,hydraulic_demands.h,hydraulic_demand_point.h,hydraulic_nodes.h,hydraulic_links.h,hydraulic_pipe_materials.h,hydraulic_curves.h,hydraulic_controls.h,hydraulic_simulation_options.h,hydraulic_simulation_results.h,water_quality_simulation_results.h,hydraulic_simulation_status.h,hydraulic_simulation_diagnostics.h,hydraulic_map.h,network_hydraulic_distribution.h
+@headers|entity.h,hydraulic_types.h,hydraulic_demands.h,hydraulic_demand_point.h,hydraulic_nodes.h,hydraulic_links.h,hydraulic_pipe_materials.h,hydraulic_curves.h,hydraulic_controls.h,hydraulic_simulation_options.h,hydraulic_simulation_results.h,water_quality_simulation_results.h,hydraulic_simulation_status.h,hydraulic_simulation_diagnostics.h,hydraulic_map.h,map/map_annotation.h,network_hydraulic_distribution.h
 entity.h|EntityMetadata|enabled|complete|conformance-negative-disabled-entity-pruning,conformance-demand-point-node-projection|
 entity.h|EntityMetadata|model_role,date_added,date_installed,description|excluded-non-epanet||AOWIS lifecycle and descriptive metadata is not an EPANET simulation input.
 entity.h|EntityMetadata|comment|complete|conformance-export-titles-comments-tags,conformance-import-metadata-report-fidelity|
@@ -140,8 +140,12 @@ hydraulic_simulation_status.h|HydraulicSimulationStatusEntity|type,id,uuid|compl
 hydraulic_simulation_status.h|HydraulicSimulationStatusEntity|index|excluded-runtime-metadata||Backend-local numeric entity indices are diagnostic implementation metadata, not stable high-level hydraulic contract fields.
 hydraulic_simulation_status.h|HydraulicSimulationStatus|success,stage,operation,property,entity,message,details,backend_name,backend_error_code,backend_operation,message_backend|complete|conformance-operational-warning-diagnostics,conformance-operational-error-diagnostics,conformance-negative-structured-diagnostics|
 hydraulic_simulation_diagnostics.h|HydraulicSimulationDiagnostic|severity,stage,operation,property,entity,message,details,backend_name,backend_error_code,backend_operation,message_backend|complete|conformance-operational-warning-diagnostics,conformance-operational-error-diagnostics,conformance-negative-structured-diagnostics|
-hydraulic_map.h|HydraulicMapLabel|id,uuid|excluded-non-epanet||AOWIS map-label identity is not serialized by EPANET.
-hydraulic_map.h|HydraulicMapLabel|coordinate_wgs84,text,anchor_node_uuid|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84,conformance-negative-invalid-map-numeric,conformance-negative-missing-map-label-anchor|
+map/map_annotation.h|MapAnnotation|uuid|excluded-non-epanet||Annotation identity is not serialized by EPANET. Import assigns a new UUIDv7.
+map/map_annotation.h|MapAnnotation|text,position_wgs84,anchor|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84,conformance-import-geometry-epsg3089-wgs84,conformance-negative-invalid-map-numeric,conformance-negative-missing-map-annotation-anchor|EPANET [LABELS] carry map annotations (EpanetRunRequest::map_annotations). Anchored rows are written at anchor + geodesic offset.
+map/map_annotation.h|MapAnnotation|style|excluded-non-epanet||Text size, background and visibility have no EPANET [LABELS] representation.
+map/map_annotation.h|MapAnnotationAnchor|entity_uuid,entity_type,offset_east_m,offset_north_m|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84,conformance-import-geometry-epsg3089-wgs84,conformance-negative-missing-map-annotation-anchor|An INP anchor node becomes a typed anchor with a WGS84 geodesic east/north offset in metres.
+map/map_annotation.h|MapAnnotationStyle|text_size,show_background,visible|excluded-non-epanet||Presentation style has no EPANET representation.
+map/map_annotation.h|MapAnnotationLayer|uuid,domain,owner_network_uuid|excluded-non-epanet||Layer metadata belongs to DVMDB. EPANET exchanges only the members of one network's layer.
 hydraulic_map.h|HydraulicMapBackdrop|enabled,lower_left_wgs84,upper_right_wgs84,file,offset_longitude_deg,offset_latitude_deg|complete|conformance-export-coordinates-vertices,conformance-import-geometry-degrees-wgs84|
 network_hydraulic_distribution.h|NetworkHydraulicDistribution|id,uuid|excluded-non-epanet||Network application identity is not an EPANET simulation input.
 network_hydraulic_distribution.h|NetworkHydraulicDistribution|title_line_1,title_line_2,title_line_3|complete|conformance-export-titles-comments-tags,conformance-import-project-globals-net1,conformance-import-metadata-report-fidelity|
@@ -166,6 +170,6 @@ network_hydraulic_distribution.h|NetworkHydraulicDistribution|curves_tank_volume
 network_hydraulic_distribution.h|NetworkHydraulicDistribution|nodes_reservoirs,nodes_junctions,nodes_tanks,links_pipes,links_pumps,links_valves|complete|conformance-net1,conformance-negative-disabled-entity-pruning|
 network_hydraulic_distribution.h|NetworkHydraulicDistribution|controls_simple|complete|conformance-controls-simple-low-level,conformance-controls-simple-disabled|
 network_hydraulic_distribution.h|NetworkHydraulicDistribution|controls_rules|complete|conformance-controls-rule-logical-if,conformance-controls-rule-disabled|
-network_hydraulic_distribution.h|NetworkHydraulicDistribution|map_labels,map_backdrop|complete|conformance-export-coordinates-vertices|
+network_hydraulic_distribution.h|NetworkHydraulicDistribution|map_backdrop|complete|conformance-export-coordinates-vertices|
 network_hydraulic_distribution.h|NetworkHydraulicDistribution|demand_points|complete|conformance-demand-point-node-projection|Demand Points are resolved into transient junction demands before the EPANET-specific build.
 network_hydraulic_distribution.h|NetworkHydraulicDistribution|presentation_units|excluded-non-epanet||Network presentation units are versioned AOWIS display metadata and not EPANET solver inputs. Physical values are passed in canonical units.

@@ -1,5 +1,6 @@
 #include <aowis/epanet/epanet_api.h>
 #include <aowis/epanet/epanet_runner.h>
+#include <aowis/model/map/map_annotation.h>
 
 #include "conformance/conformance_test_framework.h"
 #include "conformance/epanet_test_requests.h"
@@ -19,6 +20,7 @@
 #include <array>
 #include <cstdint>
 #include <cmath>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -98,6 +100,11 @@ public:
     NativeSavedProject(const NetworkHydraulicDistribution &network, const WaterQualitySolverOptions &quality_options)
     {
         initialize(AowisEpanetTests::makeRunRequest(network, quality_options));
+    }
+
+    explicit NativeSavedProject(const EpanetRunRequest &request)
+    {
+        initialize(request);
     }
 
     ~NativeSavedProject()
@@ -493,6 +500,57 @@ void expectLinkVertices(EN_Project project, const QString &link_id, const QList<
     }
 }
 
+struct InpLabel
+{
+    double longitude_deg = 0.0;
+    double latitude_deg = 0.0;
+    QString anchor_node_id;
+};
+
+// The [LABELS] row `x y "text" [anchor]` with this text, if present.
+std::optional<InpLabel> findInpLabel(const QString &section, const QString &text)
+{
+    const QString quoted = QStringLiteral("\"") + text + QStringLiteral("\"");
+    for (const QString &line : section.split(QChar('\n')))
+    {
+        const qsizetype quote = line.indexOf(quoted);
+        if (quote < 0)
+            continue;
+        const QStringList coordinates = line.left(quote).simplified().split(QChar(' '), Qt::SkipEmptyParts);
+        if (coordinates.size() != 2)
+            return std::nullopt;
+        InpLabel label;
+        bool x_ok = false;
+        bool y_ok = false;
+        label.longitude_deg = coordinates.at(0).toDouble(&x_ok);
+        label.latitude_deg = coordinates.at(1).toDouble(&y_ok);
+        if (!x_ok || !y_ok)
+            return std::nullopt;
+        label.anchor_node_id = line.mid(quote + quoted.size()).trimmed();
+        return label;
+    }
+    return std::nullopt;
+}
+
+// Independent check of the geodesic anchor offset: over a few hundred
+// metres the WGS84 meridian and prime-vertical radii give the displacement
+// to well below a centimetre.
+CoordinateWGS84 offsetReference(const CoordinateWGS84 &anchor, double east_m, double north_m)
+{
+    constexpr double pi = 3.14159265358979323846;
+    constexpr double a = 6378137.0;
+    constexpr double f = 1.0 / 298.257223563;
+    const double e2 = f * (2.0 - f);
+    const double phi = anchor.latitude_deg * pi / 180.0;
+    const double w = std::sqrt(1.0 - e2 * std::sin(phi) * std::sin(phi));
+    const double meridian = a * (1.0 - e2) / (w * w * w);
+    const double prime_vertical = a / w;
+    CoordinateWGS84 position;
+    position.latitude_deg = anchor.latitude_deg + north_m / meridian * 180.0 / pi;
+    position.longitude_deg = anchor.longitude_deg + east_m / (prime_vertical * std::cos(phi)) * 180.0 / pi;
+    return position;
+}
+
 void scenarioCoordinatesVertices(TestContext &context)
 {
     NetworkHydraulicDistribution network = cleanNet1();
@@ -528,23 +586,6 @@ void scenarioCoordinatesVertices(TestContext &context)
     valve_vertex_2.coordinate_wgs84.latitude_deg = 50.690006;
     network.links_valves.last().vertices = {valve_vertex_1, valve_vertex_2};
 
-    HydraulicMapLabel anchored_label;
-    anchored_label.id = QStringLiteral("label-source");
-    anchored_label.uuid = QUuid::createUuid();
-    anchored_label.coordinate_wgs84.longitude_deg = 8.111111;
-    anchored_label.coordinate_wgs84.latitude_deg = 50.611111;
-    anchored_label.text = QStringLiteral("Source label");
-    anchored_label.anchor_node_uuid = network.nodes_reservoirs.first().uuid;
-    network.map_labels.append(anchored_label);
-
-    HydraulicMapLabel free_label;
-    free_label.id = QStringLiteral("label-free");
-    free_label.uuid = QUuid::createUuid();
-    free_label.coordinate_wgs84.longitude_deg = 8.222222;
-    free_label.coordinate_wgs84.latitude_deg = 50.722222;
-    free_label.text = QStringLiteral("Free label");
-    network.map_labels.append(free_label);
-
     network.map_backdrop.enabled = true;
     network.map_backdrop.lower_left_wgs84.longitude_deg = 8.0;
     network.map_backdrop.lower_left_wgs84.latitude_deg = 50.5;
@@ -554,7 +595,31 @@ void scenarioCoordinatesVertices(TestContext &context)
     network.map_backdrop.offset_longitude_deg = 0.001;
     network.map_backdrop.offset_latitude_deg = -0.002;
 
-    NativeSavedProject native(network);
+    // Map annotations (MODEL A3) travel next to the network as [LABELS]:
+    // one anchored to the reservoir by a geodesic east/north offset, one
+    // free. The anchored one is written at reservoir + offset, not at its
+    // stored (stale) position.
+    EpanetRunRequest request = AowisEpanetTests::makeRunRequest(network);
+    MapAnnotation anchored;
+    anchored.uuid = QUuid::createUuid();
+    anchored.text = QStringLiteral("Source \"label\"\nsecond line");
+    anchored.position_wgs84.longitude_deg = 1.0; // ignored while the anchor resolves
+    anchored.position_wgs84.latitude_deg = 1.0;
+    MapAnnotationAnchor anchor;
+    anchor.entity_uuid = network.nodes_reservoirs.first().uuid;
+    anchor.entity_type = QStringLiteral("HydraulicNodeReservoir");
+    anchor.offset_east_m = 120.0;
+    anchor.offset_north_m = -80.0;
+    anchored.anchor = anchor;
+    MapAnnotation free_annotation;
+    free_annotation.uuid = QUuid::createUuid();
+    free_annotation.text = QStringLiteral("Free label");
+    free_annotation.position_wgs84.longitude_deg = 8.222222;
+    free_annotation.position_wgs84.latitude_deg = 50.722222;
+    free_annotation.style.text_size = MapAnnotationTextSize::Large;
+    request.map_annotations = {anchored, free_annotation};
+
+    NativeSavedProject native(request);
 
     struct CoordinateExpectation
     {
@@ -581,10 +646,92 @@ void scenarioCoordinatesVertices(TestContext &context)
     expectLinkVertices(native.handle(), valve.id, network.links_valves.last().vertices, context);
 
     const QString labels = sectionText(native.inpText(), QStringLiteral("LABELS"));
-    context.expect(sectionContainsCommand(labels, QStringLiteral("8.111111 50.611111 \"Source label\" %1").arg(network.nodes_reservoirs.first().id)),
-        "Generated [LABELS] must preserve anchored WGS84 labels");
+    const std::optional<InpLabel> source_label = findInpLabel(labels, QStringLiteral("Source 'label' second line"));
+    context.expect(source_label.has_value(),
+        "Generated [LABELS] must contain the anchored annotation as one quoted line");
+    if (source_label)
+    {
+        const CoordinateWGS84 &reservoir = network.nodes_reservoirs.first().coordinate_wgs84;
+        const CoordinateWGS84 expected = offsetReference(reservoir, 120.0, -80.0);
+        context.expectNear(source_label->longitude_deg, expected.longitude_deg, NumericTolerance{1.0e-7, 0.0},
+            comparison("labels.anchored.longitude_deg"));
+        context.expectNear(source_label->latitude_deg, expected.latitude_deg, NumericTolerance{1.0e-7, 0.0},
+            comparison("labels.anchored.latitude_deg"));
+        context.expect(source_label->anchor_node_id == network.nodes_reservoirs.first().id,
+            "Generated [LABELS] must name the anchor node");
+    }
     context.expect(sectionContainsCommand(labels, QStringLiteral("8.222222 50.722222 \"Free label\"")),
-        "Generated [LABELS] must preserve unanchored WGS84 labels");
+        "Generated [LABELS] must preserve free WGS84 annotations");
+
+    // The anchored annotation follows its node.
+    NetworkHydraulicDistribution moved = network;
+    moved.nodes_reservoirs.first().coordinate_wgs84.longitude_deg += 0.01;
+    moved.nodes_reservoirs.first().coordinate_wgs84.latitude_deg -= 0.02;
+    EpanetRunRequest moved_request = request;
+    moved_request.network = moved;
+    NativeSavedProject moved_native(moved_request);
+    const std::optional<InpLabel> moved_label = findInpLabel(
+        sectionText(moved_native.inpText(), QStringLiteral("LABELS")), QStringLiteral("Source 'label' second line"));
+    context.expect(moved_label.has_value(), "Moved anchor must still export the anchored annotation");
+    if (moved_label)
+    {
+        const CoordinateWGS84 expected = offsetReference(moved.nodes_reservoirs.first().coordinate_wgs84, 120.0, -80.0);
+        context.expectNear(moved_label->longitude_deg, expected.longitude_deg, NumericTolerance{1.0e-7, 0.0},
+            comparison("labels.moved.longitude_deg"));
+        context.expectNear(moved_label->latitude_deg, expected.latitude_deg, NumericTolerance{1.0e-7, 0.0},
+            comparison("labels.moved.latitude_deg"));
+    }
+
+    // Without annotations no [LABELS] section is written.
+    NativeSavedProject without(network);
+    context.expect(!without.inpText().contains(QStringLiteral("[LABELS]"), Qt::CaseInsensitive),
+        "INP export without map annotations must not write [LABELS]");
+
+    // Round trip: INP -> import -> the same annotations (text, free position,
+    // anchor and its offset in metres).
+    QTemporaryDir directory;
+    context.expect(directory.isValid(), "Annotation round-trip temporary directory must be available");
+    if (directory.isValid())
+    {
+        const QString input_path = directory.filePath(QStringLiteral("annotations.inp"));
+        QFile input_file(input_path);
+        if (input_file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        {
+            input_file.write(native.inpText().toUtf8());
+            input_file.close();
+        }
+        const EpanetResultImport imported = EpanetRunner().importInp(input_path);
+        context.expect(imported.status.success, "Generated INP with annotations must re-import");
+        context.expectEqual(static_cast<std::int64_t>(imported.request.map_annotations.size()), std::int64_t{2},
+            comparison("roundtrip.map_annotations.size"));
+        for (const MapAnnotation &annotation : imported.request.map_annotations)
+        {
+            context.expect(!annotation.uuid.isNull(), "Imported annotation must have a UUID");
+            if (annotation.text == QStringLiteral("Free label"))
+            {
+                context.expect(!annotation.anchor.has_value(), "Free annotation must stay free");
+                context.expectNear(annotation.position_wgs84.longitude_deg, 8.222222, NumericTolerance{1.0e-9, 0.0},
+                    comparison("roundtrip.free.longitude_deg"));
+                context.expectNear(annotation.position_wgs84.latitude_deg, 50.722222, NumericTolerance{1.0e-9, 0.0},
+                    comparison("roundtrip.free.latitude_deg"));
+                continue;
+            }
+            context.expect(annotation.text == QStringLiteral("Source 'label' second line"),
+                "Anchored annotation text must survive the round trip");
+            context.expect(annotation.anchor.has_value(), "Anchored annotation must stay anchored");
+            if (!annotation.anchor)
+                continue;
+            const QUuid reservoir_uuid = imported.request.network.nodes_reservoirs.isEmpty()
+                ? QUuid() : imported.request.network.nodes_reservoirs.first().uuid;
+            context.expect(annotation.anchor->entity_uuid == reservoir_uuid &&
+                           annotation.anchor->entity_type == QStringLiteral("HydraulicNodeReservoir"),
+                "Imported anchor must reference the imported reservoir");
+            context.expectNear(annotation.anchor->offset_east_m, 120.0, NumericTolerance{1.0e-3, 0.0},
+                comparison("roundtrip.offset_east_m"));
+            context.expectNear(annotation.anchor->offset_north_m, -80.0, NumericTolerance{1.0e-3, 0.0},
+                comparison("roundtrip.offset_north_m"));
+        }
+    }
 
     const QString backdrop = sectionText(native.inpText(), QStringLiteral("BACKDROP"));
     context.expect(sectionContainsCommand(backdrop, QStringLiteral("DIMENSIONS 8 50.5 8.5 51")),

@@ -162,14 +162,6 @@ QList<HydraulicSimulationStatus> validateReferences(const NetworkHydraulicDistri
         EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);
     }
 
-    for (const HydraulicMapLabel &label : network.map_labels)
-    {
-        if (label.anchor_node_uuid.isNull())
-            continue;
-        status = EpanetNetworkValidatorSupport::validateReference(all_nodes, enabled_nodes, label.anchor_node_uuid, HydraulicSimulationStatusEntityType::Network, label.id, label.uuid, QStringLiteral("map-label anchor node"));
-        EpanetNetworkValidatorSupport::appendValidationFailure(failures, status);
-    }
-
     for (const HydraulicControlSimple &control : network.controls_simple)
     {
         status = EpanetNetworkValidatorSupport::validateReference(all_links, enabled_links, control.link_uuid, HydraulicSimulationStatusEntityType::Control, control.id, control.uuid, QStringLiteral("controlled link"));

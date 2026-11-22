@@ -100,7 +100,7 @@ Generated quality references are written directly as native EPANET inputs from a
 | Area | Verified behavior |
 |---|---|
 | Identity | Duplicate node, link, curve, and UUID detection. |
-| References | Missing or disabled nodes, links, patterns, curves, controls, rules, quality sources, trace nodes, and map-label anchors. |
+| References | Missing or disabled nodes, links, patterns, curves, controls, rules, quality sources and trace nodes; map-annotation anchors are checked by INP export. |
 | Numeric validation | Non-finite, negative, out-of-range, and structurally invalid entity, curve, solver, report, control, map, and quality values. |
 | Diagnostics | Multiple independent failures, stable entity identity, generic stage/operation/property, and native backend provenance. |
 | Enabled state | Disabled network entities are omitted; disabled controls and rules retain membership without executing; report selections are pruned consistently. |

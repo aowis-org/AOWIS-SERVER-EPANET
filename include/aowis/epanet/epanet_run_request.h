@@ -6,6 +6,7 @@
 #include <QList>
 
 #include <aowis/model/hydraulic/network_hydraulic_distribution.h>
+#include <aowis/model/map/map_annotation.h>
 
 struct EpanetRunRequest
 {
@@ -21,6 +22,13 @@ struct EpanetRunRequest
     // nullopt means this run does not execute NetworkHydraulicDistribution::multi_species
     // even if that model is defined.
     std::optional<MultiSpeciesRunOptions> multi_species_run;
+    // Members of this network's Distribution map-annotation layer (MODEL A3;
+    // annotations are not part of the hydraulic network). EPANET INP keeps
+    // them as [LABELS]: EpanetRunner::importInp() fills this list from
+    // [LABELS] and retrieveInp() writes it back. run() ignores annotations,
+    // which have no hydraulic effect. Anchors must resolve to a junction,
+    // reservoir, tank or demand point of `network` (checked by retrieveInp).
+    QList<MapAnnotation> map_annotations;
 };
 
 #endif // AOWIS_EPANET_RUN_REQUEST_H

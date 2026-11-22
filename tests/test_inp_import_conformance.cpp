@@ -1,4 +1,6 @@
 #include <aowis/epanet/epanet_runner.h>
+#include <aowis/model/map/map_annotation.h>
+#include <aowis/model/serialization/model_validation.h>
 
 #include "conformance/conformance_test_framework.h"
 #include "conformance/inp_import_scenarios.h"
@@ -6,6 +8,8 @@
 #include "conformance/hydraulic_result_comparator.h"
 #include "conformance/native_epanet_reference_runner.h"
 #include "conformance/native_quality_reference_runner.h"
+
+#include "../src/lib/internal/epanet_map_annotations.h"
 
 #include <algorithm>
 #include <array>
@@ -1895,14 +1899,41 @@ void scenarioImportGeometryDegrees(TestContext &context)
             numeric_tolerance, comparison("P1.vertex.latitude_deg"));
     }
 
-    context.expectEqual(static_cast<std::int64_t>(network.map_labels.size()), std::int64_t{1},
-        comparison("map_labels.size"));
-    if (!network.map_labels.isEmpty())
+    // [LABELS] become MODEL map annotations next to the network (MODEL A3).
+    context.expectEqual(static_cast<std::int64_t>(result.request.map_annotations.size()), std::int64_t{1},
+        comparison("map_annotations.size"));
+    if (!result.request.map_annotations.isEmpty())
     {
-        const HydraulicMapLabel &label = network.map_labels.first();
-        context.expectEqual(label.text.toStdString(), std::string("Pump Area"), comparison("label.text"));
-        context.expect(label.anchor_node_uuid == junction->uuid,
-            "map label anchor must resolve to the imported junction UUID");
+        const MapAnnotation &annotation = result.request.map_annotations.first();
+        context.expectEqual(annotation.text.toStdString(), std::string("Pump Area"), comparison("annotation.text"));
+        context.expect(!annotation.uuid.isNull() && (annotation.uuid.toRfc4122().at(6) & 0xf0) == 0x70,
+            "imported map annotation must get a new UUIDv7");
+        context.expect(aowis::model::validateMapAnnotation(annotation).valid(),
+            "imported map annotation must pass MODEL validation");
+        context.expectNear(annotation.position_wgs84.longitude_deg, 7.004, numeric_tolerance,
+            comparison("annotation.longitude_deg"));
+        context.expectNear(annotation.position_wgs84.latitude_deg, 50.002, numeric_tolerance,
+            comparison("annotation.latitude_deg"));
+        context.expect(annotation.anchor.has_value() && annotation.anchor->entity_uuid == junction->uuid &&
+                       annotation.anchor->entity_type == QStringLiteral("HydraulicNodeJunction"),
+            "map annotation anchor must resolve to the imported junction");
+        if (annotation.anchor)
+        {
+            // Independent check: the stored metre offset from J1 (7.01, 50.0)
+            // reproduces the label position (WGS84 radii at 50 degrees).
+            constexpr double pi = 3.14159265358979323846;
+            constexpr double a = 6378137.0;
+            constexpr double f = 1.0 / 298.257223563;
+            const double e2 = f * (2.0 - f);
+            const double phi = 50.0 * pi / 180.0;
+            const double w = std::sqrt(1.0 - e2 * std::sin(phi) * std::sin(phi));
+            const double north_m = 0.002 * pi / 180.0 * a * (1.0 - e2) / (w * w * w);
+            const double east_m = -0.006 * pi / 180.0 * a / w * std::cos(phi);
+            context.expectNear(annotation.anchor->offset_east_m, east_m, NumericTolerance{0.1, 0.0},
+                comparison("annotation.offset_east_m"));
+            context.expectNear(annotation.anchor->offset_north_m, north_m, NumericTolerance{0.1, 0.0},
+                comparison("annotation.offset_north_m"));
+        }
     }
     context.expect(network.map_backdrop.enabled, "degree backdrop must be imported");
     context.expectEqual(network.map_backdrop.file.toStdString(), std::string("map.png"),
@@ -1970,15 +2001,28 @@ void scenarioImportGeometryEpsg3089(TestContext &context)
             numeric_tolerance, comparison("P1.vertex.latitude_deg"));
     }
 
-    context.expectEqual(static_cast<std::int64_t>(network.map_labels.size()), std::int64_t{1},
-        comparison("map_labels.size"));
-    if (!network.map_labels.isEmpty())
+    context.expectEqual(static_cast<std::int64_t>(result.request.map_annotations.size()), std::int64_t{1},
+        comparison("map_annotations.size"));
+    if (!result.request.map_annotations.isEmpty())
     {
-        const HydraulicMapLabel &label = network.map_labels.first();
-        context.expectNear(label.coordinate_wgs84.longitude_deg, -85.5108617949970,
-            numeric_tolerance, comparison("label.longitude_deg"));
-        context.expectNear(label.coordinate_wgs84.latitude_deg, 38.0565065341553,
-            numeric_tolerance, comparison("label.latitude_deg"));
+        const MapAnnotation &annotation = result.request.map_annotations.first();
+        context.expectNear(annotation.position_wgs84.longitude_deg, -85.5108617949970,
+            numeric_tolerance, comparison("annotation.longitude_deg"));
+        context.expectNear(annotation.position_wgs84.latitude_deg, 38.0565065341553,
+            numeric_tolerance, comparison("annotation.latitude_deg"));
+        context.expect(annotation.anchor.has_value() && annotation.anchor->entity_uuid == junction->uuid,
+            "EPSG:3089 map annotation must stay anchored to J1");
+        if (annotation.anchor)
+        {
+            // Over ~12 km the geodesic offset must still reproduce the
+            // transformed label position exactly (direct of inverse).
+            const CoordinateWGS84 resolved = epanetAnnotationOffsetPosition(
+                junction->coordinate_wgs84, annotation.anchor->offset_east_m, annotation.anchor->offset_north_m);
+            context.expectNear(resolved.longitude_deg, -85.5108617949970, numeric_tolerance,
+                comparison("annotation.resolved.longitude_deg"));
+            context.expectNear(resolved.latitude_deg, 38.0565065341553, numeric_tolerance,
+                comparison("annotation.resolved.latitude_deg"));
+        }
     }
     context.expect(network.map_backdrop.enabled, "EPSG:3089 backdrop must be imported");
     context.expectNear(network.map_backdrop.lower_left_wgs84.longitude_deg, -85.7173919677734,

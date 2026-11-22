@@ -2,11 +2,14 @@
 
 #include "epanet_coordinate_reference_transform.h"
 #include "epanet_diagnostic_helpers.h"
+#include "epanet_map_annotations.h"
 #include "epanet_project.h"
 #include "epanet_status_helpers.h"
 
 #include <aowis/epanet/epanet_api.h>
+#include <aowis/model/serialization/model_validation.h>
 #include <aowis/model/units/conversion.h>
+#include <aowis/model/uuid.h>
 
 #include <GeographicLib/LocalCartesian.hpp>
 
@@ -947,18 +950,51 @@ HydraulicSimulationStatus importEpanetInpGeometry(
 
     generateMissingNodeCoordinates(network, nodes, result);
 
+    // [LABELS] become MODEL map annotations of the network's annotation
+    // layer (MODEL A3). An anchored label keeps its exact position as a
+    // geodesic east/north offset from its anchor node.
     for (int index = 0; index < metadata.labels.size(); index++)
     {
         const SourceMapLabel &source_label = metadata.labels.at(index);
-        HydraulicMapLabel label;
-        label.id = QStringLiteral("MapLabel%1").arg(index + 1);
-        label.uuid = QUuid::createUuid();
-        label.coordinate_wgs84 = transform.transform(source_label.point);
-        label.text = source_label.text;
+        MapAnnotation annotation;
+        annotation.uuid = createUuidV7();
+        annotation.text = source_label.text;
+        if (annotation.text.trimmed().isEmpty())
+        {
+            appendGeometryDiagnostic(
+                result,
+                HydraulicSimulationDiagnosticSeverity::Warning,
+                QStringLiteral("An EPANET map label without text was skipped."),
+                {QString::number(index + 1)},
+                true);
+            continue;
+        }
+        if (annotation.text.size() > 4096)
+        {
+            annotation.text.truncate(4096);
+            appendGeometryDiagnostic(
+                result,
+                HydraulicSimulationDiagnosticSeverity::Warning,
+                QStringLiteral("An EPANET map label was longer than 4096 characters and was shortened."),
+                {QString::number(index + 1)},
+                true);
+        }
+        annotation.position_wgs84 = transform.transform(source_label.point);
         if (!source_label.anchor_node_id.isEmpty())
         {
-            label.anchor_node_uuid = nodeUuidById(network, source_label.anchor_node_id);
-            if (label.anchor_node_uuid.isNull())
+            const QUuid anchor_uuid = nodeUuidById(network, source_label.anchor_node_id);
+            const std::optional<EpanetAnnotationAnchorTarget> target =
+                epanetAnnotationAnchorTarget(network, anchor_uuid);
+            if (target)
+            {
+                MapAnnotationAnchor anchor;
+                anchor.entity_uuid = anchor_uuid;
+                anchor.entity_type = target->entity_type;
+                epanetAnnotationOffset(target->position, annotation.position_wgs84,
+                                       anchor.offset_east_m, anchor.offset_north_m);
+                annotation.anchor = anchor;
+            }
+            else
             {
                 appendGeometryDiagnostic(
                     result,
@@ -968,7 +1004,19 @@ HydraulicSimulationStatus importEpanetInpGeometry(
                     true);
             }
         }
-        network.map_labels.append(label);
+        const aowis::model::ModelValidationReport report =
+            aowis::model::validateMapAnnotation(annotation);
+        if (!report.valid())
+        {
+            appendGeometryDiagnostic(
+                result,
+                HydraulicSimulationDiagnosticSeverity::Warning,
+                QStringLiteral("An EPANET map label could not be imported: %1").arg(report.summary()),
+                {QString::number(index + 1)},
+                true);
+            continue;
+        }
+        result.request.map_annotations.append(annotation);
     }
 
     if (metadata.backdrop.present)
